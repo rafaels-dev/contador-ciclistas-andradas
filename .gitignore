@@ -1,0 +1,43 @@
+# Vídeos — não enviar ao repositório público
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.m4v
+*.mpg
+*.mpeg
+*.Zone.Identifier
+
+# Modelos de IA — baixados automaticamente na primeira execução
+*.pt
+*.onnx
+*.engine
+
+# Resultados gerados localmente
+resultado*.json
+teste_trecho.json
+
+# Ambiente virtual Python
+venv/
+.venv/
+env/
+
+# Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Cache do modelo YOLO
+runs/
+.ultralytics/
+
+# Ferramentas de desenvolvimento
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
