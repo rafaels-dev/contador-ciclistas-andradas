@@ -51,6 +51,7 @@ import supervision as sv  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
 
 import config  # noqa: E402
+from leitor import LeitorVideo, info_video  # noqa: E402
 
 _PERSON, _BICYCLE, _MOTORCYCLE = 0, 1, 3
 
@@ -199,11 +200,14 @@ def _associar(tracks: dict, pessoas, bicicletas, motos, escala: float) -> None:
             tr.vizinhos[f"{grupo}:{int(veic.tracker_id[j])}"] += 1
 
 
-def passo_deteccao(video: str, inicio_f: int, fim_f: int | None, total_f: int):
+def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
+                   imgsz_forcado: int | None = None, lote: int = 8):
+    """Retorna (tracks, escala, leitor_info). Coordenadas no espaço do quadro
+    processado (≤ 1920 px de largura; ver leitor.py)."""
     modelo = YOLO(str(RAIZ / config.MODELO) if (RAIZ / config.MODELO).exists() else config.MODELO)
     mb = getattr(config, "MODELO_BICICLETAS", None)
     modelo_bic = YOLO(str(RAIZ / mb)) if mb else None
-    conf, iou, imgsz = config.CONFIANCA, config.IOU, getattr(config, "IMGSZ", 640)
+    conf, iou = config.CONFIANCA, config.IOU
     classes = sorted({_PERSON, _BICYCLE, _MOTORCYCLE, *config.CLASSES_AUTOMOVEIS})
     trackers = {g: sv.ByteTrack() for g in GRUPOS}
 
@@ -212,48 +216,61 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None, total_f: int):
             return d
         return d[np.isin(d.class_id, ids)]
 
+    leitor = LeitorVideo(video)
+    escala = leitor.altura / 1080
+    imgsz = imgsz_forcado
+    if imgsz is None:
+        # resolução de inferência acompanha o vídeo ORIGINAL: em 4K, 640 px
+        # encolhe o quadro 6× e objetos pequenos (ciclistas numa vista
+        # alta) somem; 1080p → 640, 4K → 1280
+        base = getattr(config, "IMGSZ", 640)
+        imgsz = int(round(base * max(1.0, leitor.info["altura"] / 1080) / 32) * 32)
+    emitir(tipo="progresso", etapa="detectando", p=0, imgsz=imgsz, nvdec=leitor.gpu)
+
     tracks: dict[str, Track] = {}
-    cap = cv2.VideoCapture(video)
+    total_f = leitor.info["frames"]
+    alvo = (fim_f if fim_f is not None else total_f) - inicio_f
     idx = -1
+    while idx + 1 < inicio_f and leitor.pular():
+        idx += 1
     t0 = time.time()
     ultimo_emit = 0.0
-    escala = None
-    alvo = (fim_f if fim_f is not None else total_f) - inicio_f
+    acabou = False
 
-    while True:
-        if fim_f is not None and idx + 1 >= fim_f:
-            break
-        if idx + 1 < inicio_f:
-            if not cap.grab():
+    while not acabou:
+        # inferência em lote: a GPU fica ociosa com um quadro por chamada
+        quadros, indices = [], []
+        while len(quadros) < lote:
+            if fim_f is not None and idx + 1 >= fim_f:
+                acabou = True
+                break
+            f = leitor.ler()
+            if f is None:
+                acabou = True
                 break
             idx += 1
-            continue
-        ok, frame = cap.read()
-        if not ok:
+            quadros.append(f)
+            indices.append(idx)
+        if not quadros:
             break
-        idx += 1
-        if escala is None:
-            escala = frame.shape[0] / 1080
 
-        r = modelo(frame, conf=conf, iou=iou, imgsz=imgsz, classes=classes,
-                   agnostic_nms=True, verbose=False)[0]
-        tudo = sv.Detections.from_ultralytics(r)
-        if modelo_bic is not None:
-            rb = modelo_bic(frame, conf=conf, iou=iou, imgsz=imgsz,
-                            classes=[_BICYCLE], verbose=False)[0]
-            bikes = sv.Detections.from_ultralytics(rb)
-        else:
-            bikes = por_classe(tudo, [_BICYCLE])
+        rs = modelo(quadros, conf=conf, iou=iou, imgsz=imgsz, classes=classes,
+                    agnostic_nms=True, verbose=False)
+        rbs = (modelo_bic(quadros, conf=conf, iou=iou, imgsz=imgsz, classes=[_BICYCLE], verbose=False)
+               if modelo_bic is not None else [None] * len(quadros))
 
-        rastreados = {
-            "pes": trackers["pes"].update_with_detections(por_classe(tudo, [_PERSON])),
-            "bic": trackers["bic"].update_with_detections(bikes),
-            "aut": trackers["aut"].update_with_detections(por_classe(tudo, config.CLASSES_AUTOMOVEIS)),
-            "mot": trackers["mot"].update_with_detections(por_classe(tudo, config.CLASSES_MOTOCICLETAS)),
-        }
-        for g, d in rastreados.items():
-            _registrar(tracks, g, d, frame, idx)
-        _associar(tracks, rastreados["pes"], rastreados["bic"], rastreados["mot"], escala)
+        for frame, i, r, rb in zip(quadros, indices, rs, rbs):
+            tudo = sv.Detections.from_ultralytics(r)
+            bikes = sv.Detections.from_ultralytics(rb) if rb is not None else por_classe(tudo, [_BICYCLE])
+            rastreados = {
+                "pes": trackers["pes"].update_with_detections(por_classe(tudo, [_PERSON])),
+                "bic": trackers["bic"].update_with_detections(bikes),
+                "aut": trackers["aut"].update_with_detections(por_classe(tudo, config.CLASSES_AUTOMOVEIS)),
+                "mot": trackers["mot"].update_with_detections(por_classe(tudo, config.CLASSES_MOTOCICLETAS)),
+            }
+            for g, d in rastreados.items():
+                _registrar(tracks, g, d, frame, i)
+            _associar(tracks, rastreados["pes"], rastreados["bic"], rastreados["mot"], escala)
 
         agora = time.time()
         if agora - ultimo_emit >= 1.0:
@@ -262,8 +279,8 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None, total_f: int):
             emitir(tipo="progresso", etapa="detectando",
                    p=min(feitos / alvo, 1.0) if alvo > 0 else 0,
                    fps=round(feitos / (agora - t0), 1), frame=idx)
-    cap.release()
-    return tracks, (escala or 1.0)
+    leitor.fechar()
+    return tracks, escala, leitor
 
 
 # ----------------------------------------------------------------------
@@ -496,7 +513,7 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
     ativos: list[dict] = []
     proximo = 0
     ultimo_f = max(c["frame"] for c in pend) + meia
-    cap = cv2.VideoCapture(video)
+    leitor = LeitorVideo(video)
     idx = -1
     ultimo_emit = 0.0
     while idx < ultimo_f:
@@ -514,13 +531,12 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
             w.send(None)
             caixas = dict(zip(tr.frames, tr.caixas))
             ativos.append({"c": c, "w": w, "fim": f1, "reg": (x1, y1, x2, y2, ow, oh), "caixas": caixas})
-        precisa = any(a["c"]["frame"] - meia <= idx for a in ativos)
-        if not precisa:
-            if not cap.grab():
+        if not ativos:
+            if not leitor.pular():
                 break
             continue
-        ok, frame = cap.read()
-        if not ok:
+        frame = leitor.ler()
+        if frame is None:
             break
         for a in list(ativos):
             x1, y1, x2, y2, ow, oh = a["reg"]
@@ -545,7 +561,7 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
             emitir(tipo="progresso", etapa="clipes", p=min(idx / max(ultimo_f, 1), 1.0), frame=idx)
     for a in ativos:
         a["w"].close()
-    cap.release()
+    leitor.fechar()
 
 
 # ----------------------------------------------------------------------
@@ -557,6 +573,7 @@ def main() -> None:
     ap.add_argument("--linhas", help="JSON com lista de linhas {id,nome,x1,y1,x2,y2} (0–1)")
     ap.add_argument("--inicio", type=float, default=0.0, help="segundo inicial (testes)")
     ap.add_argument("--fim", type=float, default=None, help="segundo final (testes)")
+    ap.add_argument("--imgsz", type=int, default=None, help="resolução de inferência (padrão: pela altura do vídeo)")
     args = ap.parse_args()
 
     saida = Path(args.saida)
@@ -564,19 +581,12 @@ def main() -> None:
     (saida / "clipes").mkdir(parents=True, exist_ok=True)
     linhas = json.loads(Path(args.linhas).read_text()) if args.linhas else []
 
-    cap = cv2.VideoCapture(args.video)
-    if not cap.isOpened():
-        emitir(tipo="erro", mensagem="não foi possível abrir o vídeo")
-        sys.exit(1)
-    fps = cap.get(cv2.CAP_PROP_FPS) or 15.0
-    total_f = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-    largura = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    altura = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    cap.release()
+    fps = info_video(args.video)["fps"]
     inicio_f = int(args.inicio * fps)
     fim_f = int(args.fim * fps) if args.fim is not None else None
 
-    tracks, escala = passo_deteccao(args.video, inicio_f, fim_f, total_f)
+    tracks, escala, leitor = passo_deteccao(args.video, inicio_f, fim_f, args.imgsz)
+    largura, altura = leitor.largura, leitor.altura  # espaço do quadro processado
     tracks = emendar_tracks(tracks, fps, escala)
     candidatos = gerar_candidatos(tracks, linhas, largura, altura, fps, escala)
     emitir(tipo="progresso", etapa="filmstrips", p=0, candidatos=len(candidatos))
@@ -589,6 +599,7 @@ def main() -> None:
     saida_json = []
     for c in candidatos:
         d = {k: c.get(k) for k in campos}
+        d["bbox"] = [round(v * leitor.fator, 1) for v in c["bbox"]]  # px do vídeo original
         d["filmstrip"] = f"filmstrips/{c['id']}.jpg"
         d["clipe"] = f"clipes/{c['id']}.mp4"
         saida_json.append(d)
