@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
+import { obterJob } from "@/lib/db";
 import { dirJob } from "@/lib/paths";
 
 const TIPOS: Record<string, string> = {
@@ -13,12 +14,16 @@ const TIPOS: Record<string, string> = {
 /** Arquivos de um job (frame0, filmstrips, clipes, vídeo final), com Range. */
 export async function GET(request: Request, ctx: RouteContext<"/api/jobs/[id]/arquivos/[...caminho]">) {
   const { id, caminho } = await ctx.params;
-  const base = path.resolve(dirJob(id));
-  const alvo = path.resolve(base, ...caminho);
-  if (!alvo.startsWith(base + path.sep)) return new Response("Caminho inválido", { status: 400 });
+  // id precisa ser de um job existente (impede id = ".." apontar para data/)
+  if (!/^[\w-]{1,40}$/.test(id) || !obterJob(id)) return new Response("Não encontrado", { status: 404 });
 
+  let alvo: string;
   let tamanho: number;
   try {
+    // realpath: symlinks (ex.: video.mp4 do modo local) não podem escapar do job
+    const base = fs.realpathSync(dirJob(id));
+    alvo = fs.realpathSync(path.resolve(base, ...caminho));
+    if (!alvo.startsWith(base + path.sep)) return new Response("Caminho inválido", { status: 400 });
     const st = fs.statSync(alvo);
     if (!st.isFile()) throw new Error();
     tamanho = st.size;
