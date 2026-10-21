@@ -32,6 +32,7 @@ cai ~30 s antes do pedido (ver CLAUDE.md). Tudo é lido sequencialmente.
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import sys
 import time
@@ -150,7 +151,8 @@ def _recortar(frame, caixa, grupo: str) -> bytes:
     return buf.tobytes() if ok else b""
 
 
-def _registrar(tracks: dict, grupo: str, dets: sv.Detections, frame, idx: int) -> None:
+def _registrar(tracks: dict, grupo: str, dets: sv.Detections, frame, idx: int,
+               guardar_recortes: bool = True) -> None:
     if not len(dets) or dets.tracker_id is None:
         return
     for k, tid in enumerate(dets.tracker_id):
@@ -165,7 +167,7 @@ def _registrar(tracks: dict, grupo: str, dets: sv.Detections, frame, idx: int) -
             tr.classes[int(dets.class_id[k])] += 1
         if dets.confidence is not None:
             tr.conf_soma += float(dets.confidence[k])
-        if (tr.n - 1) % tr.passo_recorte == 0:
+        if guardar_recortes and (tr.n - 1) % tr.passo_recorte == 0:
             tr.recortes.append((idx, _recortar(frame, caixa, grupo)))
             if len(tr.recortes) > MAX_RECORTES:
                 tr.recortes = tr.recortes[::2]
@@ -269,7 +271,9 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
                 "mot": trackers["mot"].update_with_detections(por_classe(tudo, config.CLASSES_MOTOCICLETAS)),
             }
             for g, d in rastreados.items():
-                _registrar(tracks, g, d, frame, i)
+                # recortes do filmstrip saem da 2ª leitura (passo_midias), só
+                # para os candidatos — não precisa guardar de todos os tracks
+                _registrar(tracks, g, d, frame, i, guardar_recortes=False)
             _associar(tracks, rastreados["pes"], rastreados["bic"], rastreados["mot"], escala)
 
         agora = time.time()
@@ -371,6 +375,53 @@ def emendar_tracks(tracks: dict, fps: float, escala: float) -> dict:
         if tr.vizinhos:
             tr.vizinhos = Counter({raiz(k): v for k, v in tr.vizinhos.items()})
     return resultado
+
+
+# ----------------------------------------------------------------------
+# Persistência das trilhas (permite refazer candidatos ao mudar as linhas
+# sem repetir a detecção)
+# ----------------------------------------------------------------------
+
+def salvar_trilhas(caminho: Path, tracks: dict, meta: dict) -> None:
+    lista = [{
+        "grupo": t.grupo, "tid": t.tid, "frames": t.frames,
+        "caixas": [[round(v, 1) for v in c] for c in t.caixas],
+        "classes": dict(t.classes), "conf_soma": round(t.conf_soma, 3),
+        "n_bike": t.n_bike, "n_moto": t.n_moto, "vizinhos": dict(t.vizinhos), "emendas": t.emendas,
+    } for t in tracks.values() if t.n >= MIN_OBS]
+    with gzip.open(caminho, "wt", encoding="utf-8") as f:
+        json.dump({"meta": meta, "tracks": lista}, f)
+
+
+def carregar_trilhas(caminho: Path) -> tuple[dict, dict]:
+    with gzip.open(caminho, "rt", encoding="utf-8") as f:
+        dados = json.load(f)
+    tracks = {}
+    for d in dados["tracks"]:
+        t = Track(d["grupo"], d["tid"], frames=d["frames"], caixas=[tuple(c) for c in d["caixas"]],
+                  classes=Counter({int(k): v for k, v in d["classes"].items()}), conf_soma=d["conf_soma"],
+                  n_bike=d["n_bike"], n_moto=d["n_moto"], vizinhos=Counter(d["vizinhos"]), emendas=d["emendas"])
+        tracks[t.chave] = t
+    return tracks, dados["meta"]
+
+
+def salvar_pontos(caminho: Path, tracks: dict, largura: int, altura: int, max_por_grupo: int = 4000) -> None:
+    """Pontos de chão amostrados por categoria (coordenadas 0–1) — o editor de
+    linhas mostra onde cada tipo de objeto realmente passa."""
+    por_grupo: dict[str, list] = {}
+    for t in tracks.values():
+        if t.n < MIN_OBS:
+            continue
+        g = t.associado() or t.grupo
+        passo = max(1, t.n // 12)
+        for c in t.caixas[::passo]:
+            x, y = ponto_chao(c)
+            por_grupo.setdefault(CATEGORIA_GRUPO[g], []).append([round(x / largura, 4), round(y / altura, 4)])
+    rng = np.random.default_rng(0)
+    for g, pts in por_grupo.items():
+        if len(pts) > max_por_grupo:
+            por_grupo[g] = [pts[i] for i in sorted(rng.choice(len(pts), max_por_grupo, replace=False))]
+    caminho.write_text(json.dumps(por_grupo))
 
 
 # ----------------------------------------------------------------------
@@ -485,7 +536,7 @@ def salvar_filmstrip(tr: Track, destino: Path, n: int = 5) -> None:
 
 
 # ----------------------------------------------------------------------
-# Passo 2: clipes
+# Passo 2: mídias dos candidatos (clipes, contextos, filmstrips)
 # ----------------------------------------------------------------------
 
 def _regiao_clipe(tr: Track, f0: int, f1: int, largura: int, altura: int, escala: float):
@@ -501,18 +552,25 @@ def _regiao_clipe(tr: Track, f0: int, f1: int, largura: int, altura: int, escala
     return int(x1), int(y1), int(x2), int(y2), max(ow, 2), max(oh, 2)
 
 
-def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_clipes: Path,
-                 fps: float, largura: int, altura: int, escala: float) -> None:
+def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: Path,
+                 fps: float, largura: int, altura: int, escala: float, n_recortes: int = 5) -> None:
     import imageio_ffmpeg
 
+    dir_clipes = saida / "clipes"
     meia = int(CLIPE_S * fps)
     pend = sorted(candidatos, key=lambda c: c["frame"] - meia)
     if not pend:
         return
+    # quadros de onde sai cada recorte do filmstrip (espalhados pela trajetória)
+    recortes_em: dict[int, list] = {}
+    for tr in {id(c["_tr"]): c["_tr"] for c in candidatos}.values():  # 1 vez por track
+        tr.recortes = []
+        for k in np.linspace(0, tr.n - 1, min(n_recortes, tr.n)).round().astype(int):
+            recortes_em.setdefault(tr.frames[k], []).append((tr, tr.caixas[k]))
     segs = [((l["x1"] * largura, l["y1"] * altura), (l["x2"] * largura, l["y2"] * altura)) for l in linhas]
     ativos: list[dict] = []
     proximo = 0
-    ultimo_f = max(c["frame"] for c in pend) + meia
+    ultimo_f = max(max(c["frame"] for c in pend) + meia, max(recortes_em))
     leitor = LeitorVideo(video)
     idx = -1
     ultimo_emit = 0.0
@@ -531,13 +589,15 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
             w.send(None)
             caixas = dict(zip(tr.frames, tr.caixas))
             ativos.append({"c": c, "w": w, "fim": f1, "reg": (x1, y1, x2, y2, ow, oh), "caixas": caixas})
-        if not ativos:
+        if not ativos and idx not in recortes_em:
             if not leitor.pular():
                 break
             continue
         frame = leitor.ler()
         if frame is None:
             break
+        for tr, caixa in recortes_em.get(idx, ()):
+            tr.recortes.append((idx, _recortar(frame, caixa, tr.grupo)))
         for a in list(ativos):
             x1, y1, x2, y2, ow, oh = a["reg"]
             img = frame[y1:y2, x1:x2].copy()
@@ -555,7 +615,7 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
             if idx == a["c"]["frame"]:
                 # quadro do evento com caixa e linhas: contexto para o modelo de
                 # visão (em que faixa o objeto está; à noite o recorte é pouco)
-                cv2.imwrite(str(dir_clipes.parent / "contextos" / f"{a['c']['id']}.jpg"), img,
+                cv2.imwrite(str(saida / "contextos" / f"{a['c']['id']}.jpg"), img,
                             [cv2.IMWRITE_JPEG_QUALITY, 85])
             if idx >= a["fim"]:
                 a["w"].close()
@@ -567,6 +627,8 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
     for a in ativos:
         a["w"].close()
     leitor.fechar()
+    for c in candidatos:
+        salvar_filmstrip(c["_tr"], saida / "filmstrips" / f"{c['id']}.jpg")
 
 
 # ----------------------------------------------------------------------
@@ -574,38 +636,49 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--video", required=True)
-    ap.add_argument("--saida", required=True)
+    ap.add_argument("--saida", required=True, help="pasta dos candidatos (mídias + candidatos.json)")
+    ap.add_argument("--trilhas", help="arquivo .json.gz das trajetórias (padrão: <saida>/../trilhas.json.gz)")
     ap.add_argument("--linhas", help="JSON com lista de linhas {id,nome,x1,y1,x2,y2} (0–1)")
+    ap.add_argument("--etapa", choices=["tudo", "trilhas", "candidatos"], default="tudo",
+                    help="trilhas = só detecção; candidatos = só refazer a partir das trilhas salvas")
     ap.add_argument("--inicio", type=float, default=0.0, help="segundo inicial (testes)")
     ap.add_argument("--fim", type=float, default=None, help="segundo final (testes)")
     ap.add_argument("--imgsz", type=int, default=None, help="resolução de inferência (padrão: pela altura do vídeo)")
     args = ap.parse_args()
 
     saida = Path(args.saida)
-    (saida / "filmstrips").mkdir(parents=True, exist_ok=True)
-    (saida / "contextos").mkdir(parents=True, exist_ok=True)
-    (saida / "clipes").mkdir(parents=True, exist_ok=True)
+    arq_trilhas = Path(args.trilhas) if args.trilhas else saida.parent / "trilhas.json.gz"
     linhas = json.loads(Path(args.linhas).read_text()) if args.linhas else []
-
     fps = info_video(args.video)["fps"]
-    inicio_f = int(args.inicio * fps)
-    fim_f = int(args.fim * fps) if args.fim is not None else None
 
-    tracks, escala, leitor = passo_deteccao(args.video, inicio_f, fim_f, args.imgsz)
-    largura, altura = leitor.largura, leitor.altura  # espaço do quadro processado
-    tracks = emendar_tracks(tracks, fps, escala)
+    if args.etapa in ("tudo", "trilhas"):
+        inicio_f = int(args.inicio * fps)
+        fim_f = int(args.fim * fps) if args.fim is not None else None
+        tracks, escala, leitor = passo_deteccao(args.video, inicio_f, fim_f, args.imgsz)
+        tracks = emendar_tracks(tracks, fps, escala)
+        meta = {"fps": fps, "largura": leitor.largura, "altura": leitor.altura,
+                "fator": leitor.fator, "escala": escala}
+        salvar_trilhas(arq_trilhas, tracks, meta)
+        salvar_pontos(arq_trilhas.parent / "pontos.json", tracks, leitor.largura, leitor.altura)
+        if args.etapa == "trilhas":
+            emitir(tipo="fim", trilhas=len(tracks))
+            return
+    else:
+        tracks, meta = carregar_trilhas(arq_trilhas)
+    largura, altura, escala = meta["largura"], meta["altura"], meta["escala"]  # espaço do quadro processado
+
+    for sub in ("filmstrips", "contextos", "clipes"):
+        (saida / sub).mkdir(parents=True, exist_ok=True)
     candidatos = gerar_candidatos(tracks, linhas, largura, altura, fps, escala)
-    emitir(tipo="progresso", etapa="filmstrips", p=0, candidatos=len(candidatos))
-    for c in candidatos:
-        salvar_filmstrip(c["_tr"], saida / "filmstrips" / f"{c['id']}.jpg")
-    passo_clipes(args.video, candidatos, linhas, saida / "clipes", fps, largura, altura, escala)
+    emitir(tipo="progresso", etapa="clipes", p=0, candidatos=len(candidatos))
+    passo_midias(args.video, candidatos, linhas, saida, fps, largura, altura, escala)
 
     campos = ("id", "track", "linha_id", "frame", "tempo_s", "direcao", "bbox",
               "classe_yolo", "conf_yolo", "alternativa", "origem", "n_obs")
     saida_json = []
     for c in candidatos:
         d = {k: c.get(k) for k in campos}
-        d["bbox"] = [round(v * leitor.fator, 1) for v in c["bbox"]]  # px do vídeo original
+        d["bbox"] = [round(v * meta["fator"], 1) for v in c["bbox"]]  # px do vídeo original
         d["filmstrip"] = f"filmstrips/{c['id']}.jpg"
         d["clipe"] = f"clipes/{c['id']}.mp4"
         d["contexto"] = f"contextos/{c['id']}.jpg"

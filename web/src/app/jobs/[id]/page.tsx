@@ -2,9 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { listarCameras, listarCandidatos, obterJob, type Job, type Linha } from "@/lib/db";
-import { sugestoesAtivas } from "@/lib/runner";
+import { sugestoesAtivas, temTrilhas } from "@/lib/runner";
 import { cancelar, retomarSugestoes, tentarNovamente } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
+import { BotaoEditarLinhas } from "./botao-editar-linhas";
 import { EditorLinhas } from "./editor-linhas";
 import { GradeCandidatos } from "./grade-candidatos";
 
@@ -89,12 +90,20 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
           linhasIniciais={linhas}
           cameras={listarCameras().map((c) => ({ id: c.id, nome: c.nome, linhas: JSON.parse(c.linhas) as Linha[] }))}
           cameraInicial={job.camera_id}
+          pontosUrl={temTrilhas(job.id) ? `${base}/pontos.json` : null}
         />
       )}
 
       {["sugerindo", "aguardando_revisao", "renderizando", "concluido"].includes(job.status) && (
         <>
-          {!sugerindoAgora && job.mensagem && <p className="text-sm text-zinc-600 dark:text-zinc-400">{job.mensagem}</p>}
+          {!sugerindoAgora && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">{job.mensagem}</p>
+              {(job.status === "sugerindo" || job.status === "aguardando_revisao") && (
+                <BotaoEditarLinhas jobId={job.id} rapido={temTrilhas(job.id)} />
+              )}
+            </div>
+          )}
           {job.status === "sugerindo" && !sugerindoAgora && (
             <form action={retomarSugestoes.bind(null, job.id)} className="flex items-center gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
               <span className="flex-1">Há candidatos sem sugestão do modelo de visão. A revisão começa quando todos tiverem sugestão.</span>

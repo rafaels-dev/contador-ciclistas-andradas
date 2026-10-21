@@ -5,7 +5,7 @@ import path from "node:path";
 import { refresh } from "next/cache";
 import { atualizarJob, obterJob, resumoSugestoes, salvarCamera, type Linha } from "@/lib/db";
 import { dirJob } from "@/lib/paths";
-import { cancelarJob, iniciarDeteccao, iniciarDownload, iniciarSugestoes } from "@/lib/runner";
+import { cancelarJob, iniciarDeteccao, iniciarDownload, iniciarSugestoes, sugestoesAtivas } from "@/lib/runner";
 
 function validarLinhas(entrada: unknown): Linha[] {
   if (!Array.isArray(entrada)) throw new Error("Linhas inválidas.");
@@ -76,5 +76,14 @@ export async function retomarSugestoes(jobId: string): Promise<void> {
   const job = obterJob(jobId);
   if (!job || job.status !== "sugerindo") return;
   iniciarSugestoes(jobId);
+  refresh();
+}
+
+/** Volta ao editor de linhas depois da detecção (descarta candidatos/sugestões/revisão ao confirmar). */
+export async function editarLinhas(jobId: string): Promise<void> {
+  const job = obterJob(jobId);
+  if (!job || !["sugerindo", "aguardando_revisao", "erro"].includes(job.status) || sugestoesAtivas(jobId)) return;
+  if (!fs.existsSync(path.join(dirJob(jobId), "frame0.jpg"))) return;
+  atualizarJob(jobId, { status: "aguardando_linhas", erro: null, mensagem: null, progresso: 0 });
   refresh();
 }

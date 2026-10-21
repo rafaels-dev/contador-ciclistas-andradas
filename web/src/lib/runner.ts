@@ -167,9 +167,18 @@ const ROTULO_ETAPA: Record<string, string> = {
   clipes: "Gerando clipes",
 };
 
-/** Etapa 2: detecção + candidatos (fila da GPU) → sugerindo. */
+export function temTrilhas(jobId: string): boolean {
+  return fs.existsSync(path.join(dirJob(jobId), "trilhas.json.gz"));
+}
+
+/**
+ * Etapa 2: detecção + candidatos (fila da GPU) → sugerindo. Se as trilhas da
+ * detecção já existem (linhas editadas depois), refaz só os candidatos —
+ * minutos em vez de repetir a detecção inteira.
+ */
 export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
   const dir = dirJob(jobId);
+  const soCandidatos = temTrilhas(jobId);
   const arqLinhas = path.join(dir, "linhas.json");
   fs.writeFileSync(arqLinhas, JSON.stringify(linhas));
   fs.rmSync(path.join(dir, "candidatos"), { recursive: true, force: true });
@@ -178,14 +187,15 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
     linhas: JSON.stringify(linhas),
     progresso: 0,
     erro: null,
-    mensagem: "Na fila da GPU…",
+    mensagem: soCandidatos ? "Na fila: refazendo candidatos com as novas linhas…" : "Na fila da GPU…",
   });
 
   cancelados.delete(jobId);
   void naFilaDaGpu(async () => {
     if (cancelados.has(jobId) || obterJob(jobId)?.status !== "detectando") return;
     const saida = path.join(dir, "candidatos");
-    const args = ["--video", path.join(dir, "video.mp4"), "--saida", saida, "--linhas", arqLinhas];
+    const args = ["--video", path.join(dir, "video.mp4"), "--saida", saida, "--linhas", arqLinhas,
+      "--trilhas", path.join(dir, "trilhas.json.gz"), "--etapa", soCandidatos ? "candidatos" : "tudo"];
     if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos
     await rodarWorker("detectar.py", args, (ev) => {
       if (ev.tipo !== "progresso") return;
