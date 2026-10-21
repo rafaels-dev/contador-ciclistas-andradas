@@ -31,6 +31,37 @@ export function extrairIdDrive(link: string): string | null {
   return null;
 }
 
+/** ID de uma pasta do Drive (https://drive.google.com/drive/folders/<ID>). */
+export function extrairIdPastaDrive(link: string): string | null {
+  try {
+    const url = new URL(link.trim());
+    if (!/(^|\.)google\.com$/.test(url.hostname)) return null;
+    return url.pathname.match(/\/folders\/([\w-]{20,})/)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export type ArquivoDrive = { id: string; nome: string };
+
+const EXTENSOES_VIDEO = /\.(mp4|mov|mkv|avi|m4v|webm|dav|ts)$/i;
+
+/**
+ * Lista os vídeos de uma pasta PÚBLICA sem credenciais, pela visualização
+ * embutida do Drive (a API oficial exigiria chave/OAuth).
+ */
+export async function listarVideosDaPasta(idPasta: string): Promise<ArquivoDrive[]> {
+  const res = await fetch(`https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(idPasta)}`);
+  if (!res.ok) throw new Error("Não foi possível abrir a pasta — ela é pública (qualquer pessoa com o link)?");
+  const html = await res.text();
+  const arquivos: ArquivoDrive[] = [];
+  for (const m of html.matchAll(/id="entry-([\w-]+)"[\s\S]*?class="flip-entry-title">([^<]*)</g)) {
+    const nome = m[2].replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+    if (EXTENSOES_VIDEO.test(nome)) arquivos.push({ id: m[1], nome });
+  }
+  return arquivos.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }));
+}
+
 function nomeDoArquivo(res: Response): string | null {
   const cd = res.headers.get("content-disposition") ?? "";
   const utf8 = cd.match(/filename\*=UTF-8''([^;]+)/i);
