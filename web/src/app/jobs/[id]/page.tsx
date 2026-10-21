@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { listarCameras, listarCandidatos, obterJob, type Job, type Linha } from "@/lib/db";
-import { cancelar, tentarNovamente } from "./actions";
+import { sugestoesAtivas } from "@/lib/runner";
+import { cancelar, retomarSugestoes, tentarNovamente } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
 import { EditorLinhas } from "./editor-linhas";
 import { GradeCandidatos } from "./grade-candidatos";
@@ -36,7 +37,8 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
   const job = obterJob(id);
   if (!job) notFound();
   const base = `/api/jobs/${job.id}/arquivos`;
-  const trabalhando = job.status === "baixando" || job.status === "detectando";
+  const sugerindoAgora = job.status === "sugerindo" && sugestoesAtivas(job.id);
+  const trabalhando = job.status === "baixando" || job.status === "detectando" || sugerindoAgora;
   const linhas = JSON.parse(job.linhas) as Linha[];
 
   return (
@@ -60,9 +62,11 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {job.mensagem} {job.progresso > 0 && `${Math.round(job.progresso * 100)}%`}
             </p>
-            <form action={cancelar.bind(null, job.id)}>
-              <button className="rounded-lg px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950">Cancelar</button>
-            </form>
+            {!sugerindoAgora && (
+              <form action={cancelar.bind(null, job.id)}>
+                <button className="rounded-lg px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950">Cancelar</button>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -90,10 +94,13 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
 
       {["sugerindo", "aguardando_revisao", "renderizando", "concluido"].includes(job.status) && (
         <>
-          {job.mensagem && <p className="text-sm text-zinc-600 dark:text-zinc-400">{job.mensagem}</p>}
-          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-            Por enquanto a classe exibida é a do detector (YOLO). A sugestão do OpenRouter e a revisão chegam nas próximas fases.
-          </p>
+          {!sugerindoAgora && job.mensagem && <p className="text-sm text-zinc-600 dark:text-zinc-400">{job.mensagem}</p>}
+          {job.status === "sugerindo" && !sugerindoAgora && (
+            <form action={retomarSugestoes.bind(null, job.id)} className="flex items-center gap-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+              <span className="flex-1">Há candidatos sem sugestão do modelo de visão. A revisão começa quando todos tiverem sugestão.</span>
+              <button className="rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white hover:bg-amber-700">Retomar sugestões</button>
+            </form>
+          )}
           <GradeCandidatos
             base={base}
             candidatos={listarCandidatos(job.id)}

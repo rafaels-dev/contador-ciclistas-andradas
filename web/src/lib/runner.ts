@@ -1,9 +1,20 @@
+import "./env";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
-import { atualizarJob, obterJob, substituirCandidatos, type Categoria, type Linha } from "./db";
+import {
+  atualizarJob,
+  listarCandidatos,
+  obterJob,
+  registrarSugestao,
+  resumoSugestoes,
+  substituirCandidatos,
+  type Categoria,
+  type Linha,
+} from "./db";
 import { baixarDoDrive } from "./drive";
+import { ErroOpenRouter, sugerirCategoria } from "./openrouter";
 import { RAIZ_REPO, dirJob } from "./paths";
 
 /**
@@ -24,9 +35,11 @@ const g = globalThis as {
   __contadorFilaGpu?: Promise<unknown>;
   __contadorDownloads?: Map<string, AbortController>;
   __contadorCancelados?: Set<string>;
+  __contadorSugerindo?: Set<string>;
 };
 const downloads = (g.__contadorDownloads ??= new Map());
 const cancelados = (g.__contadorCancelados ??= new Set());
+const sugerindo = (g.__contadorSugerindo ??= new Set());
 
 function naFilaDaGpu<T>(tarefa: () => Promise<T>): Promise<T> {
   const anterior = g.__contadorFilaGpu ?? Promise.resolve();
@@ -144,6 +157,7 @@ type CandidatoWorker = {
   origem: string;
   n_obs: number;
   filmstrip: string;
+  contexto?: string;
   clipe: string;
 };
 
@@ -196,10 +210,114 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
         origem: c.origem,
         n_obs: c.n_obs,
         filmstrip: `candidatos/${c.filmstrip}`,
+        contexto: c.contexto ? `candidatos/${c.contexto}` : null,
         clipe: `candidatos/${c.clipe}`,
       })),
     );
-    // Fase 2: aqui entra a sugestão do OpenRouter para todo candidato.
     atualizarJob(jobId, { status: "sugerindo", progresso: 0, mensagem: `${itens.length} candidatos detectados.` });
+    iniciarSugestoes(jobId);
   }).catch((e) => falhar(jobId, e));
+}
+
+// ----------------------------------------------------------------------
+// Etapa 3: sugestão do OpenRouter para TODO candidato (regra do projeto:
+// a revisão humana só começa quando todos têm sugestão).
+// ----------------------------------------------------------------------
+
+const CONCORRENCIA_LLM = Number(process.env.OPENROUTER_CONCORRENCIA ?? 6);
+const TENTATIVAS_LLM = 4;
+// envia a classe do YOLO junto como dica (decidido pela calibração)
+const DICA_YOLO = process.env.OPENROUTER_DICA_YOLO !== "0";
+
+export function sugestoesAtivas(jobId: string): boolean {
+  return sugerindo.has(jobId);
+}
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+export function iniciarSugestoes(jobId: string): void {
+  if (sugerindo.has(jobId)) return;
+  sugerindo.add(jobId);
+  void (async () => {
+    const dir = dirJob(jobId);
+    const pendentes = listarCandidatos(jobId).filter((c) => c.status_llm !== "ok");
+    for (const c of pendentes) {
+      if (c.status_llm === "falhou") {
+        registrarSugestao(c.id, {
+          sugestao_llm: null, conf_llm: null, justificativa_llm: null,
+          modelo_llm: null, custo_llm: null, status_llm: "pendente",
+        });
+      }
+    }
+    let abortar: string | null = null;
+
+    const atualizarProgresso = () => {
+      const r = resumoSugestoes(jobId);
+      atualizarJob(jobId, {
+        status: "sugerindo",
+        progresso: r.total ? r.ok / r.total : 1,
+        mensagem: `Sugerindo classificação… ${r.ok} de ${r.total}${r.falhou ? ` (${r.falhou} falharam)` : ""} · US$ ${r.custo.toFixed(4)}`,
+      });
+    };
+    atualizarProgresso();
+
+    let proximo = 0;
+    const trabalhador = async () => {
+      while (!abortar && proximo < pendentes.length) {
+        const c = pendentes[proximo++];
+        for (let tentativa = 1; ; tentativa++) {
+          try {
+            const r = await sugerirCategoria({
+              filmstrip: path.join(dir, c.filmstrip ?? ""),
+              contexto: c.contexto ? path.join(dir, c.contexto) : null,
+              dicaDetector: DICA_YOLO ? c.classe_yolo : null,
+            });
+            registrarSugestao(c.id, {
+              sugestao_llm: r.categoria,
+              conf_llm: r.confianca,
+              justificativa_llm: r.justificativa,
+              modelo_llm: r.modelo,
+              custo_llm: r.custo_usd,
+              status_llm: "ok",
+            });
+            break;
+          } catch (e) {
+            const erro = e instanceof ErroOpenRouter ? e : new ErroOpenRouter(String(e), null, false);
+            // chave inválida / sem créditos: não adianta continuar o lote
+            if (erro.status === 401 || erro.status === 402 || erro.status === 403) {
+              abortar = erro.message;
+              break;
+            }
+            if (!erro.transitorio || tentativa >= TENTATIVAS_LLM) {
+              registrarSugestao(c.id, {
+                sugestao_llm: null, conf_llm: null, justificativa_llm: erro.message,
+                modelo_llm: null, custo_llm: null, status_llm: "falhou",
+              });
+              break;
+            }
+            await esperar(1000 * 2 ** tentativa);
+          }
+        }
+        atualizarProgresso();
+      }
+    };
+    await Promise.all(Array.from({ length: Math.max(1, CONCORRENCIA_LLM) }, trabalhador));
+
+    const r = resumoSugestoes(jobId);
+    if (abortar) {
+      atualizarJob(jobId, { status: "erro", erro: `Sugestões interrompidas: ${abortar}`, mensagem: null });
+    } else if (r.falhou > 0 || r.ok < r.total) {
+      atualizarJob(jobId, {
+        mensagem: `${r.ok} de ${r.total} com sugestão; ${r.total - r.ok} falharam — use "Retomar sugestões".`,
+      });
+    } else {
+      atualizarJob(jobId, {
+        status: "aguardando_revisao",
+        progresso: 1,
+        mensagem: `${r.total} candidatos com sugestão · custo US$ ${r.custo.toFixed(4)}`,
+      });
+    }
+  })()
+    .catch((e) => falhar(jobId, e))
+    .finally(() => sugerindo.delete(jobId));
 }

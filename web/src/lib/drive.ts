@@ -51,7 +51,9 @@ const EXTENSOES_VIDEO = /\.(mp4|mov|mkv|avi|m4v|webm|dav|ts)$/i;
  * embutida do Drive (a API oficial exigiria chave/OAuth).
  */
 export async function listarVideosDaPasta(idPasta: string): Promise<ArquivoDrive[]> {
-  const res = await fetch(`https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(idPasta)}`);
+  const res = await fetch(`https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(idPasta)}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Não foi possível abrir a pasta — ela é pública (qualquer pessoa com o link)?");
   const html = await res.text();
   const arquivos: ArquivoDrive[] = [];
@@ -95,14 +97,16 @@ export async function baixarDoDrive(
 ): Promise<{ nome: string | null; bytes: number }> {
   let res = await fetch(
     `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`,
-    { signal: sinal },
+    // no-store: o fetch do servidor do Next tenta guardar a resposta no cache
+    // de dados — com um vídeo de GBs isso estoura a memória
+    { signal: sinal, cache: "no-store" },
   );
   if (res.ok && res.headers.get("content-type")?.includes("text/html")) {
     const alternativa = urlDoFormularioDeAviso(await res.text());
     if (!alternativa) {
       throw new Error("O Drive não liberou o download — confira se o link é público (qualquer pessoa com o link).");
     }
-    res = await fetch(alternativa, { signal: sinal });
+    res = await fetch(alternativa, { signal: sinal, cache: "no-store" });
   }
   if (!res.ok || !res.body) throw new Error(`Falha no download do Drive (HTTP ${res.status}).`);
   if (res.headers.get("content-type")?.includes("text/html")) {

@@ -552,6 +552,11 @@ def passo_clipes(video: str, candidatos: list[dict], linhas: list[dict], dir_cli
                 cv2.rectangle(img, (int((cx[0] - x1) * sx), int((cx[1] - y1) * sy)),
                               (int((cx[2] - x1) * sx), int((cx[3] - y1) * sy)), cor, 2)
             a["w"].send(np.ascontiguousarray(img))
+            if idx == a["c"]["frame"]:
+                # quadro do evento com caixa e linhas: contexto para o modelo de
+                # visão (em que faixa o objeto está; à noite o recorte é pouco)
+                cv2.imwrite(str(dir_clipes.parent / "contextos" / f"{a['c']['id']}.jpg"), img,
+                            [cv2.IMWRITE_JPEG_QUALITY, 85])
             if idx >= a["fim"]:
                 a["w"].close()
                 ativos.remove(a)
@@ -578,6 +583,7 @@ def main() -> None:
 
     saida = Path(args.saida)
     (saida / "filmstrips").mkdir(parents=True, exist_ok=True)
+    (saida / "contextos").mkdir(parents=True, exist_ok=True)
     (saida / "clipes").mkdir(parents=True, exist_ok=True)
     linhas = json.loads(Path(args.linhas).read_text()) if args.linhas else []
 
@@ -602,6 +608,7 @@ def main() -> None:
         d["bbox"] = [round(v * leitor.fator, 1) for v in c["bbox"]]  # px do vídeo original
         d["filmstrip"] = f"filmstrips/{c['id']}.jpg"
         d["clipe"] = f"clipes/{c['id']}.mp4"
+        d["contexto"] = f"contextos/{c['id']}.jpg"
         saida_json.append(d)
     (saida / "candidatos.json").write_text(json.dumps(saida_json, ensure_ascii=False, indent=1))
     emitir(tipo="fim", candidatos=len(saida_json))

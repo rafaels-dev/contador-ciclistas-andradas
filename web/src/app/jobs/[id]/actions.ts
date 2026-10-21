@@ -3,9 +3,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { refresh } from "next/cache";
-import { atualizarJob, obterJob, salvarCamera, type Linha } from "@/lib/db";
+import { atualizarJob, obterJob, resumoSugestoes, salvarCamera, type Linha } from "@/lib/db";
 import { dirJob } from "@/lib/paths";
-import { cancelarJob, iniciarDeteccao, iniciarDownload } from "@/lib/runner";
+import { cancelarJob, iniciarDeteccao, iniciarDownload, iniciarSugestoes } from "@/lib/runner";
 
 function validarLinhas(entrada: unknown): Linha[] {
   if (!Array.isArray(entrada)) throw new Error("Linhas inválidas.");
@@ -53,7 +53,10 @@ export async function confirmarLinhas(
 export async function tentarNovamente(jobId: string): Promise<void> {
   const job = obterJob(jobId);
   if (!job || job.status !== "erro") return;
-  if (fs.existsSync(path.join(dirJob(jobId), "frame0.jpg"))) {
+  if (resumoSugestoes(jobId).total > 0) {
+    // falhou na etapa de sugestões: retoma só os candidatos sem sugestão
+    iniciarSugestoes(jobId);
+  } else if (fs.existsSync(path.join(dirJob(jobId), "frame0.jpg"))) {
     // vídeo já baixado: volta para a definição das linhas (pré-preenchidas)
     atualizarJob(jobId, { status: "aguardando_linhas", erro: null, mensagem: null, progresso: 0 });
   } else {
@@ -66,5 +69,12 @@ export async function cancelar(jobId: string): Promise<void> {
   const job = obterJob(jobId);
   if (!job || !["baixando", "detectando"].includes(job.status)) return;
   cancelarJob(jobId);
+  refresh();
+}
+
+export async function retomarSugestoes(jobId: string): Promise<void> {
+  const job = obterJob(jobId);
+  if (!job || job.status !== "sugerindo") return;
+  iniciarSugestoes(jobId);
   refresh();
 }

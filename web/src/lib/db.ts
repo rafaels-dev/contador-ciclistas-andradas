@@ -102,8 +102,10 @@ CREATE TABLE IF NOT EXISTS candidatos (
   origem             TEXT,             -- track | pessoa_com_bicicleta | pessoa_com_moto
   n_obs              INTEGER,
   filmstrip          TEXT,             -- caminho relativo ao dir do job
+  contexto           TEXT,             -- quadro do evento recortado (p/ o modelo de visão)
   clipe              TEXT,
-  sugestao_llm       TEXT,             -- categoria sugerida pelo OpenRouter
+  sugestao_llm       TEXT,             -- categoria sugerida pelo OpenRouter (ou 'descartado')
+  custo_llm          REAL,             -- US$ da chamada (informado pelo OpenRouter)
   conf_llm           REAL,
   justificativa_llm  TEXT,
   modelo_llm         TEXT,
@@ -114,9 +116,25 @@ CREATE TABLE IF NOT EXISTS candidatos (
 CREATE INDEX IF NOT EXISTS idx_candidatos_job ON candidatos(job_id);
 `;
 
+/** Colunas adicionadas depois da criação do banco (CREATE IF NOT EXISTS não altera tabela existente). */
+function migrar(d: DatabaseSync): void {
+  const novas: Record<string, Record<string, string>> = {
+    candidatos: { contexto: "TEXT", custo_llm: "REAL" },
+  };
+  for (const [tabela, colunas] of Object.entries(novas)) {
+    const existentes = new Set((d.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map((c) => c.name));
+    for (const [col, tipo] of Object.entries(colunas)) {
+      if (!existentes.has(col)) d.exec(`ALTER TABLE ${tabela} ADD COLUMN ${col} ${tipo}`);
+    }
+  }
+}
+
 // globalThis: sobrevive ao hot reload do `next dev` (senão cada recarga
 // reabriria o banco e marcaria como interrompidos os jobs em andamento)
-const g = globalThis as { __contadorDb?: DatabaseSync };
+const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
+// incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
+// migração precisa rodar sem reiniciar o servidor (e os workers em curso)
+const VERSAO_SCHEMA = 2;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -130,6 +148,10 @@ export function db(): DatabaseSync {
        atualizado_em = datetime('now') WHERE status IN ('baixando', 'detectando')`,
     ).run();
     g.__contadorDb = d;
+  }
+  if (g.__contadorDbVersao !== VERSAO_SCHEMA) {
+    migrar(g.__contadorDb);
+    g.__contadorDbVersao = VERSAO_SCHEMA;
   }
   return g.__contadorDb;
 }
@@ -155,8 +177,10 @@ export type Candidato = {
   origem: string | null;
   n_obs: number | null;
   filmstrip: string | null;
+  contexto: string | null;
   clipe: string | null;
-  sugestao_llm: Categoria | null;
+  sugestao_llm: Categoria | "descartado" | null;
+  custo_llm: number | null;
   conf_llm: number | null;
   justificativa_llm: string | null;
   modelo_llm: string | null;
@@ -187,7 +211,7 @@ export function listarCandidatos(jobId: string): Candidato[] {
 
 export function substituirCandidatos(
   jobId: string,
-  itens: Omit<Candidato, "id" | "job_id" | "sugestao_llm" | "conf_llm" | "justificativa_llm" | "modelo_llm" | "status_llm" | "rotulo" | "revisado_em">[],
+  itens: Omit<Candidato, "id" | "job_id" | "sugestao_llm" | "custo_llm" | "conf_llm" | "justificativa_llm" | "modelo_llm" | "status_llm" | "rotulo" | "revisado_em">[],
 ): void {
   const d = db();
   d.exec("BEGIN");
@@ -195,12 +219,12 @@ export function substituirCandidatos(
     d.prepare("DELETE FROM candidatos WHERE job_id = ?").run(jobId);
     const ins = d.prepare(
       `INSERT INTO candidatos (job_id, track, linha_id, frame, tempo_s, direcao, bbox, classe_yolo,
-         conf_yolo, alternativa, origem, n_obs, filmstrip, clipe)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         conf_yolo, alternativa, origem, n_obs, filmstrip, contexto, clipe)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     );
     for (const c of itens) {
       ins.run(jobId, c.track, c.linha_id, c.frame, c.tempo_s, c.direcao, c.bbox, c.classe_yolo,
-        c.conf_yolo, c.alternativa, c.origem, c.n_obs, c.filmstrip, c.clipe);
+        c.conf_yolo, c.alternativa, c.origem, c.n_obs, c.filmstrip, c.contexto, c.clipe);
     }
     d.exec("COMMIT");
   } catch (e) {
@@ -235,4 +259,26 @@ export function criarJob(dados: { id: string; link_drive: string; drive_id: stri
   db()
     .prepare("INSERT INTO jobs (id, link_drive, drive_id) VALUES (?, ?, ?)")
     .run(dados.id, dados.link_drive, dados.drive_id);
+}
+
+export function registrarSugestao(
+  id: number,
+  dados: { sugestao_llm: string | null; conf_llm: number | null; justificativa_llm: string | null; modelo_llm: string | null; custo_llm: number | null; status_llm: "ok" | "falhou" | "pendente" },
+): void {
+  db()
+    .prepare(
+      `UPDATE candidatos SET sugestao_llm = ?, conf_llm = ?, justificativa_llm = ?, modelo_llm = ?, custo_llm = ?, status_llm = ?
+       WHERE id = ?`,
+    )
+    .run(dados.sugestao_llm, dados.conf_llm, dados.justificativa_llm, dados.modelo_llm, dados.custo_llm, dados.status_llm, id);
+}
+
+export function resumoSugestoes(jobId: string): { total: number; ok: number; falhou: number; custo: number } {
+  const r = db()
+    .prepare(
+      `SELECT COUNT(*) AS total, SUM(status_llm = 'ok') AS ok, SUM(status_llm = 'falhou') AS falhou,
+              COALESCE(SUM(custo_llm), 0) AS custo FROM candidatos WHERE job_id = ?`,
+    )
+    .get(jobId) as { total: number; ok: number | null; falhou: number | null; custo: number };
+  return { total: r.total, ok: r.ok ?? 0, falhou: r.falhou ?? 0, custo: r.custo };
 }
