@@ -226,8 +226,10 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
 
 const CONCORRENCIA_LLM = Number(process.env.OPENROUTER_CONCORRENCIA ?? 6);
 const TENTATIVAS_LLM = 4;
-// envia a classe do YOLO junto como dica (decidido pela calibração)
-const DICA_YOLO = process.env.OPENROUTER_DICA_YOLO !== "0";
+// dica do YOLO desligada por padrão: na calibração não melhorou o acerto e
+// arrisca puxar o modelo para o erro típico do detector (ciclista noturno
+// visto como pedestre). OPENROUTER_DICA_YOLO=1 liga.
+const DICA_YOLO = process.env.OPENROUTER_DICA_YOLO === "1";
 
 export function sugestoesAtivas(jobId: string): boolean {
   return sugerindo.has(jobId);

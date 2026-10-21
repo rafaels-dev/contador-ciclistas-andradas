@@ -18,7 +18,9 @@ const ROTULO_PROMPT: Record<Sugestao, string> = {
 };
 const DO_PROMPT = Object.fromEntries(Object.entries(ROTULO_PROMPT).map(([k, v]) => [v, k as Sugestao]));
 
-export const MODELO_PADRAO = "google/gemini-2.5-flash-lite";
+// calibração (out/2026, 142 casos noturnos rotulados): Haiku 5.5 99–100% de
+// acerto a ~US$ 0,18/mil; Gemini 3.1 Flash Lite igual a 4×; YOLO sozinho 87%
+export const MODELO_PADRAO = "anthropic/claude-haiku-5.5";
 
 const INSTRUCOES = `Você classifica objetos em movimento vistos por uma câmera fixa de trânsito (rua com ciclovia, calçada e pista de veículos). Pode ser dia ou noite; à noite há borrão de movimento forte e faróis.
 

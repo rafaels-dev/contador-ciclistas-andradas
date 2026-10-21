@@ -85,6 +85,10 @@ When changing counting logic, preserve idempotency AND the plausibility checks i
 
 Direção nova: em vez de contagem 100% automática, um app Next.js 16 (`web/`, ver `web/README.md` e `web/AGENTS.md` — a versão do Next tem APIs novas, leia `web/node_modules/next/dist/docs/` antes de mexer) recebe um link do Drive, o usuário desenha linhas de contagem em qualquer ângulo, o worker Python detecta/rastreia, o OpenRouter sugere a classe de **todo** candidato, um humano revisa, e só então o vídeo final com contador é renderizado. A `LinhaContagem` vertical (`linha_x`) continua servindo os entry points CLI; o app usa segmentos arbitrários.
 
+Worker do app: `worker/detectar.py` (trajetórias completas → candidatos, filmstrip/contexto/clipe) lê vídeo via `worker/leitor.py` (ffmpeg NVDEC + `scale_cuda`, saída YUV; precisa do build BtbN em `~/.local/opt/ffmpeg-btbn` ou `CONTADOR_FFMPEG`, senão cai para CPU). Vídeos > 1920 px são processados em 1080p; `imgsz` acompanha a resolução de origem (4K → 1280).
+
+Modelo de visão (OpenRouter): padrão `anthropic/claude-haiku-5.5`, filmstrip + contexto, sem dica do YOLO. Calibração (out/2026): `avaliacao/montar_calibracao_llm.py` casa os rótulos do Cristiano (`rotulos_andradas.json`, no Drive) com candidatos do worker; `web/scripts/calibrar.ts` compara modelos. Gabarito auditado em `avaliacao/calibracao_llm_auditada.json` (142 casos, quase todos crepúsculo/noite): Haiku 5.5 99–100%, Gemini 3.1 Flash Lite 99% a 4× o custo, YOLO sozinho 87% (13/32 ciclistas).
+
 ## Output data model
 
 Both entry points produce events keyed by category (`ciclistas`/`pedestres`/`automoveis`/`motocicletas`), each carrying a running total plus `in`/`out` directional counts (`in` = right→left, `out` = left→right, per `LinhaContagem`). `processar_video.py` accumulates these into one `resultado.json` at the end; `stream_tempo_real.py` emits them as they happen (plus `inicio`/`heartbeat`/`encerramento` lifecycle events) so downstream consumers don't need to wait for the stream to end.
