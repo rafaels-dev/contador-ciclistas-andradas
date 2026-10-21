@@ -81,6 +81,10 @@ When changing counting logic, preserve idempotency AND the plausibility checks i
 
 **`contador/visualizador.py`** (`anotar_frame`) draws bboxes/traces/labels per category in a distinct color, the counting line, a red screen-flash on any new count event, and the stats panel — purely cosmetic, only invoked when annotated video output is requested (skipped entirely by `--sem-video`).
 
+## Web app (`web/`) — revisão humana (out/2026)
+
+Direção nova: em vez de contagem 100% automática, um app Next.js 16 (`web/`, ver `web/README.md` e `web/AGENTS.md` — a versão do Next tem APIs novas, leia `web/node_modules/next/dist/docs/` antes de mexer) recebe um link do Drive, o usuário desenha linhas de contagem em qualquer ângulo, o worker Python detecta/rastreia, o OpenRouter sugere a classe de **todo** candidato, um humano revisa, e só então o vídeo final com contador é renderizado. A `LinhaContagem` vertical (`linha_x`) continua servindo os entry points CLI; o app usa segmentos arbitrários.
+
 ## Output data model
 
 Both entry points produce events keyed by category (`ciclistas`/`pedestres`/`automoveis`/`motocicletas`), each carrying a running total plus `in`/`out` directional counts (`in` = right→left, `out` = left→right, per `LinhaContagem`). `processar_video.py` accumulates these into one `resultado.json` at the end; `stream_tempo_real.py` emits them as they happen (plus `inicio`/`heartbeat`/`encerramento` lifecycle events) so downstream consumers don't need to wait for the stream to end.
