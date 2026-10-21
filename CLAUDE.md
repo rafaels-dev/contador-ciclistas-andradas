@@ -30,24 +30,50 @@ python stream_tempo_real.py 0 --sem-janela          # webcam, no display window
 python stream_tempo_real.py rtsp://... --pular 1    # skip every other frame to cut CPU load
 ```
 
-There is no test suite, linter, or type-checker configured. Validate changes by running `processar_video.py --sem-video --inicio X --fim Y` on a short slice of `Andradas.mp4` and checking the printed per-category totals and `resultado.json` against expectations (or by eyeballing `Andradas_anotado.mp4`).
+There is no test suite, linter, or type-checker configured. Validate changes with the evaluation harness in `avaliacao/` (validation videos live in `avaliacao/videos/`, gitignored, downloaded from Cristiano's Drive via rclone remote `gdrive`):
+
+```bash
+# diagnóstico instrumentado: eventos.jsonl (cada contagem com motivo/lado/dx),
+# tracks.json (trajetórias), snapshots JPG por evento
+python avaliacao/rodar_instrumentado.py --video avaliacao/videos/Andradas_07.mp4 --saida avaliacao/diag_07
+
+# aponta suspeitas: contado_sem_cruzar, direcao_invertida, cruzou_sem_contar, possivel_duplicata
+python avaliacao/analisar_diagnostico.py avaliacao/diag_07
+
+# grades de miniaturas p/ verificação visual (por humano ou agente barato)
+python avaliacao/montar_grade.py avaliacao/diag_07 --cat ciclistas
+
+# contador independente sem ML (subtração de fundo na coluna da linha) p/ cross-check
+python avaliacao/contar_scanline.py avaliacao/videos/Andradas_07.mp4 --inicio 600 --fim 900 --json blobs.json
+
+# varredura completa das 19 horas + tabela consolidada
+python avaliacao/varrer_tudo.py
+```
+
+Quick sanity check on the small local clip: `python avaliacao/rodar_instrumentado.py --video "Andradas - todas categorias.mp4" --saida /tmp/diag` — expected totals with current code: ciclistas 2, pedestres 7, automóveis 13, motocicletas 9.
 
 ## Architecture
 
-**Single YOLO inference per frame, then split into 4 independent pipelines.** `ContadorVeiculos.processar()` (`contador/detector.py`) is the shared core used by both entry points:
+**Single YOLO inference per frame (class-agnostic NMS), then 4 trackers + arbitration.** `ContadorVeiculos.processar()` (`contador/detector.py`) is the shared core used by both entry points:
 
-1. One `YOLOv8n` call detects all relevant COCO classes at once (person, bicycle, car, bus, truck, motorcycle).
-2. Detections are partitioned into 4 mutually-exclusive categories. The tricky part is `person`: a person is a **ciclista** if a `bicycle` is within `DIST_MAX_CYCLIST_PX` of its centroid, a **pedestre** if no bicycle or motorcycle is nearby, or discarded entirely if a `motorcycle` is nearby (assumed to be the rider/pillion, already counted as a motorcycle — must not double-count as a pedestrian).
-3. Each category gets its own `sv.ByteTrack()` tracker (independent ID spaces) and its own `LinhaContagem` (independent counting line state) — categories never interfere with each other's IDs or counts.
-4. Each `LinhaContagem.trigger()` call returns which detections just crossed the line this frame, in which direction.
+1. One `YOLOv8n` (COCO) call detects person/car/bus/truck/motorcycle with `agnostic_nms=True` (prevents car+truck double boxes). A SECOND model — `MODELO_BICICLETAS` in config.py, a yolov8n fine-tuned on this camera with synthetic motion blur (`runs/ft_blur/weights/best.pt`, built by `avaliacao/montar_dataset.py` + `avaliacao/treinar_ft.py`) — supplies ONLY the `bicycle` detections. The fine-tune recovers blurred dusk/night bicycles (h17: 35→56 of 70 manual; h18: 10→32 of 85) without touching the other classes. Set `MODELO_BICICLETAS = None` to fall back to COCO-only. Do NOT train with unlabeled night frames (blurred unlabeled vehicles teach the model that night objects are background — this was tried and it collapsed night car counts).
+2. **Ciclistas are counted from the `bicycle` class** (own tracker + line — project decision: vehicles carrying bikes essentially never pass here), with two recovery paths: a person track with bike association whose crossing pairs with no bicycle event within ±45 frames counts as cyclist ("cic_pessoa"); a bike track that dies without crossing the line but moved ≥350 px counts once ("tela" — Cristiano counts bikes that pass through the SCREEN, not only line-crossers).
+3. **Persons** are tracked in a single tracker; each person track accumulates, frame by frame, whether a bicycle or motorcycle was nearby (anisotropic: |dx|≤120, |dy|≤250 px). When a person crosses the line it counts as **pedestre** only if its track is NOT bike-associated (that's the cyclist, already counted via bicycle) NOR moto-associated (rider/pillion, already counted via motorcycle). Track-level (not per-frame) classification prevents double counting when bicycle detection flickers.
+4. **Motos** go through bike↔moto arbitration at count time: a motorcycle crossing event that coincides with a recent, consistent bicycle track (COCO confuses the two classes on two-wheelers) is discarded as a misclassified bicycle.
+5. Automóveis (car+bus+truck) count directly. Each category has its own `sv.ByteTrack()` and `LinhaContagem`.
 
-**`LinhaContagem` (`contador/linha.py`) is the trickiest piece of logic in the codebase** — read it fully before touching counting behavior. It does NOT use `supervision`'s built-in `LineZone` because that fails on large objects (bbox overlaps the line before/after the true crossing) and fast vehicles (bbox gets clipped at the frame edge, so ByteTrack loses and re-assigns a new ID mid-crossing). Instead it combines:
-- Centroid-crossing detection (`cx` crosses `linha_x`) for tracks that persist through the crossing.
-- Frame-edge entry detection (`margem_borda`) for objects first seen already at the frame boundary.
-- Two re-ID heuristics for broken tracks, keyed on where a lost ID was last seen: **same-side re-ID** (`janela_mesmo_lado`, `dist_spatial`) merges a new ID with a recently-lost one at a similar position without counting again (handles partial occlusion / brief redetection); **opposite-side re-ID** (`janela_reid`) counts once when a fast-moving object's track broke exactly at the line.
-- A `_contados` set guarantees no ID is ever counted twice, and expired lost-IDs are pruned so ByteTrack can safely reuse the numeric ID later.
+**`LinhaContagem` (`contador/linha.py`) is the trickiest piece of logic in the codebase** — read it fully before touching counting behavior. Philosophy (v2, jul/2026): **only actual line crossings count**. It does NOT use `supervision`'s `LineZone` (fails on large/fast objects). Counting paths, mutually exclusive per ID:
+- `centroide` — track persists and its `cx` switches sides of `linha_x`.
+- `centroide_gap` — the SAME tracker id disappears for a few frames and resumes on the other side (ByteTrack re-association) — the crossing happened during the gap.
+- `reid_oposto` — a NEW id appears on the opposite side of a recently-lost id, with physical plausibility checks: vertical coherence (`dist_vertical`), implied speed ≤ `vmax_reid` px/frame × gap, and motion-direction consistency with the lost track's velocity (EMA `dx`). Without these checks this path both double-counts and suppresses real counts (platoons of cars in the same lane).
+- `entrada` (legacy, OFF by default) — counts on frame-edge entry; direction inferred from which edge (right edge → moving left = in). The old always-on version counted objects that never crossed and inverted directions.
+Same-side re-ID (`janela_mesmo_lado`, `dist_spatial`, `dist_vertical`) merges broken tracks without counting; a new id adjacent to an already-counted ACTIVE track inherits "counted" (duplicate YOLO boxes). `_contados` guarantees idempotency; expired lost-ids are pruned.
 
-When changing counting logic, preserve this idempotency guarantee — it's easy to accidentally double-count or under-count by changing the order of the re-ID checks in `trigger()`.
+When changing counting logic, preserve idempotency AND the plausibility checks in `_par_oposto_lado` — both directions of error (double-count and suppressed-count) came from that path historically.
+
+**Known limitation (night)**: heavy motion blur under artificial lighting makes the `bicycle`/`motorcycle` classes undetectable while the rider is still detected as `person` → night cyclists/motorcyclists get counted as pedestres. A speed-based reclassification fallback exists but is disabled (`LIMIAR_VEL_CICLISTA_PX_FRAME = None`) because ByteTrack id-switches poison track velocity.
+
+**DVR seek quirk**: `cap.set(CAP_PROP_POS_FRAMES)` lands ~30 s early on these files and `get()` silently reports the requested position. Any frame extraction for visualization/verification must decode sequentially (`avaliacao/frames_exatos.py`). The processing entry points always read sequentially, so their frame numbers are the ground truth.
 
 **Category-specific config lives in `config.py`**, not hardcoded — `LINHA_X` (counting line position), `CONFIANCA` (detection confidence threshold), `DIST_MAX_CYCLIST_PX` (person↔bicycle association distance), and the COCO class-ID groupings per category. This is the first place to look when adapting the tool to a different camera/location.
 
