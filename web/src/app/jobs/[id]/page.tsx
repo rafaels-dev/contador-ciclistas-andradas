@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { listarCameras, listarCandidatos, obterJob, type Job, type Linha } from "@/lib/db";
-import { tentarNovamente } from "./actions";
+import { cancelar, tentarNovamente } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
 import { EditorLinhas } from "./editor-linhas";
 import { GradeCandidatos } from "./grade-candidatos";
@@ -56,9 +56,14 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
           <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
             <div className="h-full bg-emerald-600 transition-all" style={{ width: `${Math.round(job.progresso * 100)}%` }} />
           </div>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            {job.mensagem} {job.progresso > 0 && `${Math.round(job.progresso * 100)}%`}
-          </p>
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              {job.mensagem} {job.progresso > 0 && `${Math.round(job.progresso * 100)}%`}
+            </p>
+            <form action={cancelar.bind(null, job.id)}>
+              <button className="rounded-lg px-3 py-1 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950">Cancelar</button>
+            </form>
+          </div>
         </div>
       )}
 

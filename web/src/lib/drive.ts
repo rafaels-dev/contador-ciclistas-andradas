@@ -90,17 +90,19 @@ function urlDoFormularioDeAviso(html: string): string | null {
 export async function baixarDoDrive(
   id: string,
   destino: string,
+  sinal: AbortSignal,
   aoProgredir: (baixados: number, total: number | null) => void,
 ): Promise<{ nome: string | null; bytes: number }> {
   let res = await fetch(
     `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`,
+    { signal: sinal },
   );
   if (res.ok && res.headers.get("content-type")?.includes("text/html")) {
     const alternativa = urlDoFormularioDeAviso(await res.text());
     if (!alternativa) {
       throw new Error("O Drive não liberou o download — confira se o link é público (qualquer pessoa com o link).");
     }
-    res = await fetch(alternativa);
+    res = await fetch(alternativa, { signal: sinal });
   }
   if (!res.ok || !res.body) throw new Error(`Falha no download do Drive (HTTP ${res.status}).`);
   if (res.headers.get("content-type")?.includes("text/html")) {

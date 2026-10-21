@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
@@ -20,7 +20,13 @@ type EventoWorker =
   | { tipo: "fim"; candidatos: number }
   | { tipo: "erro"; mensagem: string };
 
-const g = globalThis as { __contadorFilaGpu?: Promise<unknown> };
+const g = globalThis as {
+  __contadorFilaGpu?: Promise<unknown>;
+  __contadorDownloads?: Map<string, AbortController>;
+  __contadorCancelados?: Set<string>;
+};
+const downloads = (g.__contadorDownloads ??= new Map());
+const cancelados = (g.__contadorCancelados ??= new Set());
 
 function naFilaDaGpu<T>(tarefa: () => Promise<T>): Promise<T> {
   const anterior = g.__contadorFilaGpu ?? Promise.resolve();
@@ -59,7 +65,21 @@ function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker)
 }
 
 function falhar(jobId: string, e: unknown): void {
-  atualizarJob(jobId, { status: "erro", erro: e instanceof Error ? e.message : String(e), mensagem: null });
+  const erro = cancelados.delete(jobId) ? "Cancelado pelo usuário." : e instanceof Error ? e.message : String(e);
+  atualizarJob(jobId, { status: "erro", erro, mensagem: null });
+}
+
+/**
+ * Interrompe download ou worker de um job. Os workers são achados pelo
+ * caminho do vídeo na linha de comando (funciona mesmo para processos
+ * iniciados antes de um hot reload ou de outra instância do módulo).
+ */
+export function cancelarJob(jobId: string): void {
+  cancelados.add(jobId);
+  downloads.get(jobId)?.abort();
+  spawnSync("pkill", ["-f", `worker/.*${path.join(dirJob(jobId), "video.mp4")}`]);
+  // na fila da GPU (ainda sem processo): a tarefa confere o status ao começar
+  atualizarJob(jobId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
 }
 
 /** Etapa 1: download + metadados + 1º frame → aguardando_linhas. */
@@ -78,14 +98,17 @@ export function iniciarDownload(jobId: string): void {
       fs.symlinkSync(path.resolve(job.link_drive), destino);
       atualizarJob(jobId, { nome_arquivo: path.basename(job.link_drive) });
     } else {
-      const { nome } = await baixarDoDrive(job.drive_id, destino, (feito, total) => {
+      const controle = new AbortController();
+      downloads.set(jobId, controle);
+      const { nome } = await baixarDoDrive(job.drive_id, destino, controle.signal, (feito, total) => {
         const mb = (feito / 1e6).toFixed(0);
         atualizarJob(jobId, {
           progresso: total ? feito / total : 0,
           mensagem: total ? `Baixando… ${mb} de ${(total / 1e6).toFixed(0)} MB` : `Baixando… ${mb} MB`,
         });
       });
-      atualizarJob(jobId, { nome_arquivo: nome });
+      downloads.delete(jobId);
+      atualizarJob(jobId, { nome_arquivo: nome ?? job.nome_arquivo });
     }
 
     atualizarJob(jobId, { mensagem: "Lendo o vídeo…", progresso: 1 });
@@ -101,7 +124,10 @@ export function iniciarDownload(jobId: string): void {
       }
     });
     atualizarJob(jobId, { status: "aguardando_linhas", mensagem: null, progresso: 0 });
-  })().catch((e) => falhar(jobId, e));
+  })().catch((e) => {
+    downloads.delete(jobId);
+    falhar(jobId, e);
+  });
 }
 
 type CandidatoWorker = {
@@ -141,7 +167,9 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
     mensagem: "Na fila da GPU…",
   });
 
+  cancelados.delete(jobId);
   void naFilaDaGpu(async () => {
+    if (cancelados.has(jobId) || obterJob(jobId)?.status !== "detectando") return;
     const saida = path.join(dir, "candidatos");
     const args = ["--video", path.join(dir, "video.mp4"), "--saida", saida, "--linhas", arqLinhas];
     if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos

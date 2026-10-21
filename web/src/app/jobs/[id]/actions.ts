@@ -5,7 +5,7 @@ import path from "node:path";
 import { refresh } from "next/cache";
 import { atualizarJob, obterJob, salvarCamera, type Linha } from "@/lib/db";
 import { dirJob } from "@/lib/paths";
-import { iniciarDeteccao, iniciarDownload } from "@/lib/runner";
+import { cancelarJob, iniciarDeteccao, iniciarDownload } from "@/lib/runner";
 
 function validarLinhas(entrada: unknown): Linha[] {
   if (!Array.isArray(entrada)) throw new Error("Linhas inválidas.");
@@ -59,5 +59,12 @@ export async function tentarNovamente(jobId: string): Promise<void> {
   } else {
     iniciarDownload(jobId);
   }
+  refresh();
+}
+
+export async function cancelar(jobId: string): Promise<void> {
+  const job = obterJob(jobId);
+  if (!job || !["baixando", "detectando"].includes(job.status)) return;
+  cancelarJob(jobId);
   refresh();
 }
