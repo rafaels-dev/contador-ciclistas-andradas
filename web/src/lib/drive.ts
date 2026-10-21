@@ -1,3 +1,7 @@
+import fs from "node:fs";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+
 /**
  * Extrai o ID de arquivo de um link do Google Drive. Aceita os formatos:
  *   https://drive.google.com/file/d/<ID>/view?usp=sharing
@@ -25,4 +29,68 @@ export function extrairIdDrive(link: string): string | null {
   if (porQuery && /^[\w-]{20,}$/.test(porQuery)) return porQuery;
 
   return null;
+}
+
+function nomeDoArquivo(res: Response): string | null {
+  const cd = res.headers.get("content-disposition") ?? "";
+  const utf8 = cd.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8) return decodeURIComponent(utf8[1]);
+  const simples = cd.match(/filename="?([^";]+)"?/i);
+  return simples ? simples[1] : null;
+}
+
+/**
+ * Arquivos grandes públicos passam por uma página "não foi possível verificar
+ * vírus" com um formulário; reenvia os campos dele para obter o binário.
+ */
+function urlDoFormularioDeAviso(html: string): string | null {
+  const form = html.match(/<form[^>]+id="download-form"[^>]+action="([^"]+)"[\s\S]*?<\/form>/);
+  if (!form) return null;
+  const url = new URL(form[1].replace(/&amp;/g, "&"));
+  for (const m of form[0].matchAll(/<input[^>]+type="hidden"[^>]*>/g)) {
+    const nome = m[0].match(/name="([^"]+)"/)?.[1];
+    const valor = m[0].match(/value="([^"]*)"/)?.[1];
+    if (nome) url.searchParams.set(nome, valor ?? "");
+  }
+  return url.toString();
+}
+
+/** Baixa um arquivo PÚBLICO do Drive ("qualquer pessoa com o link"). */
+export async function baixarDoDrive(
+  id: string,
+  destino: string,
+  aoProgredir: (baixados: number, total: number | null) => void,
+): Promise<{ nome: string | null; bytes: number }> {
+  let res = await fetch(
+    `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`,
+  );
+  if (res.ok && res.headers.get("content-type")?.includes("text/html")) {
+    const alternativa = urlDoFormularioDeAviso(await res.text());
+    if (!alternativa) {
+      throw new Error("O Drive não liberou o download — confira se o link é público (qualquer pessoa com o link).");
+    }
+    res = await fetch(alternativa);
+  }
+  if (!res.ok || !res.body) throw new Error(`Falha no download do Drive (HTTP ${res.status}).`);
+  if (res.headers.get("content-type")?.includes("text/html")) {
+    throw new Error("O Drive devolveu uma página em vez do vídeo — o arquivo é público?");
+  }
+
+  const total = Number(res.headers.get("content-length")) || null;
+  let baixados = 0;
+  let ultimo = 0;
+  const contador = new Transform({
+    transform(pedaco: Buffer, _enc, cb) {
+      baixados += pedaco.length;
+      const agora = Date.now();
+      if (agora - ultimo > 1000) {
+        ultimo = agora;
+        aoProgredir(baixados, total);
+      }
+      cb(null, pedaco);
+    },
+  });
+  await pipeline(Readable.fromWeb(res.body as import("node:stream/web").ReadableStream), contador, fs.createWriteStream(destino));
+  aoProgredir(baixados, total);
+  return { nome: nomeDoArquivo(res), bytes: baixados };
 }

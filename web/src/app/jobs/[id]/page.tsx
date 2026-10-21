@@ -1,11 +1,26 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { obterJob } from "@/lib/db";
+import { listarCameras, listarCandidatos, obterJob, type Job, type Linha } from "@/lib/db";
+import { tentarNovamente } from "./actions";
+import { AutoRefresh } from "./auto-refresh";
+import { EditorLinhas } from "./editor-linhas";
+import { GradeCandidatos } from "./grade-candidatos";
+
+const ROTULO_STATUS: Record<Job["status"], string> = {
+  baixando: "Baixando",
+  aguardando_linhas: "Defina as linhas de contagem",
+  detectando: "Detectando objetos",
+  sugerindo: "Sugestão de classificação",
+  aguardando_revisao: "Aguardando revisão",
+  renderizando: "Gerando vídeo final",
+  concluido: "Concluído",
+  erro: "Erro",
+};
 
 export default function PaginaJob(props: PageProps<"/jobs/[id]">) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-10">
+    <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10">
       <Link href="/" className="text-sm text-emerald-700 hover:underline dark:text-emerald-400">
         ← Jobs
       </Link>
@@ -20,24 +35,67 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const job = obterJob(id);
   if (!job) notFound();
+  const base = `/api/jobs/${job.id}/arquivos`;
+  const trabalhando = job.status === "baixando" || job.status === "detectando";
+  const linhas = JSON.parse(job.linhas) as Linha[];
 
   return (
-    <section className="flex flex-col gap-2">
-      <h1 className="text-xl font-semibold">{job.nome_arquivo ?? job.drive_id}</h1>
-      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-zinc-500">Status</dt>
-        <dd>{job.status}</dd>
-        <dt className="text-zinc-500">Progresso</dt>
-        <dd>{Math.round(job.progresso * 100)}%</dd>
-        <dt className="text-zinc-500">Link</dt>
-        <dd className="truncate">{job.link_drive}</dd>
-        {job.erro && (
-          <>
-            <dt className="text-zinc-500">Erro</dt>
-            <dd className="text-red-600">{job.erro}</dd>
-          </>
-        )}
-      </dl>
+    <section className="flex flex-col gap-6">
+      {trabalhando && <AutoRefresh />}
+      <header className="flex flex-col gap-1">
+        <h1 className="text-xl font-semibold break-all">{job.nome_arquivo ?? job.drive_id}</h1>
+        <p className="text-sm text-zinc-500">
+          {ROTULO_STATUS[job.status]}
+          {job.duracao_s ? ` · ${Math.round(job.duracao_s / 60)} min de vídeo` : ""}
+          {job.largura ? ` · ${job.largura}×${job.altura} @ ${job.fps?.toFixed(1)} fps` : ""}
+        </p>
+      </header>
+
+      {trabalhando && (
+        <div className="flex flex-col gap-2" data-testid="progresso">
+          <div className="h-2 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+            <div className="h-full bg-emerald-600 transition-all" style={{ width: `${Math.round(job.progresso * 100)}%` }} />
+          </div>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            {job.mensagem} {job.progresso > 0 && `${Math.round(job.progresso * 100)}%`}
+          </p>
+        </div>
+      )}
+
+      {job.status === "erro" && (
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-red-300 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+          <p className="text-red-700 dark:text-red-300">{job.erro}</p>
+          <form action={tentarNovamente.bind(null, job.id)}>
+            <button className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm text-white hover:bg-zinc-700">Tentar novamente</button>
+          </form>
+        </div>
+      )}
+
+      {job.status === "aguardando_linhas" && job.largura && job.altura && (
+        <EditorLinhas
+          jobId={job.id}
+          frameUrl={`${base}/frame0.jpg`}
+          largura={job.largura}
+          altura={job.altura}
+          linhasIniciais={linhas}
+          cameras={listarCameras().map((c) => ({ id: c.id, nome: c.nome, linhas: JSON.parse(c.linhas) as Linha[] }))}
+          cameraInicial={job.camera_id}
+        />
+      )}
+
+      {["sugerindo", "aguardando_revisao", "renderizando", "concluido"].includes(job.status) && (
+        <>
+          {job.mensagem && <p className="text-sm text-zinc-600 dark:text-zinc-400">{job.mensagem}</p>}
+          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            Por enquanto a classe exibida é a do detector (YOLO). A sugestão do OpenRouter e a revisão chegam nas próximas fases.
+          </p>
+          <GradeCandidatos
+            base={base}
+            candidatos={listarCandidatos(job.id)}
+            nomesLinhas={Object.fromEntries(linhas.map((l) => [l.id, l.nome]))}
+          />
+        </>
+      )}
     </section>
   );
 }
