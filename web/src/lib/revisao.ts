@@ -7,15 +7,17 @@ import type { Candidato, Categoria, Linha } from "./db";
 
 export type Classe = Categoria | "descartado";
 
-export const CLASSES: readonly Classe[] = ["ciclistas", "patinetes", "scooters", "pedestres", "automoveis", "motocicletas", "descartado"];
+export const CLASSES: readonly Classe[] = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado"];
 
 export const NOME_CATEGORIA: Record<Classe, string> = {
   ciclistas: "Ciclista",
   patinetes: "Patinete",
   scooters: "Scooter elétrico",
+  monociclos: "Monociclo",
   pedestres: "Pedestre",
   automoveis: "Automóvel",
   motocicletas: "Motocicleta",
+  outros: "Outros",
   descartado: "Nada / descartar",
 };
 

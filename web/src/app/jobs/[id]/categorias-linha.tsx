@@ -5,7 +5,7 @@ import type { Categoria, Linha } from "@/lib/db";
 import { NOME_CATEGORIA } from "@/lib/revisao";
 import { definirCategoriasLinhas } from "./actions";
 
-const TODAS: Categoria[] = ["ciclistas", "patinetes", "scooters", "pedestres", "motocicletas", "automoveis"];
+const TODAS: Categoria[] = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "motocicletas", "automoveis", "outros"];
 
 /** Botões liga/desliga das categorias que uma linha conta (nenhuma desligada = todas). */
 export function ChipsCategorias({ valor, aoMudar, rotulo }: { valor: Categoria[] | undefined; aoMudar: (v: Categoria[] | undefined) => void; rotulo: string }) {

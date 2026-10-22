@@ -11,6 +11,9 @@ Passo 1 (sequencial): mesmos modelos do contador (COCO + bicicletas
   fine-tuned), 4 ByteTracks (pessoas, bicicletas, automóveis, motos).
   Cada track guarda as caixas por frame, votos de classe, associação
   pessoa↔bicicleta/moto e alguns recortes (para o filmstrip).
+  Em paralelo, subtração de fundo: manchas em movimento que nenhuma caixa
+  do YOLO explica viram um 5º ByteTrack ("movimento" → categoria outros) —
+  tudo que se move e cruza a linha chega à revisão, mesmo sem modelo.
 Pós-processamento: gera candidatos
   - com linhas: 1º cruzamento do ponto de contato com o chão (base-centro
     da caixa) com cada segmento desenhado; direção A→B / B→A.
@@ -56,14 +59,25 @@ from leitor import LeitorVideo, info_video  # noqa: E402
 
 _PERSON, _BICYCLE, _MOTORCYCLE = 0, 1, 3
 
-GRUPOS = ("pes", "bic", "aut", "mot")
-CATEGORIA_GRUPO = {"pes": "pedestres", "bic": "ciclistas", "aut": "automoveis", "mot": "motocicletas"}
+GRUPOS = ("pes", "bic", "aut", "mot", "mov")
+CATEGORIA_GRUPO = {"pes": "pedestres", "bic": "ciclistas", "aut": "automoveis", "mot": "motocicletas",
+                   "mov": "outros"}
 
+TRILHAS_VERSAO = 2       # 2: inclui o grupo "mov"; trilhas mais antigas forçam nova detecção
 MIN_OBS = 3              # observações mínimas (após emendas) para virar candidato
 MAX_RECORTES = 10        # recortes guardados por track (filmstrip)
 DESLOC_MIN_FRAC = 0.12   # sem linhas: deslocamento mínimo (fração da diagonal)
 JANELA_PAREAR_S = 3.0    # pessoa↔veículo: eventos a até ±3 s são o mesmo objeto
 CLIPE_S = 1.5            # meia-janela do clipe (s)
+
+# movimento sem modelo (subtração de fundo numa cópia reduzida do quadro)
+MOV_LARGURA = 480        # largura da máscara de movimento (px)
+MOV_AREA_MIN = 40        # área mínima da mancha na máscara (px; ~25×25 em 1080p)
+MOV_AREA_MAX = 0.25      # mancha maior que isso do quadro = troca de exposição/IR, ignora
+MOV_EXPLICADO = 0.3      # fração da mancha dentro de caixas do YOLO → já é um objeto conhecido
+MOV_AQUECER_S = 3.0      # o modelo de fundo precisa de alguns segundos para estabilizar
+MOV_MIN_S = 0.6          # track de movimento: duração mínima
+MOV_DESLOC_ALTURAS = 1.5 # ... e deslocamento mínimo, em alturas da própria caixa
 
 
 def emitir(**dados) -> None:
@@ -202,6 +216,55 @@ def _associar(tracks: dict, pessoas, bicicletas, motos, escala: float) -> None:
             tr.vizinhos[f"{grupo}:{int(veic.tracker_id[j])}"] += 1
 
 
+class Movimento:
+    """Manchas em movimento não explicadas pelo YOLO, como sv.Detections no
+    espaço do quadro processado. Sombras (MOG2 marca 127) ficam de fora."""
+
+    def __init__(self, largura: int, altura: int, fps: float):
+        self.s = MOV_LARGURA / largura
+        self.tam = (MOV_LARGURA, max(1, int(round(altura * self.s))))
+        self.fundo = cv2.createBackgroundSubtractorMOG2(history=int(20 * fps), varThreshold=25,
+                                                        detectShadows=True)
+        self.aquecer = int(MOV_AQUECER_S * fps)
+        self.n = 0
+        self.k_abre = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        self.k_fecha = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+
+    def detectar(self, frame, conhecidos: list[sv.Detections]) -> sv.Detections:
+        pequeno = cv2.resize(frame, self.tam, interpolation=cv2.INTER_AREA)
+        mascara = self.fundo.apply(pequeno)
+        self.n += 1
+        if self.n <= self.aquecer:
+            return sv.Detections.empty()
+        _, m = cv2.threshold(mascara, 200, 255, cv2.THRESH_BINARY)
+        m = cv2.morphologyEx(m, cv2.MORPH_OPEN, self.k_abre)
+        m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, self.k_fecha)
+        n, rot, est, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+        if n <= 1:
+            return sv.Detections.empty()
+        # caixas do YOLO, alargadas para os lados e para baixo (rodas, pernas,
+        # sombra colada): mancha majoritariamente dentro delas já tem modelo
+        cobre = np.zeros(m.shape, np.uint8)
+        for d in conhecidos:
+            for x1, y1, x2, y2 in d.xyxy * self.s:
+                w, h = x2 - x1, y2 - y1
+                cv2.rectangle(cobre, (int(x1 - 0.3 * w), int(y1 - 0.1 * h)),
+                              (int(x2 + 0.3 * w), int(y2 + 0.5 * h)), 1, -1)
+        dentro = np.bincount(rot[cobre > 0], minlength=n)
+        area_max = MOV_AREA_MAX * m.size
+        caixas = []
+        for i in range(1, n):
+            x, y, w, h, area = est[i]
+            if area < MOV_AREA_MIN or area > area_max or dentro[i] / area >= MOV_EXPLICADO:
+                continue
+            caixas.append((x, y, x + w, y + h))
+        if not caixas:
+            return sv.Detections.empty()
+        xyxy = np.array(caixas, np.float32) / self.s
+        return sv.Detections(xyxy=xyxy, confidence=np.full(len(xyxy), 0.5, np.float32),
+                             class_id=np.full(len(xyxy), -1, int))
+
+
 def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
                    imgsz_forcado: int | None = None, lote: int = 8):
     """Retorna (tracks, escala, leitor_info). Coordenadas no espaço do quadro
@@ -220,6 +283,7 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
 
     leitor = LeitorVideo(video)
     escala = leitor.altura / 1080
+    movimento = Movimento(leitor.largura, leitor.altura, leitor.info["fps"])
     imgsz = imgsz_forcado
     if imgsz is None:
         # resolução de inferência acompanha o vídeo ORIGINAL: em 4K, 640 px
@@ -275,6 +339,11 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
                 # para os candidatos — não precisa guardar de todos os tracks
                 _registrar(tracks, g, d, frame, i, guardar_recortes=False)
             _associar(tracks, rastreados["pes"], rastreados["bic"], rastreados["mot"], escala)
+            # caixas cruas do YOLO (não só as rastreadas): um objeto que o
+            # tracker ainda não confirmou não deve virar "outros"
+            mov = movimento.detectar(frame, [tudo, bikes])
+            _registrar(tracks, "mov", trackers["mov"].update_with_detections(mov), frame, i,
+                       guardar_recortes=False)
 
         agora = time.time()
         if agora - ultimo_emit >= 1.0:
@@ -428,6 +497,16 @@ def salvar_pontos(caminho: Path, tracks: dict, largura: int, altura: int, max_po
 # Candidatos
 # ----------------------------------------------------------------------
 
+def _movimento_real(tr: Track, fps: float) -> bool:
+    """Track só de subtração de fundo: precisa durar e se deslocar de verdade
+    (folhas, chuva e faróis piscando ficam no lugar)."""
+    if tr.frames[-1] - tr.frames[0] < MOV_MIN_S * fps:
+        return False
+    alturas = sorted(c[3] - c[1] for c in tr.caixas)
+    p0, p1 = ponto_chao(tr.caixas[0]), ponto_chao(tr.caixas[-1])
+    return np.hypot(p1[0] - p0[0], p1[1] - p0[1]) >= MOV_DESLOC_ALTURAS * alturas[len(alturas) // 2]
+
+
 def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int,
                      fps: float, escala: float) -> list[dict]:
     segs = [(l["id"], (l["x1"] * largura, l["y1"] * altura), (l["x2"] * largura, l["y2"] * altura))
@@ -437,6 +516,8 @@ def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int
 
     for tr in tracks.values():
         if tr.n < MIN_OBS:
+            continue
+        if tr.grupo == "mov" and not _movimento_real(tr, fps):
             continue
         base = {"track": tr.chave, "grupo": tr.grupo, "_tr": tr}
         if segs:
@@ -506,6 +587,18 @@ def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int
             fica["alternativa"] = CATEGORIA_GRUPO[sai["grupo"]]
             removidos.add(id(sai))
     finais = [e for e in finais if id(e) not in removidos]
+
+    # movimento que coincide com um evento do YOLO (mesma linha, perto no
+    # tempo e no espaço) é o mesmo objeto visto antes/depois do modelo pegar
+    conhecidos = [e for e in finais if e["grupo"] != "mov"]
+    def _repetido(ev) -> bool:
+        cx = (ev["bbox"][0] + ev["bbox"][2]) / 2
+        return any(c["linha_id"] == ev["linha_id"] and abs(c["frame"] - ev["frame"]) <= fps
+                   and abs((c["bbox"][0] + c["bbox"][2]) / 2 - cx) <= 150 * escala for c in conhecidos)
+    for ev in finais:
+        if ev["grupo"] == "mov":
+            ev["origem"] = "movimento"
+    finais = [e for e in finais if e["grupo"] != "mov" or not _repetido(e)]
 
     for k, ev in enumerate(finais):
         tr = ev["_tr"]
@@ -651,20 +744,23 @@ def main() -> None:
     linhas = json.loads(Path(args.linhas).read_text()) if args.linhas else []
     fps = info_video(args.video)["fps"]
 
-    if args.etapa in ("tudo", "trilhas"):
+    tracks = None
+    if args.etapa == "candidatos":
+        tracks, meta = carregar_trilhas(arq_trilhas)
+        if meta.get("versao", 1) < TRILHAS_VERSAO:
+            tracks = None  # detecção antiga (sem movimento): refaz tudo
+    if tracks is None:
         inicio_f = int(args.inicio * fps)
         fim_f = int(args.fim * fps) if args.fim is not None else None
         tracks, escala, leitor = passo_deteccao(args.video, inicio_f, fim_f, args.imgsz)
         tracks = emendar_tracks(tracks, fps, escala)
         meta = {"fps": fps, "largura": leitor.largura, "altura": leitor.altura,
-                "fator": leitor.fator, "escala": escala}
+                "fator": leitor.fator, "escala": escala, "versao": TRILHAS_VERSAO}
         salvar_trilhas(arq_trilhas, tracks, meta)
         salvar_pontos(arq_trilhas.parent / "pontos.json", tracks, leitor.largura, leitor.altura)
         if args.etapa == "trilhas":
             emitir(tipo="fim", trilhas=len(tracks))
             return
-    else:
-        tracks, meta = carregar_trilhas(arq_trilhas)
     largura, altura, escala = meta["largura"], meta["altura"], meta["escala"]  # espaço do quadro processado
 
     for sub in ("filmstrips", "contextos", "clipes"):

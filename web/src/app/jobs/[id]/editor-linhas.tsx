@@ -17,13 +17,14 @@ type Props = {
   pontosUrl: string | null;
 };
 
-type Pontos = Partial<Record<"ciclistas" | "pedestres" | "automoveis" | "motocicletas", [number, number][]>>;
+type Pontos = Partial<Record<"ciclistas" | "pedestres" | "automoveis" | "motocicletas" | "outros", [number, number][]>>;
 
 const COR_PONTOS: Record<keyof Pontos, { cor: string; nome: string }> = {
   ciclistas: { cor: "#22c55e", nome: "Ciclistas" },
   pedestres: { cor: "#3b82f6", nome: "Pedestres" },
   motocicletas: { cor: "#d946ef", nome: "Motos" },
   automoveis: { cor: "#f97316", nome: "Automóveis" },
+  outros: { cor: "#a8a29e", nome: "Outros (movimento)" },
 };
 
 const CORES = ["#facc15", "#22d3ee", "#f472b6", "#a3e635", "#fb923c", "#c084fc"];
