@@ -6,11 +6,13 @@ import fs from "node:fs";
  * (web/scripts/calibrar.ts) roda este mesmo código fora do Next.
  */
 
-export const SUGESTOES = ["ciclistas", "pedestres", "automoveis", "motocicletas", "descartado"] as const;
+export const SUGESTOES = ["ciclistas", "patinetes", "scooters", "pedestres", "automoveis", "motocicletas", "descartado"] as const;
 export type Sugestao = (typeof SUGESTOES)[number];
 
 const ROTULO_PROMPT: Record<Sugestao, string> = {
   ciclistas: "ciclista",
+  patinetes: "patinete",
+  scooters: "scooter_eletrico",
   pedestres: "pedestre",
   automoveis: "automovel",
   motocicletas: "motocicleta",
@@ -29,13 +31,15 @@ Você recebe:
 - CONTEXTO (se houver): o quadro do momento em que o objeto cruza a linha de contagem (linhas amarelas), recortado em volta dele; a caixa colorida marca o objeto.
 
 Categorias:
-- ciclista: pessoa montada em bicicleta (inclui bicicleta elétrica de pedal).
+- ciclista: pessoa montada em bicicleta, sentada no selim e pedalando (inclui bicicleta elétrica de pedal).
+- patinete: pessoa EM PÉ sobre um patinete, manual ou elétrico (inclusive os de aluguel): plataforma baixa, guidão alto em T, rodas pequenas, sem pedalar; o corpo fica ereto e quase imóvel enquanto desliza.
+- scooter_eletrico: pessoa SENTADA num veículo elétrico leve de duas rodas, sem pedalar (motinho/scooter elétrica, "bicicleta elétrica" sem pedal): menor e mais leve que uma moto, rodas pequenas ou finas, sem escapamento.
 - pedestre: pessoa a pé, andando ou correndo.
-- motocicleta: moto, motoneta ou scooter motorizada (com piloto e garupa contam como uma só).
+- motocicleta: moto, motoneta ou scooter a combustão (com piloto e garupa contam como uma só).
 - automovel: carro, van, ônibus, caminhão.
 - nenhum: não há objeto real em movimento (sombra, reflexo, farol, árvore, objeto parado, recorte vazio).
 
-Pistas úteis: à noite um ciclista borrado costuma parecer "pessoa sem pernas visíveis" se deslocando rápido; motos têm farol forte e corpo largo; bicicletas têm quadro fino e rodas finas. Na dúvida entre duas categorias, escolha a mais provável e reduza a confiança.`;
+Pistas úteis: à noite um ciclista borrado costuma parecer "pessoa sem pernas visíveis" se deslocando rápido; motos têm farol forte e corpo largo; bicicletas têm quadro fino e rodas finas, e o ciclista mexe as pernas; no patinete a pessoa vai em pé, mais alta que um ciclista, e as pernas não giram. Na dúvida entre duas categorias, escolha a mais provável e reduza a confiança.`;
 
 const ESQUEMA = {
   name: "classificacao",

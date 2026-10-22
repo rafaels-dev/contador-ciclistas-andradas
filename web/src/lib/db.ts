@@ -21,7 +21,9 @@ export const STATUS_JOB = [
 ] as const;
 export type StatusJob = (typeof STATUS_JOB)[number];
 
-export const CATEGORIAS = ["ciclistas", "pedestres", "automoveis", "motocicletas"] as const;
+// patinetes (em pé) e scooters elétricos (sentado, sem pedalar): só o modelo de
+// visão e a revisão os distinguem — o YOLO os entrega como pessoa/bicicleta/moto
+export const CATEGORIAS = ["ciclistas", "patinetes", "scooters", "pedestres", "automoveis", "motocicletas"] as const;
 export type Categoria = (typeof CATEGORIAS)[number];
 
 /**

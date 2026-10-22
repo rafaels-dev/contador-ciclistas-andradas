@@ -50,7 +50,7 @@ async function rodar(modelo: string) {
   await Promise.all(Array.from({ length: 6 }, trabalhador));
   fs.writeFileSync(saida, JSON.stringify(feitos, null, 1));
 
-  const classes = ["ciclistas", "pedestres", "automoveis", "motocicletas", "descartado"] as const;
+  const classes = ["ciclistas", "patinetes", "scooters", "pedestres", "automoveis", "motocicletas", "descartado"] as const;
   let acertos = 0, acertosYolo = 0, custo = 0, erros = 0;
   const porClasse = Object.fromEntries(classes.map((k) => [k, { n: 0, ok: 0 }]));
   const confusao: Record<string, number> = {};

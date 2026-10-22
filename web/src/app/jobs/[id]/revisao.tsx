@@ -16,6 +16,8 @@ const ATALHOS: [Classe, string][] = [
   ["pedestres", "2"],
   ["automoveis", "3"],
   ["motocicletas", "4"],
+  ["patinetes", "5"],
+  ["scooters", "6"],
   ["descartado", "0"],
 ];
 const POR_TECLA: Record<string, Classe> = { ...Object.fromEntries(ATALHOS.map(([c, k]) => [k, c])), x: "descartado" };
@@ -120,7 +122,7 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
     return () => window.removeEventListener("keydown", tecla);
   });
 
-  const filtros: Filtro[] = ["pendentes", "revisados", "todos", "ciclistas", "pedestres", "automoveis", "motocicletas", "descartado", "fora", "divergentes"];
+  const filtros: Filtro[] = ["pendentes", "revisados", "todos", "ciclistas", "patinetes", "scooters", "pedestres", "automoveis", "motocicletas", "descartado", "fora", "divergentes"];
   const nomeFiltro = (f: Filtro) =>
     ({ pendentes: "Pendentes", revisados: "Revisados", todos: "Todos", divergentes: "Modelo ≠ detector", fora: "Fora da linha" } as Record<string, string>)[f] ??
     NOME_CATEGORIA[f as Classe];
@@ -185,7 +187,7 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
           </div>
           <p className="text-xs text-zinc-500">
             Teclado: <kbd>↑</kbd>/<kbd>↓</kbd> navega · <kbd>Enter</kbd> aceita a proposta · <kbd>1</kbd> ciclista ·{" "}
-            <kbd>2</kbd> pedestre · <kbd>3</kbd> automóvel · <kbd>4</kbd> moto · <kbd>0</kbd> descartar · <kbd>U</kbd> desfaz
+            <kbd>2</kbd> pedestre · <kbd>3</kbd> automóvel · <kbd>4</kbd> moto · <kbd>5</kbd> patinete · <kbd>6</kbd> scooter elétrico · <kbd>0</kbd> descartar · <kbd>U</kbd> desfaz
           </p>
           {erro && <p className="text-red-600">{erro}</p>}
         </div>
@@ -347,7 +349,7 @@ function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDec
   );
 }
 
-const ORDEM: Categoria[] = ["ciclistas", "pedestres", "motocicletas", "automoveis"];
+const ORDEM: Categoria[] = ["ciclistas", "patinetes", "scooters", "pedestres", "motocicletas", "automoveis"];
 
 function QuadroTotais({ totais, linhas, total }: { totais: ReturnType<typeof calcularTotais>; linhas: Linha[]; total: number }) {
   const ids = linhas.length ? linhas.map((l) => l.id) : [""];
