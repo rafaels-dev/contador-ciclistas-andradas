@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import https from "node:https";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
@@ -88,6 +89,31 @@ function urlDoFormularioDeAviso(html: string): string | null {
   return url.toString();
 }
 
+/**
+ * GET via node:https, devolvido como Response. Não usa o fetch global: no
+ * servidor do Next ele é interceptado e, mesmo com cache "no-store", retém o
+ * corpo — 4 vídeos de 3,7 GB em paralelo levaram o processo a 12 GB de RAM e
+ * a ~170 KB/s cada (fora do Next o mesmo download faz ~60 MB/s).
+ */
+function obter(url: string, sinal: AbortSignal, redirecionamentos = 5): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { signal: sinal }, (msg) => {
+      const status = msg.statusCode ?? 0;
+      if (status >= 300 && status < 400 && msg.headers.location) {
+        msg.resume();
+        if (redirecionamentos <= 0) return reject(new Error("Redirecionamentos demais no download do Drive."));
+        return resolve(obter(new URL(msg.headers.location, url).toString(), sinal, redirecionamentos - 1));
+      }
+      const headers = new Headers();
+      for (const [k, v] of Object.entries(msg.headers)) {
+        if (v !== undefined) headers.set(k, Array.isArray(v) ? v.join(", ") : v);
+      }
+      resolve(new Response(Readable.toWeb(msg) as ReadableStream, { status, headers }));
+    });
+    req.on("error", reject);
+  });
+}
+
 /** Baixa um arquivo PÚBLICO do Drive ("qualquer pessoa com o link"). */
 export async function baixarDoDrive(
   id: string,
@@ -95,18 +121,16 @@ export async function baixarDoDrive(
   sinal: AbortSignal,
   aoProgredir: (baixados: number, total: number | null) => void,
 ): Promise<{ nome: string | null; bytes: number }> {
-  let res = await fetch(
+  let res = await obter(
     `https://drive.usercontent.google.com/download?id=${encodeURIComponent(id)}&export=download&confirm=t`,
-    // no-store: o fetch do servidor do Next tenta guardar a resposta no cache
-    // de dados — com um vídeo de GBs isso estoura a memória
-    { signal: sinal, cache: "no-store" },
+    sinal,
   );
   if (res.ok && res.headers.get("content-type")?.includes("text/html")) {
     const alternativa = urlDoFormularioDeAviso(await res.text());
     if (!alternativa) {
       throw new Error("O Drive não liberou o download — confira se o link é público (qualquer pessoa com o link).");
     }
-    res = await fetch(alternativa, { signal: sinal, cache: "no-store" });
+    res = await obter(alternativa, sinal);
   }
   if (!res.ok || !res.body) throw new Error(`Falha no download do Drive (HTTP ${res.status}).`);
   if (res.headers.get("content-type")?.includes("text/html")) {
