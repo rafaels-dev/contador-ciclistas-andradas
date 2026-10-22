@@ -7,7 +7,8 @@ import { cancelar, retomarSugestoes, tentarNovamente } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
 import { BotaoEditarLinhas } from "./botao-editar-linhas";
 import { EditorLinhas } from "./editor-linhas";
-import { GradeCandidatos } from "./grade-candidatos";
+import { CategoriasDasLinhas } from "./categorias-linha";
+import { Revisao } from "./revisao";
 
 const ROTULO_STATUS: Record<Job["status"], string> = {
   baixando: "Baixando",
@@ -110,10 +111,16 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
               <button className="rounded-lg bg-amber-600 px-3 py-1.5 font-medium text-white hover:bg-amber-700">Retomar sugestões</button>
             </form>
           )}
-          <GradeCandidatos
+          {(job.status === "sugerindo" || job.status === "aguardando_revisao") && (
+            <CategoriasDasLinhas jobId={job.id} linhas={linhas} />
+          )}
+          <Revisao
+            key={job.status}
+            jobId={job.id}
             base={base}
             candidatos={listarCandidatos(job.id)}
-            nomesLinhas={Object.fromEntries(linhas.map((l) => [l.id, l.nome]))}
+            linhas={linhas}
+            editavel={job.status === "aguardando_revisao"}
           />
         </>
       )}

@@ -37,6 +37,9 @@ export type Linha = {
   y1: number;
   x2: number;
   y2: number;
+  /** categorias contadas nesta linha (vazio/ausente = todas); as demais vão
+   *  para a revisão já propostas como descarte — ver lib/revisao.ts */
+  categorias?: Categoria[];
 };
 
 export type Job = {
@@ -271,6 +274,30 @@ export function registrarSugestao(
        WHERE id = ?`,
     )
     .run(dados.sugestao_llm, dados.conf_llm, dados.justificativa_llm, dados.modelo_llm, dados.custo_llm, dados.status_llm, id);
+}
+
+/** Grava decisões humanas (rotulo null = volta a pendente). Só toca candidatos do job. */
+export function revisarCandidatos(jobId: string, decisoes: { id: number; rotulo: Categoria | "descartado" | null }[]): void {
+  const d = db();
+  const upd = d.prepare(
+    `UPDATE candidatos SET rotulo = ?, revisado_em = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END
+     WHERE id = ? AND job_id = ?`,
+  );
+  d.exec("BEGIN");
+  try {
+    for (const x of decisoes) upd.run(x.rotulo, x.rotulo, x.id, jobId);
+    d.exec("COMMIT");
+  } catch (e) {
+    d.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+export function resumoRevisao(jobId: string): { total: number; revisados: number } {
+  const r = db()
+    .prepare("SELECT COUNT(*) AS total, COUNT(rotulo) AS revisados FROM candidatos WHERE job_id = ?")
+    .get(jobId) as { total: number; revisados: number };
+  return { total: r.total, revisados: r.revisados };
 }
 
 export function resumoSugestoes(jobId: string): { total: number; ok: number; falhou: number; custo: number } {

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { Linha } from "@/lib/db";
 import { confirmarLinhas } from "./actions";
+import { ChipsCategorias } from "./categorias-linha";
 
 type Props = {
   jobId: string;
@@ -116,7 +117,8 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
         Clique e arraste sobre o quadro para desenhar uma linha de contagem (uma por ciclovia ou faixa, em qualquer
         ângulo). Conta quem cruzar a linha; <strong>A→B</strong> e <strong>B→A</strong> indicam o sentido. Sem
         nenhuma linha, toda trajetória relevante vira candidata. O cruzamento usa o ponto em que o objeto toca o chão
-        (base da caixa): a linha deve atravessar só a faixa desejada, sem encostar nas vizinhas.
+        (base da caixa): a linha deve atravessar só a faixa desejada, sem encostar nas vizinhas. Desligue as categorias
+        que uma linha não deve contar (ex.: na ciclovia, automóveis) — elas chegam à revisão já propostas como descarte.
       </p>
 
       {pontos && (
@@ -206,13 +208,18 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
       {linhas.length > 0 && (
         <ul className="flex flex-col gap-2">
           {linhas.map((l, i) => (
-            <li key={l.id} className="flex items-center gap-2">
+            <li key={l.id} className="flex flex-wrap items-center gap-2">
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: CORES[i % CORES.length] }} />
               <input
                 value={l.nome}
                 onChange={(e) => setLinhas(linhas.map((x) => (x.id === l.id ? { ...x, nome: e.target.value } : x)))}
-                className="flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                className="min-w-40 flex-1 rounded border border-zinc-300 bg-white px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
                 aria-label={`Nome da linha ${i + 1}`}
+              />
+              <ChipsCategorias
+                valor={l.categorias}
+                rotulo={`Categorias da linha ${i + 1}`}
+                aoMudar={(v) => setLinhas(linhas.map((x) => (x.id === l.id ? { ...x, categorias: v } : x)))}
               />
               <button
                 type="button"

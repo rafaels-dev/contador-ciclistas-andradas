@@ -3,9 +3,27 @@
 import fs from "node:fs";
 import path from "node:path";
 import { refresh } from "next/cache";
-import { atualizarJob, obterJob, resumoSugestoes, salvarCamera, type Linha } from "@/lib/db";
+import {
+  CATEGORIAS,
+  atualizarJob,
+  listarCameras,
+  obterJob,
+  resumoSugestoes,
+  revisarCandidatos,
+  salvarCamera,
+  type Categoria,
+  type Linha,
+} from "@/lib/db";
+import { CLASSES, type Classe } from "@/lib/revisao";
 import { dirJob } from "@/lib/paths";
 import { cancelarJob, iniciarDeteccao, iniciarDownload, iniciarSugestoes, sugestoesAtivas } from "@/lib/runner";
+
+function validarCategorias(entrada: unknown): Categoria[] | undefined {
+  if (!Array.isArray(entrada)) return undefined;
+  const cats = CATEGORIAS.filter((c) => entrada.includes(c));
+  // todas marcadas = sem restrição
+  return cats.length && cats.length < CATEGORIAS.length ? cats : undefined;
+}
 
 function validarLinhas(entrada: unknown): Linha[] {
   if (!Array.isArray(entrada)) throw new Error("Linhas inválidas.");
@@ -22,6 +40,7 @@ function validarLinhas(entrada: unknown): Linha[] {
       y1: num(l.y1),
       x2: num(l.x2),
       y2: num(l.y2),
+      categorias: validarCategorias(l.categorias),
     };
   });
 }
@@ -85,5 +104,39 @@ export async function editarLinhas(jobId: string): Promise<void> {
   if (!job || !["sugerindo", "aguardando_revisao", "erro"].includes(job.status) || sugestoesAtivas(jobId)) return;
   if (!fs.existsSync(path.join(dirJob(jobId), "frame0.jpg"))) return;
   atualizarJob(jobId, { status: "aguardando_linhas", erro: null, mensagem: null, progresso: 0 });
+  refresh();
+}
+
+/**
+ * Decisões da revisão humana. Não chama refresh(): a tela mantém o estado
+ * local para responder na hora a cada tecla; o servidor só persiste.
+ */
+export async function revisar(
+  jobId: string,
+  decisoes: { id: number; rotulo: Classe | null }[],
+): Promise<{ erro?: string }> {
+  const job = obterJob(jobId);
+  if (!job) return { erro: "Job não encontrado." };
+  if (job.status !== "aguardando_revisao") return { erro: `O job está em "${job.status}" — a revisão está fechada.` };
+  if (!Array.isArray(decisoes) || decisoes.some((d) => !Number.isInteger(d?.id) || (d.rotulo !== null && !CLASSES.includes(d.rotulo)))) {
+    return { erro: "Decisão inválida." };
+  }
+  revisarCandidatos(jobId, decisoes);
+  return {};
+}
+
+/**
+ * Muda só as categorias contadas por linha, sem refazer candidatos nem
+ * sugestões (a proposta de descarte é calculada na tela). Atualiza também a
+ * câmera salva, para os próximos vídeos dela.
+ */
+export async function definirCategoriasLinhas(jobId: string, mapa: Record<string, string[]>): Promise<void> {
+  const job = obterJob(jobId);
+  if (!job || !["sugerindo", "aguardando_revisao"].includes(job.status)) return;
+  const aplicar = (linhas: Linha[]) =>
+    linhas.map((l) => (l.id in mapa ? { ...l, categorias: validarCategorias(mapa[l.id]) } : l));
+  atualizarJob(jobId, { linhas: JSON.stringify(aplicar(JSON.parse(job.linhas) as Linha[])) });
+  const cam = job.camera_id ? listarCameras().find((c) => c.id === job.camera_id) : undefined;
+  if (cam) salvarCamera(cam.id, cam.nome, aplicar(JSON.parse(cam.linhas) as Linha[]));
   refresh();
 }
