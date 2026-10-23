@@ -15,11 +15,13 @@ Empacota o app de revisão (`web/`) como um programa instalável, no estilo do S
   - macOS: `~/Library/Application Support/Contador de Tráfego`.
   - Linux: `~/.config/Contador de Tráfego`.
   - Conteúdo: `dados/` (banco e vídeos processados), `config.env` (chave do OpenRouter, editável em **Configurações**), `motor/` (Python) e `servidor.log`.
-- **Motor (Python + YOLO):** não vai no instalador, porque o PyTorch com CUDA passa de 2 GB. Na primeira execução, **Configurações → Instalar o motor** usa o `uv` embutido para:
+- **Primeiro acesso:** um assistente pergunta pela placa de vídeo, instala o motor e pede a chave da IA (com passo a passo e teste antes de salvar). Tudo isso continua editável em **Configurações**.
+- **Motor (Python + YOLO):** não vai no instalador, porque o PyTorch com CUDA passa de 2 GB. O assistente (ou **Configurações → Instalar**) usa o `uv` embutido para:
   - baixar o Python 3.11;
   - instalar o PyTorch (com CUDA se houver placa NVIDIA, senão para CPU; MPS no Mac);
   - instalar o `requirements.txt`.
-- **Python já existente:** a variável `PYTHON` aponta o worker para um Python já instalado.
+- **Python já existente:** a variável `PYTHON` aponta o worker para um Python já instalado. Sem ela, o app usa só o ambiente que ele mesmo instalou.
+- **Versões fixas:** `requirements.txt` e o PyTorch têm versão fixa, porque cada máquina instala do zero. Testado no Linux: a instalação só com processador ocupa 1,7 GB e detecta normalmente (17 fps num clipe 1080p).
 
 ## Gerar os instaladores
 

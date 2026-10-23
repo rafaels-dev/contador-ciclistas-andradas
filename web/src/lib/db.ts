@@ -79,6 +79,12 @@ CREATE TABLE IF NOT EXISTS grupos (
   nome       TEXT NOT NULL,
   criado_em  TEXT NOT NULL DEFAULT (datetime('now'))
 );
+-- preferências do app (placa de vídeo, primeiro acesso…); a chave do
+-- OpenRouter não fica aqui, e sim no arquivo de configuração (lib/env.ts)
+CREATE TABLE IF NOT EXISTS configuracoes (
+  chave  TEXT PRIMARY KEY,
+  valor  TEXT NOT NULL
+);
 `;
 
 const SCHEMA_RENDERS = `
@@ -174,7 +180,7 @@ function migrar(d: DatabaseSync): void {
 const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
 // incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
 // migração precisa rodar sem reiniciar o servidor (e os workers em curso)
-const VERSAO_SCHEMA = 4;
+const VERSAO_SCHEMA = 5;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -418,4 +424,14 @@ export function atualizarRender(id: string, campos: Partial<Pick<Render, "status
   db()
     .prepare(`UPDATE renders SET ${chaves.map((k) => `${k} = ?`).join(", ")}, atualizado_em = datetime('now') WHERE id = ?`)
     .run(...chaves.map((k) => campos[k] ?? null), id);
+}
+
+export function lerConfiguracao(chave: string): string | null {
+  const linha = db().prepare("SELECT valor FROM configuracoes WHERE chave = ?").get(chave) as { valor: string } | undefined;
+  return linha?.valor ?? null;
+}
+
+export function gravarConfiguracao(chave: string, valor: string | null): void {
+  if (valor === null) db().prepare("DELETE FROM configuracoes WHERE chave = ?").run(chave);
+  else db().prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").run(chave, valor);
 }

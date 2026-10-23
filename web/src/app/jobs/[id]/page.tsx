@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { listarCameras, listarCandidatos, obterGrupo, obterJob, type Job, type Linha } from "@/lib/db";
-import { sugestoesAtivas, temTrilhas } from "@/lib/runner";
+import { SUFIXO_CHAVE, sugestoesAtivas, temTrilhas } from "@/lib/runner";
 import { ETAPAS, etapaAtual, rotuloStatus } from "@/lib/status";
 import { BOTAO, timecode } from "@/lib/ui";
 import { cancelar, retomarSugestoes, tentarNovamente } from "./actions";
@@ -99,6 +99,11 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
       {job.status === "erro" && (
         <div className="m-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger/40 bg-danger/10 p-4">
           <p className="flex-1 text-danger">{job.erro}</p>
+          {job.erro?.endsWith(SUFIXO_CHAVE) && (
+            <Link href="/configuracoes" className={BOTAO.primario}>
+              Abrir Configurações
+            </Link>
+          )}
           <form action={tentarNovamente.bind(null, job.id)}>
             <button className={BOTAO.secundario}>Tentar novamente</button>
           </form>

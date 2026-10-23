@@ -13,7 +13,8 @@ const nextConfig: NextConfig = {
   // os dados (vídeos, banco) são lidos em tempo de execução, nunca empacotados
   outputFileTracingExcludes: { "*": ["data/**", "scripts/**"] },
   cacheComponents: true,
-  partialPrefetching: true,
+  // sem partialPrefetching: no build de produção (Next 16.4) ele impedia o
+  // refresh() das server actions de atualizar a tela (no `next dev` funcionava)
   turbopack: {
     root: path.resolve(__dirname),
     rules: {

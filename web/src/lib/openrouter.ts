@@ -167,3 +167,21 @@ export async function sugerirCategoria(
     tokens_entrada: corpo.usage?.prompt_tokens ?? null,
   };
 }
+
+export type VerificacaoChave = { ok: boolean; saldo_usd: number | null; erro?: string };
+
+/** Confere se a chave funciona e quanto saldo ela tem (para a tela de configuração). */
+export async function verificarChave(chave: string): Promise<VerificacaoChave> {
+  const cab = { Authorization: `Bearer ${chave}` };
+  try {
+    const r = await fetch("https://openrouter.ai/api/v1/key", { headers: cab, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (r.status === 401 || r.status === 403) return { ok: false, saldo_usd: null, erro: "Essa chave não foi aceita. Confira se copiou a chave inteira." };
+    if (!r.ok) return { ok: false, saldo_usd: null, erro: `O OpenRouter não respondeu direito (erro ${r.status}). Tente de novo.` };
+    const c = await fetch("https://openrouter.ai/api/v1/credits", { headers: cab, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    const dados = c.ok ? ((await c.json()) as { data?: { total_credits?: number; total_usage?: number } }).data : undefined;
+    const saldo = dados?.total_credits != null ? dados.total_credits - (dados.total_usage ?? 0) : null;
+    return { ok: true, saldo_usd: saldo };
+  } catch {
+    return { ok: false, saldo_usd: null, erro: "Sem conexão com o OpenRouter. Confira a internet." };
+  }
+}

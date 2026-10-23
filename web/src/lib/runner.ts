@@ -16,7 +16,7 @@ import {
   type Linha,
 } from "./db";
 import { baixarDoDrive } from "./drive";
-import { pythonDoMotor } from "./motor";
+import { ambienteDoWorker, pythonDoMotor } from "./motor";
 import { ErroOpenRouter, sugerirCategoria } from "./openrouter";
 import { RAIZ_REPO, dirJob, dirRender } from "./paths";
 
@@ -81,7 +81,7 @@ function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker)
   return new Promise((resolve, reject) => {
     const proc = spawn(pythonDoMotor(), [path.join("worker", script), ...args], {
       cwd: RAIZ_REPO,
-      env: { ...process.env, PYTHONUNBUFFERED: "1" },
+      env: { ...process.env, PYTHONUNBUFFERED: "1", ...ambienteDoWorker() },
       windowsHide: true,
     });
     if (dono) {
@@ -336,6 +336,21 @@ export function sugestoesAtivas(jobId: string): boolean {
 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// sugestões que pararam por causa da chave da IA: texto para quem não é da
+// área; a página do vídeo reconhece SUFIXO_CHAVE e oferece abrir Configurações
+export const SUFIXO_CHAVE = "Resolva em Configurações e clique em “Tentar novamente” — a detecção não é refeita.";
+function mensagemChave(status: number): string {
+  const motivo =
+    status === 402
+      ? "Acabaram os créditos da inteligência artificial (OpenRouter)."
+      : status === 403
+        ? "A chave da inteligência artificial não tem permissão para este uso."
+        : process.env.OPENROUTER_API_KEY
+          ? "A chave da inteligência artificial foi recusada."
+          : "A chave da inteligência artificial ainda não foi configurada.";
+  return `${motivo} ${SUFIXO_CHAVE}`;
+}
+
 export function iniciarSugestoes(jobId: string): void {
   if (sugerindo.has(jobId)) return;
   sugerindo.add(jobId);
@@ -386,7 +401,7 @@ export function iniciarSugestoes(jobId: string): void {
             const erro = e instanceof ErroOpenRouter ? e : new ErroOpenRouter(String(e), null, false);
             // chave inválida / sem créditos: não adianta continuar o lote
             if (erro.status === 401 || erro.status === 402 || erro.status === 403) {
-              abortar = erro.message;
+              abortar = mensagemChave(erro.status);
               break;
             }
             if (!erro.transitorio || tentativa >= TENTATIVAS_LLM) {
@@ -406,7 +421,7 @@ export function iniciarSugestoes(jobId: string): void {
 
     const r = resumoSugestoes(jobId);
     if (abortar) {
-      atualizarJob(jobId, { status: "erro", erro: `Sugestões interrompidas: ${abortar}`, mensagem: null });
+      atualizarJob(jobId, { status: "erro", erro: abortar, mensagem: null });
     } else if (r.falhou > 0 || r.ok < r.total) {
       atualizarJob(jobId, {
         mensagem: `${r.ok} de ${r.total} com sugestão; ${r.total - r.ok} falharam — use "Retomar sugestões".`,

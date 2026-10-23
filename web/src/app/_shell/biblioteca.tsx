@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { tarefasEmAndamento } from "@/lib/atividade";
 import { listarGrupos, listarJobs, listarRenders } from "@/lib/db";
 import { BOTAO, TITULO_PAINEL } from "@/lib/ui";
 import { ItemNav, NovoGrupo } from "./itens-nav";
+import { PainelTarefas } from "./tarefas";
 
 /** Painel lateral: a biblioteca de vídeos, organizada em grupos, e as exportações. */
 export async function Biblioteca() {
@@ -45,6 +47,8 @@ export async function Biblioteca() {
           Exportações
         </ItemNav>
       </nav>
+
+      <PainelTarefas tarefas={tarefasEmAndamento()} />
 
       <nav className="mt-auto flex flex-col gap-0.5">
         <ItemNav href="/configuracoes" grupo={undefined} n={null} icone="config">

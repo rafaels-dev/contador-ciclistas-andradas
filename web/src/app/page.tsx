@@ -1,10 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { jobTrabalhando } from "@/lib/atividade";
-import { listarCandidatos, listarGrupos, listarJobs, obterGrupo, resumoRevisao } from "@/lib/db";
+import { lerConfiguracao, listarCandidatos, listarGrupos, listarJobs, obterGrupo, resumoRevisao } from "@/lib/db";
 import { dirJob } from "@/lib/paths";
 import { rotuloStatus } from "@/lib/status";
 import { BOTAO } from "@/lib/ui";
@@ -22,6 +23,8 @@ export default function Home(props: PageProps<"/">) {
 
 async function Painel({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   await connection();
+  // primeiro acesso: o assistente prepara placa de vídeo, motor e chave da IA
+  if (!lerConfiguracao("primeiro_acesso")) redirect("/boas-vindas");
   const sp = await searchParams;
   const filtro = typeof sp.grupo === "string" ? sp.grupo : null;
   const grupo = filtro && filtro !== "sem" ? obterGrupo(filtro) : undefined;
