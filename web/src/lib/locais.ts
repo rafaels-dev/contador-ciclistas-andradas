@@ -55,6 +55,15 @@ export function raizes(): ItemPasta[] {
   return lista;
 }
 
+function abre(pasta: string): boolean {
+  try {
+    fs.opendirSync(pasta).closeSync();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function listarPasta(caminho: string): ConteudoPasta {
   const entradas = fs.readdirSync(caminho, { withFileTypes: true });
   const pastas: ItemPasta[] = [];
@@ -64,7 +73,12 @@ export function listarPasta(caminho: string): ConteudoPasta {
     const completo = path.join(caminho, e.name);
     try {
       const st = fs.statSync(completo); // segue atalhos/symlinks
-      if (st.isDirectory()) pastas.push({ nome: e.name, caminho: completo });
+      if (st.isDirectory()) {
+        // Windows: a pasta do usuário tem junções de compatibilidade ("Application
+        // Data", "Cookies", "My Documents"…) que não abrem — só confundiriam
+        if (process.platform === "win32" && e.isSymbolicLink() && !abre(completo)) continue;
+        pastas.push({ nome: e.name, caminho: completo });
+      }
       else if (st.isFile() && ehVideo(e.name)) videos.push({ nome: e.name, caminho: completo, bytes: st.size });
     } catch {
       // sem permissão ou link quebrado: não aparece

@@ -38,18 +38,27 @@ npm run dist:mac     # .dmg (arm64 e x64) — rode num Mac
 - **Servidor Next standalone:** compilado numa cópia limpa de `web/`, sem `data/`. Com os vídeos lá dentro, o Turbopack estoura a memória.
 - **Worker e pesos:** `worker/`, `config.py` e os pesos do YOLO.
 - **uv:** a cópia do sistema; no CI, baixada do GitHub.
+- **Pesos:** `best.pt` vem do repositório; `yolov8n.pt` da raiz ou, faltando, do release da Ultralytics.
 
-No CI (`.github/workflows/desktop.yml`), uma tag `v*` gera os três instaladores e os publica no Release, de onde os apps já instalados se atualizam. Para isso, o fine-tune de bicicletas (`runs/ft_blur/weights/best.pt`) precisa estar anexado a um release, com a URL na variável `PESOS_BICICLETAS_URL` do repositório.
+No CI (`.github/workflows/desktop.yml`), uma tag `v*` (ex.: `git tag v0.0.1 && git push origin v0.0.1`) gera os três instaladores e os publica no Release, de onde os apps já instalados se atualizam; em **Actions → App desktop → Run workflow** dá para gerar à mão, informando a versão e o sistema, sem publicar. O fine-tune de bicicletas (`runs/ft_blur/weights/best.pt`, 6 MB) está no git; o `yolov8n.pt` o CI baixa da Ultralytics.
 
 ## Testar sem empacotar
 
 ```bash
 cd desktop
-npm run dev          # janela do app sobre o `next dev` em http://127.0.0.1:3000
+npm run dev          # janela do app sobre um servidor já rodando em http://127.0.0.1:3000 (`next dev` ou `npm run producao` em web/)
 npm run preparar && npm run iniciar   # com o servidor embutido, como no instalador
 ```
 
 ## Pendências
 
 - **Assinatura:** sem certificado de código, o Windows (SmartScreen) e o macOS (Gatekeeper) avisam na primeira abertura. O Mac usa assinatura ad-hoc.
-- **Testes nos outros sistemas:** a instalação do motor e a detecção ainda não foram testadas no Windows e no macOS. No Mac não há NVDEC, então o worker lê o vídeo pela CPU.
+- **macOS:** a instalação do motor e a detecção ainda não foram testadas. No Mac não há NVDEC, então o worker lê o vídeo pela CPU.
+
+## Validado no Windows (out/2026)
+
+Windows 11, RTX 4060: instalador NSIS, assistente de primeiro acesso (placa, motor com CUDA pelo `uv`, chave da IA), importação pelo diálogo nativo e pelo campo de caminho, detecção, sugestões, revisão, vídeo final (h264_nvenc), downloads, cancelamento (`taskkill /T`) e fechamento com worker rodando (nada fica órfão). Armadilhas encontradas e corrigidas:
+
+- `cv2.imwrite` devolve `False` em silêncio com acento no caminho — e a pasta de dados é `Contador de Tráfego`. O worker grava JPG por `imencode` + `write_bytes` (`gravar_jpg` em `worker/leitor.py`).
+- O Python do Windows nasce em cp1252: os eventos JSON com "→"/"…" derrubavam o worker. O runner passa `PYTHONUTF8=1` e os scripts reconfiguram o stdout.
+- `fs.readdirSync` lista as junções de compatibilidade da pasta do usuário ("Application Data", "My Documents"…), que não abrem; o navegador de pastas as esconde.

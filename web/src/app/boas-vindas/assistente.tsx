@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useState, useTransition } from "react";
 import { BOTAO } from "@/lib/ui";
 import { Marca } from "../_shell/barra-titulo";
 import { concluirPrimeiroAcesso, conferirChaveSalva, verificarMotor, type EstadoConfiguracao } from "../configuracoes/actions";
@@ -21,12 +21,20 @@ export function Assistente({ inicial }: { inicial: EstadoConfiguracao }) {
   const aoMotor = useCallback((ok: boolean) => setMotorPronto(ok), []);
   const aoChave = useCallback((ok: boolean) => setChavePronta(ok), []);
 
-  // pulou algum passo: confere antes do resumo final
-  useEffect(() => {
-    if (passo !== 4) return;
-    if (motorPronto === null) void verificarMotor().then((s) => setMotorPronto(s.ok));
-    if (chavePronta === null) void conferirChaveSalva().then((r) => setChavePronta(r.ok));
-  }, [passo, motorPronto, chavePronta]);
+  // confere de novo ao chegar no resumo: o motor pode ter terminado de
+  // instalar depois que o usuário seguiu para o passo 3 (o painel só avisa
+  // "não pronto" ao abrir), e a chave pode ter sido salva fora do assistente
+  function irParaResumo() {
+    if (motorPronto !== true) {
+      setMotorPronto(null);
+      void verificarMotor().then((s) => setMotorPronto(s.ok));
+    }
+    if (chavePronta !== true) {
+      setChavePronta(null);
+      void conferirChaveSalva().then((r) => setChavePronta(r.ok));
+    }
+    setPasso(4);
+  }
   const conferindo = passo === 4 && (motorPronto === null || chavePronta === null);
 
   const pendencias = [
@@ -113,7 +121,7 @@ export function Assistente({ inicial }: { inicial: EstadoConfiguracao }) {
             {passo === 2 && motorPronto !== true && <span className="text-xs text-muted">Dá para seguir enquanto instala</span>}
             <button
               type="button"
-              onClick={() => setPasso(passo + 1)}
+              onClick={() => (passo === 3 ? irParaResumo() : setPasso(passo + 1))}
               className={(passo === 2 && motorPronto !== true) || (passo === 3 && chavePronta !== true) ? BOTAO.secundario : BOTAO.primario}
               data-testid="proximo"
             >
