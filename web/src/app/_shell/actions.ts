@@ -15,6 +15,9 @@ export async function criarGrupo(nome: string): Promise<void> {
   if (!n) return;
   const id = randomUUID().slice(0, 8);
   salvarGrupo(id, n);
+  // o redirect sozinho só troca a página: a biblioteca lateral (layout) ficava
+  // com a lista antiga, sem o grupo novo (Next 16.4, build de produção)
+  refresh();
   redirect(`/?grupo=${id}`);
 }
 
@@ -27,6 +30,7 @@ export async function renomearGrupo(id: string, nome: string): Promise<void> {
 
 export async function apagarGrupo(id: string): Promise<void> {
   excluirGrupo(String(id));
+  refresh();
   redirect("/?grupo=sem");
 }
 

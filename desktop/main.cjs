@@ -40,6 +40,11 @@ const WSL = process.platform === "linux" && (() => {
 // não compartilha esses buffers com o Windows): desenha pelo processador
 if (WSL) app.disableHardwareAcceleration();
 
+// em desenvolvimento, dados separados dos do app instalado (mesmo nome de
+// produto = mesma pasta): senão o lock de instância única do instalado
+// derruba a janela de desenvolvimento com ERR_FAILED
+if (!app.isPackaged) app.setPath("userData", path.join(app.getPath("appData"), "Contador de Tráfego (dev)"));
+
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let janela = null;

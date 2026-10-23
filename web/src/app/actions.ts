@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { exigirAcesso } from "@/lib/acesso";
 import { atualizarJob, criarJob, obterGrupo } from "@/lib/db";
@@ -88,6 +89,7 @@ export async function criarJobsLocais(caminhos: string[], grupoId: string | null
     .map(normalizarCaminho)
     .filter((c) => ehVideo(c) && fs.existsSync(c) && fs.statSync(c).isFile())
     .map((c) => criarJobLocal(c, grupo));
+  refresh(); // a biblioteca lateral (layout) não é refeita só pelo redirect
   if (ids.length === 1) redirect(`/jobs/${ids[0]}`);
   redirect(grupo ? `/?grupo=${grupo}` : "/");
 }
@@ -106,6 +108,7 @@ export async function criarJobsDaPasta(formData: FormData): Promise<void> {
     iniciarDownload(id);
     ids.push(id);
   }
+  refresh(); // a biblioteca lateral (layout) não é refeita só pelo redirect
   if (ids.length === 1) redirect(`/jobs/${ids[0]}`);
   redirect(grupo ? `/?grupo=${grupo}` : "/");
 }
