@@ -52,8 +52,9 @@ if (SO_WEB) {
   process.exit(0);
 }
 
-// 2. motor (o que worker/ usa em tempo de execução). Os pesos não vão para o
-// git: no CI vêm de URLs (o fine-tune de bicicletas, de um release do projeto)
+// 2. motor (o que worker/ usa em tempo de execução). O fine-tune de bicicletas
+// (best.pt, 6 MB) está no git; o yolov8n.pt vem da Ultralytics quando não há
+// cópia na raiz (PESOS_BICICLETAS_URL continua como alternativa ao arquivo)
 const PESOS = {
   "yolov8n.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt",
   [path.join("runs", "ft_blur", "weights", "best.pt")]: process.env.PESOS_BICICLETAS_URL,

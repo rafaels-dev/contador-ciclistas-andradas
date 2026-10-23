@@ -62,3 +62,11 @@ avaliacao/brilho/
 node_modules/
 web/.next/
 web/data/
+
+# fine-tune de bicicletas (6 MB): vai no git porque o instalador (CI) precisa dele
+!runs/
+!runs/ft_blur/
+!runs/ft_blur/weights/
+!runs/ft_blur/weights/best.pt
+runs/ft_blur/*
+!runs/ft_blur/weights
