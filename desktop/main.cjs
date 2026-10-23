@@ -9,6 +9,7 @@
 //   <userData>/     dados (banco, vídeos processados), config.env, motor/ (venv)
 
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, session, shell, utilityProcess } = require("electron");
+const { execFileSync } = require("node:child_process");
 const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
@@ -109,6 +110,25 @@ async function subirServidor() {
   return url;
 }
 
+/**
+ * No WSL o Chromium lê o tema do GTK (claro, sem configuração), não o do
+ * Windows: segue o "modo dos apps" do registro do Windows. Nos sistemas
+ * nativos o Electron já acompanha o tema do computador.
+ */
+function seguirTemaDoWindowsNoWsl() {
+  if (process.platform !== "linux" || !fs.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) return;
+  try {
+    const saida = execFileSync("reg.exe", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], {
+      encoding: "utf8",
+      timeout: 3000,
+    });
+    const m = /AppsUseLightTheme\s+REG_DWORD\s+0x(\d+)/.exec(saida);
+    if (m) nativeTheme.themeSource = Number(m[1]) ? "light" : "dark";
+  } catch {
+    // sem reg.exe (interop do WSL desligado): fica o padrão do Chromium
+  }
+}
+
 // tamanho e posição da janela entre sessões
 const arquivoJanela = () => path.join(app.getPath("userData"), "janela.json");
 function lerEstadoJanela() {
@@ -180,9 +200,10 @@ ipcMain.on("versao", (e) => {
   e.returnValue = app.getVersion();
 });
 
+// tema efetivo da página (escolha do usuário ou o do sistema): só recolore a
+// janela — não fixa nativeTheme, senão "Sistema" deixaria de seguir o computador
 ipcMain.on("tema", (e, tema) => {
   if (tema !== "dark" && tema !== "light") return;
-  nativeTheme.themeSource = tema;
   const w = BrowserWindow.fromWebContents(e.sender);
   if (w && !MAC) w.setTitleBarOverlay({ ...BARRA[tema], height: 40 });
   w?.setBackgroundColor(FUNDO[tema]);
@@ -210,6 +231,7 @@ app.on("before-quit", () => {
 });
 
 app.whenReady().then(async () => {
+  seguirTemaDoWindowsNoWsl();
   // sem barra de menus no Windows/Linux; no macOS o menu do app é obrigatório
   Menu.setApplicationMenu(MAC ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null);
   const w = criarJanela();

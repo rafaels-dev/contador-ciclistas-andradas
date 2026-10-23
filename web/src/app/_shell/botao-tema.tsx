@@ -3,12 +3,19 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 type Tema = "dark" | "light";
+/** "sistema" = sem escolha salva: segue o tema do computador */
+type Escolha = "sistema" | Tema;
 
 const CHAVE = "contador:tema";
+const ORDEM: Escolha[] = ["sistema", "dark", "light"];
+const NOME: Record<Escolha, string> = { sistema: "Sistema", dark: "Escuro", light: "Claro" };
 
-function temaAtual(): Tema {
+function escolhaSalva(): Escolha {
   const d = document.documentElement.getAttribute("data-theme");
-  if (d === "dark" || d === "light") return d;
+  return d === "dark" || d === "light" ? d : "sistema";
+}
+
+function temaDoSistema(): Tema {
   return matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
 
@@ -23,41 +30,47 @@ function assinar(f: () => void) {
   };
 }
 
-/** Alterna entre o tema escuro e o claro; a escolha fica salva neste computador. */
+/** Alterna Sistema → Escuro → Claro; a escolha fica salva neste computador. */
 export function BotaoTema() {
-  const tema = useSyncExternalStore<Tema | null>(assinar, temaAtual, () => null);
-  const proximo: Tema = tema === "light" ? "dark" : "light";
+  // "sistema|dark": a escolha e o tema efetivo numa string só (snapshot estável)
+  const estado = useSyncExternalStore(assinar, () => `${escolhaSalva()}|${temaDoSistema()}`, () => null);
+  const [escolha, sistema] = (estado?.split("|") ?? [null, null]) as [Escolha | null, Tema | null];
+  const efetivo: Tema | null = escolha === "sistema" ? sistema : escolha;
 
   // app desktop: os botões da janela acompanham o tema da página
   useEffect(() => {
     const desktop = window.contadorDesktop;
     if (!desktop) return;
     document.documentElement.setAttribute("data-desktop", desktop.plataforma);
-    if (tema) desktop.tema?.(tema);
-  }, [tema]);
+    if (efetivo) desktop.tema?.(efetivo);
+  }, [efetivo]);
 
   function trocar() {
-    document.documentElement.setAttribute("data-theme", proximo);
+    const proxima = ORDEM[(ORDEM.indexOf(escolha ?? "sistema") + 1) % ORDEM.length];
     try {
-      localStorage.setItem(CHAVE, proximo);
+      if (proxima === "sistema") localStorage.removeItem(CHAVE);
+      else localStorage.setItem(CHAVE, proxima);
     } catch {}
-    window.contadorDesktop?.tema?.(proximo);
+    if (proxima === "sistema") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", proxima);
     ouvintes.forEach((f) => f());
   }
 
+  const rotulo = escolha === "sistema" && sistema ? `Sistema (${NOME[sistema].toLowerCase()})` : escolha ? NOME[escolha] : "Tema";
   return (
     <button
       type="button"
       onClick={trocar}
       className="flex h-7 items-center gap-1.5 rounded-md border border-line bg-raised px-2 text-xs font-medium text-muted hover:bg-hover hover:text-fg"
-      aria-label={tema ? `Usar tema ${proximo === "light" ? "claro" : "escuro"}` : "Trocar tema"}
-      title="Trocar tema claro/escuro"
+      aria-label={`Tema: ${rotulo}. Clique para trocar`}
+      title="Tema: Sistema → Escuro → Claro"
+      data-testid="botao-tema"
     >
       <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" aria-hidden>
         <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
         <path d="M8 1.75a6.25 6.25 0 0 1 0 12.5Z" fill="currentColor" />
       </svg>
-      {tema === null ? "Tema" : tema === "light" ? "Claro" : "Escuro"}
+      {rotulo}
     </button>
   );
 }
