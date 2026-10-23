@@ -52,6 +52,11 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
   const [gerando, iniciarRender] = useTransition();
 
   const porIdCand = useMemo(() => Object.fromEntries(candidatos.map((c) => [c.id, c])), [candidatos]);
+  // número fixo de cada candidato no vídeo (ordem do tempo), igual em qualquer filtro
+  const numero = useMemo(
+    () => Object.fromEntries([...candidatos].sort((a, b) => a.tempo_s - b.tempo_s || a.id - b.id).map((c, i) => [c.id, i + 1])),
+    [candidatos],
+  );
   const props = useMemo(() => Object.fromEntries(candidatos.map((c) => [c.id, proposta(c, porId)])), [candidatos, porId]);
   const rotulo = (c: Candidato) => rotulos[c.id] ?? null;
   const divergente = (c: Candidato) => c.status_llm === "ok" && c.sugestao_llm !== c.classe_yolo;
@@ -221,7 +226,8 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
             aoFocar={() => setFoco(c.id)}
             aoDecidir={(classe) => decidirFoco(c, classe)}
             aoDesfazer={() => decidir([{ id: c.id, rotulo: null }])}
-            duplicadoDe={(duplicados.get(c.id) ?? []).map((id) => porIdCand[id])}
+            numero={numero[c.id]}
+            duplicadoDe={(duplicados.get(c.id) ?? []).map((id) => ({ c: porIdCand[id], numero: numero[id] }))}
             aoIrPara={(id) => {
               if (!visiveis.some((v) => v.id === id)) setFiltro("duplicados");
               setFoco(id);
@@ -275,11 +281,12 @@ type PropsCartao = {
   aoDecidir: (c: Classe) => void;
   aoDesfazer: () => void;
   /** candidatos que podem ser o mesmo objeto (mesma linha, sentido e classe, quase juntos) */
-  duplicadoDe: Candidato[];
+  duplicadoDe: { c: Candidato; numero: number }[];
+  numero: number;
   aoIrPara: (id: number) => void;
 };
 
-function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDecidir, aoDesfazer, duplicadoDe, aoIrPara }: PropsCartao) {
+function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDecidir, aoDesfazer, duplicadoDe, aoIrPara, numero }: PropsCartao) {
   const corrigido = rotulo && rotulo !== prop.classe;
   return (
     <li
@@ -301,6 +308,14 @@ function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDec
       </div>
       <div className="flex flex-col gap-1.5 px-3 py-2 text-sm">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span
+            className={`rounded px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums ${
+              duplicadoDe.length ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+            }`}
+            data-testid="numero"
+          >
+            #{numero}
+          </span>
           {c.status_llm === "ok" && prop.classe ? (
             <span className="font-medium">
               {prop.foraDaLinha ? (
@@ -332,11 +347,12 @@ function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDec
           <p className="text-xs text-amber-700 dark:text-amber-300" data-testid="duplicado">
             ⚠ Pode ser o mesmo objeto que{" "}
             {duplicadoDe.map((d, i) => (
-              <span key={d.id}>
+              <span key={d.c.id}>
                 {i > 0 && ", "}
-                <button onClick={(e) => (e.stopPropagation(), aoIrPara(d.id))} className="font-medium underline">
-                  o de {mmss(d.tempo_s)}
-                </button>
+                <button onClick={(e) => (e.stopPropagation(), aoIrPara(d.c.id))} className="font-medium underline">
+                  o #{d.numero}
+                </button>{" "}
+                ({mmss(d.c.tempo_s)})
               </span>
             ))}{" "}
             — confira se não está contando duas vezes.
