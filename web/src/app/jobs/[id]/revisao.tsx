@@ -255,7 +255,7 @@ export function Revisao({ jobId, base, candidatos, linhas, duracao, editavel, pa
                 Gerar vídeo final…
               </button>
               {escolhendoFinal && (
-                <div className="absolute left-0 top-full z-20 mt-1 flex w-96 flex-col gap-3 rounded-lg border border-line bg-panel p-3 shadow-xl" data-testid="menu-video-final">
+                <div className="absolute right-0 top-full z-20 mt-1 flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-lg border border-line bg-panel p-3 shadow-xl" data-testid="menu-video-final">
                   <EscolhaCategorias valor={categoriasFinal} aoMudar={setCategoriasFinal} />
                   <div className="flex items-center justify-end gap-2">
                     <button type="button" onClick={() => setEscolhendoFinal(false)} className={BOTAO.fantasma}>
