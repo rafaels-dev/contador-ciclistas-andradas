@@ -85,7 +85,7 @@ When changing counting logic, preserve idempotency AND the plausibility checks i
 
 Direção nova: em vez de contagem 100% automática, um app Next.js 16 (`web/`, ver `web/README.md` e `web/AGENTS.md` — a versão do Next tem APIs novas, leia `web/node_modules/next/dist/docs/` antes de mexer) recebe um link do Drive, o usuário desenha linhas de contagem em qualquer ângulo, o worker Python detecta/rastreia, o OpenRouter sugere a classe de **todo** candidato, um humano revisa, e só então o vídeo final com contador é renderizado. A `LinhaContagem` vertical (`linha_x`) continua servindo os entry points CLI; o app usa segmentos arbitrários.
 
-Vídeos do computador (o app roda localmente): a página inicial navega pelas pastas no servidor (`web/src/lib/locais.ts`; caminhos `C:\...` colados viram `/mnt/c/...` no WSL) e o job usa o arquivo **onde está** — `drive_id = "local"`, `arquivo_video` com caminho absoluto, sem cópia nem symlink.
+Vídeos do computador (o app roda localmente): a página inicial navega pelas pastas no servidor (`web/src/lib/locais.ts`; caminhos `C:\...` colados viram `/mnt/c/...` no WSL) e o job usa o arquivo **onde está** — `drive_id = "local"`, `arquivo_video` com caminho absoluto, sem cópia nem symlink. Como isso expõe o disco a quem acessa o app, `npm run dev`/`start` escutam só em 127.0.0.1; `CONTADOR_ARQUIVOS_LOCAIS=0` desliga o recurso se o app for publicado na rede.
 
 Worker do app: `worker/detectar.py` (trajetórias completas → candidatos, filmstrip/contexto/clipe) lê vídeo via `worker/leitor.py` (ffmpeg NVDEC + `scale_cuda`, saída YUV; precisa do build BtbN em `~/.local/opt/ffmpeg-btbn` ou `CONTADOR_FFMPEG`, senão cai para CPU). Vídeos > 1920 px são processados em 1080p; `imgsz` acompanha a resolução de origem (4K → 1280).
 

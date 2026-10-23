@@ -8,6 +8,15 @@ import path from "node:path";
  * seletor de arquivos do navegador (que não revela o caminho do arquivo).
  */
 
+/**
+ * Navegar pelas pastas expõe o disco a quem acessa o app: por isso o servidor
+ * escuta só em 127.0.0.1 (scripts do package.json) e, se for publicado na
+ * rede, CONTADOR_ARQUIVOS_LOCAIS=0 desliga os vídeos locais.
+ */
+export function arquivosLocaisPermitidos(): boolean {
+  return process.env.CONTADOR_ARQUIVOS_LOCAIS !== "0";
+}
+
 export const EXTENSOES_VIDEO = [".mp4", ".mkv", ".avi", ".mov", ".m4v", ".ts", ".webm"];
 
 export type ItemPasta = { nome: string; caminho: string; bytes?: number };
