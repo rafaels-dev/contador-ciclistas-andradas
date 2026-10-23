@@ -4,6 +4,7 @@
   "desktopName": "contador-trafego.desktop",
   "version": "0.0.1",
   "description": "Contagem de ciclistas, pedestres e veículos com revisão humana",
+  "homepage": "https://github.com/rafaels-dev/contador-ciclistas-andradas",
   "author": "Rafael Schettino <rcschettino@gmail.com>",
   "license": "UNLICENSED",
   "private": true,
