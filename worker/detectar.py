@@ -35,6 +35,7 @@ cai ~30 s antes do pedido (ver CLAUDE.md). Tudo é lido sequencialmente.
 from __future__ import annotations
 
 import argparse
+import bisect
 import gzip
 import json
 import sys
@@ -662,6 +663,20 @@ def _regiao_clipe(tr: Track, f0: int, f1: int, largura: int, altura: int, escala
     return int(x1), int(y1), int(x2), int(y2), max(ow, 2), max(oh, 2)
 
 
+def _caixa_em(tr: Track, idx: int):
+    """Caixa do track no quadro idx, interpolada entre as observações vizinhas
+    quando ele caiu num buraco do rastreio (o cruzamento costuma cair entre
+    duas detecções; sem caixa, o modelo de visão não sabe qual é o objeto)."""
+    k = bisect.bisect_left(tr.frames, idx)
+    if k < tr.n and tr.frames[k] == idx:
+        return tr.caixas[k]
+    if k == 0 or k == tr.n:
+        return None
+    f0, f1 = tr.frames[k - 1], tr.frames[k]
+    t = (idx - f0) / (f1 - f0)
+    return [a + t * (b - a) for a, b in zip(tr.caixas[k - 1], tr.caixas[k])]
+
+
 def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: Path,
                  fps: float, largura: int, altura: int, escala: float, n_recortes: int = 5) -> None:
     import imageio_ffmpeg
@@ -697,8 +712,7 @@ def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: 
                 pix_fmt_in="bgr24", pix_fmt_out="yuv420p", macro_block_size=2,
                 output_params=["-preset", "veryfast", "-crf", "28", "-movflags", "+faststart"])
             w.send(None)
-            caixas = dict(zip(tr.frames, tr.caixas))
-            ativos.append({"c": c, "w": w, "fim": f1, "reg": (x1, y1, x2, y2, ow, oh), "caixas": caixas})
+            ativos.append({"c": c, "w": w, "fim": f1, "reg": (x1, y1, x2, y2, ow, oh), "tr": tr})
         if not ativos and idx not in recortes_em:
             if not leitor.pular():
                 break
@@ -716,7 +730,7 @@ def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: 
             for pa, pb in segs:
                 cv2.line(img, (int((pa[0] - x1) * sx), int((pa[1] - y1) * sy)),
                          (int((pb[0] - x1) * sx), int((pb[1] - y1) * sy)), (0, 220, 255), 2)
-            cx = a["caixas"].get(idx)
+            cx = _caixa_em(a["tr"], idx)
             if cx is not None:
                 cor = (0, 0, 255) if idx >= a["c"]["frame"] else (0, 255, 0)
                 cv2.rectangle(img, (int((cx[0] - x1) * sx), int((cx[1] - y1) * sy)),

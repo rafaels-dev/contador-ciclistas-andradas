@@ -32,6 +32,8 @@ Você recebe:
 - FILMSTRIP: recortes do MESMO objeto ao longo do tempo (da esquerda para a direita), com uma margem acima do veículo para incluir o condutor.
 - CONTEXTO (se houver): o quadro do momento em que o objeto cruza a linha de contagem (linhas amarelas), recortado em volta dele; a caixa colorida marca o objeto. Alguns objetos foram achados só por movimento: a caixa pode cobrir apenas parte dele.
 
+Classifique SOMENTE o objeto marcado: o que aparece em todos os recortes do filmstrip e dentro da caixa do contexto. Outros objetos que passam perto (um ciclista ao lado de um carro, um pedestre atrás de uma moto) têm a sua própria análise — ignore-os, mesmo que chamem mais atenção.
+
 Categorias:
 - ciclista: pessoa montada em bicicleta, sentada no selim e pedalando (inclui bicicleta elétrica de pedal).
 - patinete: pessoa EM PÉ sobre um patinete, manual ou elétrico (inclusive os de aluguel): plataforma baixa, guidão alto em T, rodas pequenas, sem pedalar; o corpo fica ereto e quase imóvel enquanto desliza.

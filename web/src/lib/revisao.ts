@@ -69,3 +69,44 @@ export function calcularTotais(candidatos: Pick<Candidato, "linha_id" | "direcao
   }
   return t;
 }
+
+/** Dois cruzamentos do mesmo objeto chegam juntos; objetos diferentes na mesma faixa vêm espaçados. */
+export const JANELA_DUPLICADO_S = 1;
+
+function sobreposicao(a: number[], b: number[]): number {
+  const w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
+  const h = Math.min(a[3], b[3]) - Math.max(a[1], b[1]);
+  if (w <= 0 || h <= 0) return 0;
+  const area = (c: number[]) => (c[2] - c[0]) * (c[3] - c[1]);
+  return (w * h) / Math.min(area(a), area(b));
+}
+
+/**
+ * Possível dupla contagem do mesmo objeto (ex.: o modelo olhou o ciclista ao
+ * lado do carro, ou o rastreio partiu um objeto em dois): mesma linha e
+ * sentido, mesma classe, cruzando a até JANELA_DUPLICADO_S com as caixas
+ * sobrepostas. Só aponta para o humano conferir — não descarta nada.
+ * Devolve id → ids dos candidatos parecidos.
+ */
+export function possiveisDuplicados(
+  candidatos: Pick<Candidato, "id" | "linha_id" | "direcao" | "tempo_s" | "bbox">[],
+  classeDe: (id: number) => Classe | null,
+): Map<number, number[]> {
+  const pares = new Map<number, number[]>();
+  const ordem = [...candidatos].sort((a, b) => a.tempo_s - b.tempo_s);
+  const caixa = (c: (typeof ordem)[number]) => (c.bbox ? (JSON.parse(c.bbox) as number[]) : null);
+  for (let i = 0; i < ordem.length; i++) {
+    const a = ordem[i];
+    const ca = classeDe(a.id);
+    if (!ca || ca === "descartado") continue;
+    for (let j = i + 1; j < ordem.length && ordem[j].tempo_s - a.tempo_s <= JANELA_DUPLICADO_S; j++) {
+      const b = ordem[j];
+      if (b.linha_id !== a.linha_id || b.direcao !== a.direcao || classeDe(b.id) !== ca) continue;
+      const [xa, xb] = [caixa(a), caixa(b)];
+      if (!xa || !xb || sobreposicao(xa, xb) < 0.3) continue;
+      pares.set(a.id, [...(pares.get(a.id) ?? []), b.id]);
+      pares.set(b.id, [...(pares.get(b.id) ?? []), a.id]);
+    }
+  }
+  return pares;
+}

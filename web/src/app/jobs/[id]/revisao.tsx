@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Candidato, Categoria, Linha } from "@/lib/db";
-import { calcularTotais, NOME_CATEGORIA, proposta, type Classe } from "@/lib/revisao";
+import { calcularTotais, NOME_CATEGORIA, possiveisDuplicados, proposta, type Classe } from "@/lib/revisao";
 import Link from "next/link";
 import { gerarVideoFinal } from "../../renders/actions";
 import { revisar } from "./actions";
@@ -26,7 +26,7 @@ const ATALHOS: [Classe, string][] = [
 ];
 const POR_TECLA: Record<string, Classe> = { ...Object.fromEntries(ATALHOS.map(([c, k]) => [k, c])), x: "descartado" };
 
-type Filtro = "pendentes" | "revisados" | "todos" | "divergentes" | "fora" | Classe;
+type Filtro = "pendentes" | "revisados" | "todos" | "divergentes" | "fora" | "duplicados" | Classe;
 
 type Props = {
   jobId: string;
@@ -51,9 +51,12 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
   const [, iniciar] = useTransition();
   const [gerando, iniciarRender] = useTransition();
 
+  const porIdCand = useMemo(() => Object.fromEntries(candidatos.map((c) => [c.id, c])), [candidatos]);
   const props = useMemo(() => Object.fromEntries(candidatos.map((c) => [c.id, proposta(c, porId)])), [candidatos, porId]);
   const rotulo = (c: Candidato) => rotulos[c.id] ?? null;
   const divergente = (c: Candidato) => c.status_llm === "ok" && c.sugestao_llm !== c.classe_yolo;
+  const classeDe = (c: Candidato) => rotulo(c) ?? props[c.id].classe;
+  const duplicados = possiveisDuplicados(candidatos, (id) => classeDe(porIdCand[id]));
   const passa = (c: Candidato, f: Filtro) => {
     switch (f) {
       case "todos": return true;
@@ -61,7 +64,8 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
       case "revisados": return !!rotulo(c);
       case "divergentes": return divergente(c);
       case "fora": return !!props[c.id].foraDaLinha;
-      default: return (rotulo(c) ?? props[c.id].classe) === f;
+      case "duplicados": return duplicados.has(c.id);
+      default: return classeDe(c) === f;
     }
   };
   const naLinha = candidatos.filter((c) => !linhaFiltro || c.linha_id === linhaFiltro);
@@ -127,9 +131,9 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
     return () => window.removeEventListener("keydown", tecla);
   });
 
-  const filtros: Filtro[] = ["pendentes", "revisados", "todos", "ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado", "fora", "divergentes"];
+  const filtros: Filtro[] = ["pendentes", "revisados", "todos", "ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado", "fora", "divergentes", "duplicados"];
   const nomeFiltro = (f: Filtro) =>
-    ({ pendentes: "Pendentes", revisados: "Revisados", todos: "Todos", divergentes: "Modelo ≠ detector", fora: "Fora da linha" } as Record<string, string>)[f] ??
+    ({ pendentes: "Pendentes", revisados: "Revisados", todos: "Todos", divergentes: "Modelo ≠ detector", fora: "Fora da linha", duplicados: "Possível duplicado" } as Record<string, string>)[f] ??
     NOME_CATEGORIA[f as Classe];
 
   return (
@@ -217,6 +221,11 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
             aoFocar={() => setFoco(c.id)}
             aoDecidir={(classe) => decidirFoco(c, classe)}
             aoDesfazer={() => decidir([{ id: c.id, rotulo: null }])}
+            duplicadoDe={(duplicados.get(c.id) ?? []).map((id) => porIdCand[id])}
+            aoIrPara={(id) => {
+              if (!visiveis.some((v) => v.id === id)) setFiltro("duplicados");
+              setFoco(id);
+            }}
           />
         ))}
       </ul>
@@ -227,6 +236,11 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
             {totais.pendentes
               ? `Faltam ${totais.pendentes} de ${candidatos.length} para liberar o vídeo final.`
               : "Revisão completa."}{" "}
+            {duplicados.size > 0 && (
+              <button onClick={() => setFiltro("duplicados")} className="text-amber-700 hover:underline dark:text-amber-300">
+                ⚠ {duplicados.size} possíveis duplicados — conferir.
+              </button>
+            )}{" "}
             <Link href="/" className="text-emerald-700 hover:underline dark:text-emerald-400">
               Juntar com outros vídeos
             </Link>
@@ -260,9 +274,12 @@ type PropsCartao = {
   aoFocar: () => void;
   aoDecidir: (c: Classe) => void;
   aoDesfazer: () => void;
+  /** candidatos que podem ser o mesmo objeto (mesma linha, sentido e classe, quase juntos) */
+  duplicadoDe: Candidato[];
+  aoIrPara: (id: number) => void;
 };
 
-function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDecidir, aoDesfazer }: PropsCartao) {
+function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDecidir, aoDesfazer, duplicadoDe, aoIrPara }: PropsCartao) {
   const corrigido = rotulo && rotulo !== prop.classe;
   return (
     <li
@@ -311,6 +328,20 @@ function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDec
           )}
         </div>
         {c.justificativa_llm && <p className="text-xs text-zinc-600 dark:text-zinc-400">{c.justificativa_llm}</p>}
+        {duplicadoDe.length > 0 && (
+          <p className="text-xs text-amber-700 dark:text-amber-300" data-testid="duplicado">
+            ⚠ Pode ser o mesmo objeto que{" "}
+            {duplicadoDe.map((d, i) => (
+              <span key={d.id}>
+                {i > 0 && ", "}
+                <button onClick={(e) => (e.stopPropagation(), aoIrPara(d.id))} className="font-medium underline">
+                  o de {mmss(d.tempo_s)}
+                </button>
+              </span>
+            ))}{" "}
+            — confira se não está contando duas vezes.
+          </p>
+        )}
         <div className="text-xs text-zinc-500">
           Detector: {c.classe_yolo ? NOME_CATEGORIA[c.classe_yolo] : "?"}
           {c.alternativa && ` ou ${NOME_CATEGORIA[c.alternativa]}`}
