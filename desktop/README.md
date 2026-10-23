@@ -9,6 +9,7 @@ Empacota o app de revisão (`web/`) como um programa instalável, no estilo do S
 ## Como funciona
 
 - **Electron** (`main.cjs`): abre a janela e sobe o servidor Next *standalone* num processo filho, numa porta livre de `127.0.0.1`. A ponte mínima com a página fica em `preload.cjs`: plataforma, cor dos botões da janela por tema e o diálogo nativo de arquivos.
+- **Acesso ao servidor:** a cada execução o Electron sorteia um token (`CONTADOR_TOKEN`) e o entrega só à sua janela, como cookie. O `web/src/proxy.ts` recusa requisições sem o token ou com `Host` diferente de `127.0.0.1:<porta>`, o que barra outros programas do computador e DNS rebinding. A janela só navega dentro da origem do app; o resto (só `http`/`https`) abre no navegador padrão.
 - **Dados do usuário:** ficam na pasta de dados do app.
   - Windows: `%APPDATA%\Contador de Tráfego`.
   - macOS: `~/Library/Application Support/Contador de Tráfego`.

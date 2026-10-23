@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { redirect } from "next/navigation";
+import { exigirAcesso } from "@/lib/acesso";
 import { atualizarJob, criarJob, obterGrupo } from "@/lib/db";
 import { extrairIdDrive, extrairIdPastaDrive, listarVideosDaPasta, type ArquivoDrive } from "@/lib/drive";
 import { arquivosLocaisPermitidos, ehVideo, listarPasta, normalizarCaminho, raizes, type ConteudoPasta, type ItemPasta } from "@/lib/locais";
@@ -18,6 +19,7 @@ function grupoValido(id: unknown): string | null {
 }
 
 export async function novoJob(_anterior: EstadoNovoJob, formData: FormData): Promise<EstadoNovoJob> {
+  await exigirAcesso();
   const link = String(formData.get("link") ?? "").trim();
   const grupo = grupoValido(formData.get("grupo"));
 
@@ -61,6 +63,7 @@ export type EstadoPasta = { conteudo?: ConteudoPasta; raizes: ItemPasta[]; erro?
 
 /** Navegador de pastas do computador (o app roda localmente). Sem caminho: pasta do usuário. */
 export async function navegarPasta(caminho: string | null): Promise<EstadoPasta> {
+  await exigirAcesso();
   if (!arquivosLocaisPermitidos()) return { raizes: [], erro: "Vídeos do computador estão desligados neste servidor." };
   const base = { raizes: raizes() };
   try {
@@ -78,6 +81,7 @@ export async function navegarPasta(caminho: string | null): Promise<EstadoPasta>
 }
 
 export async function criarJobsLocais(caminhos: string[], grupoId: string | null = null): Promise<void> {
+  await exigirAcesso();
   if (!arquivosLocaisPermitidos()) return;
   const grupo = grupoValido(grupoId);
   const ids = caminhos

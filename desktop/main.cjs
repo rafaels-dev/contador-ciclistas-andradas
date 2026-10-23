@@ -8,7 +8,8 @@
 //   recursos/bin    uv, que instala o Python do motor na 1ª execução
 //   <userData>/     dados (banco, vídeos processados), config.env, motor/ (venv)
 
-const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, shell, utilityProcess } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, session, shell, utilityProcess } = require("electron");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
@@ -31,6 +32,12 @@ if (!app.requestSingleInstanceLock()) app.quit();
 
 let janela = null;
 let servidor = null;
+// origem do app (http://127.0.0.1:<porta>): a janela só navega dentro dela
+let origemApp = null;
+
+// token sorteado a cada execução: o servidor só atende quem o apresenta
+// (web/src/lib/acesso.ts) — e só esta janela o recebe, como cookie
+const TOKEN = crypto.randomBytes(32).toString("hex");
 
 function recursos(...partes) {
   return app.isPackaged ? path.join(process.resourcesPath, ...partes) : path.join(__dirname, "recursos", ...partes);
@@ -82,6 +89,7 @@ async function subirServidor() {
       CONTADOR_ENV: path.join(dados, "config.env"),
       CONTADOR_MOTOR: path.join(dados, "motor"),
       CONTADOR_RAIZ: recursos("motor"),
+      CONTADOR_TOKEN: TOKEN,
       ...(fs.existsSync(uv) ? { CONTADOR_UV: uv } : {}),
     },
   });
@@ -97,6 +105,7 @@ async function subirServidor() {
   });
   const url = `http://127.0.0.1:${porta}`;
   await esperarServidor(url);
+  await session.defaultSession.cookies.set({ url, name: "contador_token", value: TOKEN, httpOnly: true, sameSite: "strict" });
   return url;
 }
 
@@ -144,17 +153,25 @@ function criarJanela() {
   };
   janela.on("close", salvar);
 
-  // links externos (Drive, OpenRouter) abrem no navegador padrão
+  // links externos (Drive, OpenRouter) abrem no navegador padrão — só
+  // http(s); qualquer outro esquema (file:, smb:, ms-…) é ignorado
+  const abrirFora = (url) => {
+    try {
+      if (["http:", "https:"].includes(new URL(url).protocol)) void shell.openExternal(url);
+    } catch {}
+  };
   janela.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) void shell.openExternal(url);
+    abrirFora(url);
     return { action: "deny" };
   });
   janela.webContents.on("will-navigate", (e, url) => {
-    const destino = new URL(url);
-    if (destino.hostname !== "127.0.0.1" && destino.hostname !== "localhost") {
-      e.preventDefault();
-      void shell.openExternal(url);
-    }
+    let origem = null;
+    try {
+      origem = new URL(url).origin;
+    } catch {}
+    if (origem && origem === origemApp) return;
+    e.preventDefault();
+    abrirFora(url);
   });
   return janela;
 }
@@ -198,6 +215,7 @@ app.whenReady().then(async () => {
   const w = criarJanela();
   try {
     const url = URL_DEV ?? (await subirServidor());
+    origemApp = new URL(url).origin;
     await w.loadURL(url);
   } catch (e) {
     dialog.showErrorBox("Contador de Tráfego", String(e?.message ?? e));
