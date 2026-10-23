@@ -6,6 +6,9 @@ import type { StatusJob } from "@/lib/db";
 import { BOTAO, CAMPO, timecode } from "@/lib/ui";
 import { moverParaGrupo } from "./_shell/actions";
 import { gerarVideoFinal } from "./renders/actions";
+import { EscolhaCategorias } from "./renders/escolha-categorias";
+import { CATEGORIAS_CONTADAS } from "@/lib/revisao";
+import type { Categoria } from "@/lib/db";
 
 export type VideoNaGrade = {
   id: string;
@@ -142,7 +145,7 @@ export function GradeVideos({ videos, grupos, grupoAtual }: Props) {
           erro={erro}
           pendente={pendente}
           aoFechar={() => setExportando(null)}
-          aoGerar={() => iniciar(async () => setErro((await gerarVideoFinal(exportando)).erro ?? null))}
+          aoGerar={(categorias) => iniciar(async () => setErro((await gerarVideoFinal(exportando, categorias)).erro ?? null))}
         />
       )}
     </div>
@@ -246,12 +249,13 @@ type PropsBandeja = {
   erro: string | null;
   pendente: boolean;
   aoFechar: () => void;
-  aoGerar: () => void;
+  aoGerar: (categorias: Categoria[]) => void;
 };
 
 /** A sequência do vídeo final, como uma trilha: cada vídeo é um bloco proporcional à duração. */
 function BandejaExportacao({ ordem, porId, setOrdem, erro, pendente, aoFechar, aoGerar }: PropsBandeja) {
   const total = ordem.reduce((s, id) => s + (porId[id]?.duracao_s ?? 0), 0) || 1;
+  const [categorias, setCategorias] = useState<Categoria[]>([...CATEGORIAS_CONTADAS]);
   const mover = (i: number, d: number) => {
     const n = [...ordem];
     [n[i], n[i + d]] = [n[i + d], n[i]];
@@ -299,8 +303,9 @@ function BandejaExportacao({ ordem, porId, setOrdem, erro, pendente, aoFechar, a
           </li>
         ))}
       </ol>
+      <EscolhaCategorias valor={categorias} aoMudar={setCategorias} />
       <div className="flex items-center gap-3">
-        <button type="button" disabled={!ordem.length || pendente} onClick={aoGerar} className={BOTAO.primario}>
+        <button type="button" disabled={!ordem.length || !categorias.length || pendente} onClick={() => aoGerar(categorias)} className={BOTAO.primario}>
           {pendente ? "Enviando…" : `Gerar vídeo final${ordem.length > 1 ? ` com ${ordem.length} vídeos` : ""}`}
         </button>
         {erro && <span className="text-sm text-danger">{erro}</span>}

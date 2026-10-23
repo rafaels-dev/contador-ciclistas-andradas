@@ -164,6 +164,7 @@ function migrar(d: DatabaseSync): void {
   const novas: Record<string, Record<string, string>> = {
     candidatos: { contexto: "TEXT", custo_llm: "REAL" },
     jobs: { grupo_id: "TEXT REFERENCES grupos(id) ON DELETE SET NULL" },
+    renders: { categorias: "TEXT" }, // JSON de Categoria[]; NULL = todas
   };
   d.exec(SCHEMA_RENDERS);
   d.exec(SCHEMA_GRUPOS);
@@ -180,7 +181,7 @@ function migrar(d: DatabaseSync): void {
 const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
 // incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
 // migração precisa rodar sem reiniciar o servidor (e os workers em curso)
-const VERSAO_SCHEMA = 5;
+const VERSAO_SCHEMA = 6;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -397,6 +398,8 @@ export type Render = {
   id: string;
   nome: string;
   jobs: string; // JSON de string[]
+  /** JSON de Categoria[] que entram no vídeo e na contagem; null = todas */
+  categorias: string | null;
   status: StatusRender;
   progresso: number;
   mensagem: string | null;
@@ -405,8 +408,8 @@ export type Render = {
   atualizado_em: string;
 };
 
-export function criarRender(id: string, nome: string, jobs: string[]): void {
-  db().prepare("INSERT INTO renders (id, nome, jobs) VALUES (?, ?, ?)").run(id, nome, JSON.stringify(jobs));
+export function criarRender(id: string, nome: string, jobs: string[], categorias: Categoria[] | null = null): void {
+  db().prepare("INSERT INTO renders (id, nome, jobs, categorias) VALUES (?, ?, ?, ?)").run(id, nome, JSON.stringify(jobs), categorias ? JSON.stringify(categorias) : null);
 }
 
 export function obterRender(id: string): Render | undefined {
@@ -418,7 +421,7 @@ export function listarRenders(): Render[] {
   return db().prepare("SELECT * FROM renders ORDER BY criado_em DESC").all().map(simples) as Render[];
 }
 
-export function atualizarRender(id: string, campos: Partial<Pick<Render, "status" | "progresso" | "mensagem" | "erro">>): void {
+export function atualizarRender(id: string, campos: Partial<Pick<Render, "status" | "progresso" | "mensagem" | "erro" | "categorias">>): void {
   const chaves = Object.keys(campos) as (keyof typeof campos)[];
   if (!chaves.length) return;
   db()

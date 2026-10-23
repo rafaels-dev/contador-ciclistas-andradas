@@ -54,6 +54,7 @@ async function DetalheRender({ params }: { params: Promise<{ id: string }> }) {
   const base = `/api/renders/${id}/arquivos`;
   const trabalhando = render.status === "na_fila" || render.status === "renderizando";
   const jobs = JSON.parse(render.jobs) as string[];
+  const categoriasRender = render.categorias ? (JSON.parse(render.categorias) as Categoria[]) : null;
   const rel = render.status === "pronto" ? lerJson<Relatorio>(path.join(dir, "relatorio.json")) : null;
   const versao = encodeURIComponent(render.atualizado_em);
 
@@ -63,7 +64,7 @@ async function DetalheRender({ params }: { params: Promise<{ id: string }> }) {
     render.status === "pronto" &&
     plano?.videos.some((v) => {
       const atual = listarCandidatos(v.job)
-        .filter((c) => c.rotulo && c.rotulo !== "descartado")
+        .filter((c) => c.rotulo && c.rotulo !== "descartado" && (!categoriasRender || categoriasRender.includes(c.rotulo)))
         .map((c) => `${c.id}:${c.rotulo}`)
         .sort()
         .join(",");
@@ -92,6 +93,11 @@ async function DetalheRender({ params }: { params: Promise<{ id: string }> }) {
           {ROTULO_STATUS[render.status]} · {jobs.length} {jobs.length === 1 ? "vídeo" : "vídeos"}
           {render.status === "pronto" && render.mensagem ? ` · ${render.mensagem}` : ""}
         </span>
+        {categoriasRender && (
+          <span className="text-xs text-muted" data-testid="categorias-render">
+            Só {categoriasRender.map((c) => NOME_CATEGORIA[c]).join(", ")}
+          </span>
+        )}
       </header>
 
       {trabalhando && (
@@ -112,14 +118,14 @@ async function DetalheRender({ params }: { params: Promise<{ id: string }> }) {
       {render.status === "erro" && (
         <div className="m-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger/40 bg-danger/10 p-4">
           <p className="flex-1 text-danger">{render.erro}</p>
-          <BotaoGerarDeNovo renderId={render.id} rotulo="Tentar de novo" />
+          <BotaoGerarDeNovo renderId={render.id} categorias={categoriasRender} rotulo="Tentar de novo" />
         </div>
       )}
 
       {desatualizado && (
         <div className="flex flex-wrap items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-2 text-sm text-warn">
           <span className="flex-1">A revisão de algum destes vídeos mudou depois que este vídeo final foi gerado.</span>
-          <BotaoGerarDeNovo renderId={render.id} rotulo="Gerar de novo com a revisão atual" />
+          <BotaoGerarDeNovo renderId={render.id} categorias={categoriasRender} rotulo="Gerar de novo com a revisão atual" />
         </div>
       )}
 
@@ -147,7 +153,7 @@ async function DetalheRender({ params }: { params: Promise<{ id: string }> }) {
                   Relatório (JSON)
                 </a>
               </div>
-              {!desatualizado && <BotaoGerarDeNovo renderId={render.id} rotulo="Gerar de novo" />}
+              {!desatualizado && <BotaoGerarDeNovo renderId={render.id} categorias={categoriasRender} rotulo="Gerar de novo" />}
             </section>
           )}
 

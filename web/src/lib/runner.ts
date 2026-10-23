@@ -450,6 +450,10 @@ export function iniciarRender(renderId: string): void {
   if (!render) return;
   const dir = dirRender(renderId);
   fs.mkdirSync(dir, { recursive: true });
+  // categorias escolhidas para este vídeo final (null = todas): os eventos
+  // das outras ficam de fora do vídeo, da contagem e do painel
+  const escolhidas = render.categorias ? new Set(JSON.parse(render.categorias) as Categoria[]) : null;
+  const entra = (c: Categoria) => !escolhidas || escolhidas.has(c);
   const videos = (JSON.parse(render.jobs) as string[]).map((jobId) => {
     const job = obterJob(jobId);
     if (!job) throw new Error(`Job ${jobId} não existe mais.`);
@@ -459,14 +463,14 @@ export function iniciarRender(renderId: string): void {
       titulo: job.nome_arquivo ?? jobId,
       video: caminhoVideo(job.id),
       trilhas: path.join(djob, "trilhas.json.gz"),
-      linhas: JSON.parse(job.linhas) as Linha[],
+      linhas: (JSON.parse(job.linhas) as Linha[]).map((l) => (l.categorias?.length ? { ...l, categorias: l.categorias.filter(entra) } : l)),
       eventos: listarCandidatos(jobId)
-        .filter((c) => c.rotulo && c.rotulo !== "descartado")
+        .filter((c) => c.rotulo && c.rotulo !== "descartado" && entra(c.rotulo))
         .map((c) => ({ id: c.id, frame: c.frame, linha_id: c.linha_id, categoria: c.rotulo, direcao: c.direcao, track: c.track })),
     };
   });
   const arqPlano = path.join(dir, "plano.json");
-  fs.writeFileSync(arqPlano, JSON.stringify({ videos }, null, 1));
+  fs.writeFileSync(arqPlano, JSON.stringify({ categorias: escolhidas ? [...escolhidas] : null, videos }, null, 1));
   for (const f of ["video_final.mp4", "relatorio.json", "eventos.csv"]) fs.rmSync(path.join(/* turbopackIgnore: true */ dir, f), { force: true });
   atualizarRender(renderId, { status: "na_fila", progresso: 0, erro: null, mensagem: "Na fila da GPU…" });
 

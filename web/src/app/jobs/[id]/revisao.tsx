@@ -5,6 +5,8 @@ import type { Candidato, Categoria, Linha } from "@/lib/db";
 import { calcularTotais, NOME_CATEGORIA, possiveisDuplicados, proposta, type Classe } from "@/lib/revisao";
 import { BOTAO, CAMPO, COR_CLASSE, TITULO_PAINEL, timecode } from "@/lib/ui";
 import { gerarVideoFinal } from "../../renders/actions";
+import { EscolhaCategorias } from "../../renders/escolha-categorias";
+import { CATEGORIAS_CONTADAS } from "@/lib/revisao";
 import { revisar } from "./actions";
 
 // teclas 1–8 e 0, na ordem dos botões
@@ -65,6 +67,8 @@ export function Revisao({ jobId, base, candidatos, linhas, duracao, editavel, pa
   const [erro, setErro] = useState<string | null>(null);
   const [, iniciar] = useTransition();
   const [gerando, iniciarRender] = useTransition();
+  const [categoriasFinal, setCategoriasFinal] = useState<Categoria[]>([...CATEGORIAS_CONTADAS]);
+  const [escolhendoFinal, setEscolhendoFinal] = useState(false);
 
   const porIdCand = useMemo(() => Object.fromEntries(candidatos.map((c) => [c.id, c])), [candidatos]);
   // número fixo de cada candidato no vídeo (ordem do tempo), igual em qualquer filtro
@@ -239,20 +243,42 @@ export function Revisao({ jobId, base, candidatos, linhas, duracao, editavel, pa
         {editavel && (
           <>
             <span className="font-mono text-xs text-muted">{totais.pendentes ? `faltam ${totais.pendentes}` : "revisão completa"}</span>
-            <button
-              type="button"
-              disabled={totais.pendentes > 0 || gerando}
-              onClick={() =>
-                iniciarRender(async () => {
-                  const r = await gerarVideoFinal([jobId]);
-                  if (r.erro) setErro(r.erro);
-                })
-              }
-              className={BOTAO.primario}
-              title={totais.pendentes ? "Revise todos os candidatos para liberar" : "Gera o vídeo com o contador"}
-            >
-              Gerar vídeo final
-            </button>
+            <span className="relative">
+              <button
+                type="button"
+                disabled={totais.pendentes > 0 || gerando}
+                onClick={() => setEscolhendoFinal((v) => !v)}
+                aria-expanded={escolhendoFinal}
+                className={BOTAO.primario}
+                title={totais.pendentes ? "Revise todos os candidatos para liberar" : "Gera o vídeo com o contador"}
+              >
+                Gerar vídeo final…
+              </button>
+              {escolhendoFinal && (
+                <div className="absolute left-0 top-full z-20 mt-1 flex w-96 flex-col gap-3 rounded-lg border border-line bg-panel p-3 shadow-xl" data-testid="menu-video-final">
+                  <EscolhaCategorias valor={categoriasFinal} aoMudar={setCategoriasFinal} />
+                  <div className="flex items-center justify-end gap-2">
+                    <button type="button" onClick={() => setEscolhendoFinal(false)} className={BOTAO.fantasma}>
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!categoriasFinal.length || gerando}
+                      onClick={() =>
+                        iniciarRender(async () => {
+                          const r = await gerarVideoFinal([jobId], categoriasFinal);
+                          if (r.erro) setErro(r.erro);
+                          else setEscolhendoFinal(false);
+                        })
+                      }
+                      className={BOTAO.primario}
+                    >
+                      {gerando ? "Enviando…" : "Gerar vídeo final"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </span>
           </>
         )}
       </div>

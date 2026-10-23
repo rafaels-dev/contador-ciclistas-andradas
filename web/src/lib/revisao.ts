@@ -9,6 +9,9 @@ export type Classe = Categoria | "descartado";
 
 export const CLASSES: readonly Classe[] = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado"];
 
+/** As categorias contadas (CLASSES sem "descartado"), para o navegador — db.ts não pode ir ao bundle do cliente. */
+export const CATEGORIAS_CONTADAS: readonly Categoria[] = CLASSES.filter((c): c is Categoria => c !== "descartado");
+
 export const NOME_CATEGORIA: Record<Classe, string> = {
   ciclistas: "Ciclista",
   patinetes: "Patinete",
