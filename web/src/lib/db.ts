@@ -6,8 +6,11 @@ import { ARQUIVO_DB, DIR_DADOS } from "./paths";
  * Fluxo de um job (ordem fixa — o render só acontece depois da revisão humana):
  *   baixando → aguardando_linhas (usuário desenha as linhas no 1º frame)
  *   → detectando → sugerindo (OpenRouter p/ TODO candidato)
- *   → aguardando_revisao → renderizando → concluido
- * Qualquer etapa pode ir para `erro` (mensagem em jobs.erro).
+ *   → aguardando_revisao
+ * Qualquer etapa pode ir para `erro` (mensagem em jobs.erro). O vídeo final é
+ * um `render` à parte: junta um ou mais jobs com a revisão completa (contador
+ * somando entre eles) e não muda o status dos jobs — a revisão continua
+ * editável e dá para gerar de novo. (renderizando/concluido: legado.)
  */
 export const STATUS_JOB = [
   "baixando",
@@ -66,6 +69,20 @@ export type Job = {
   atualizado_em: string;
 };
 
+const SCHEMA_RENDERS = `
+CREATE TABLE IF NOT EXISTS renders (
+  id             TEXT PRIMARY KEY,
+  nome           TEXT NOT NULL,
+  jobs           TEXT NOT NULL,              -- JSON: ids dos jobs, na ordem do vídeo
+  status         TEXT NOT NULL DEFAULT 'na_fila', -- na_fila | renderizando | pronto | erro
+  progresso      REAL NOT NULL DEFAULT 0,
+  mensagem       TEXT,
+  erro           TEXT,
+  criado_em      TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS cameras (
   id          TEXT PRIMARY KEY,
@@ -121,13 +138,14 @@ CREATE TABLE IF NOT EXISTS candidatos (
   revisado_em        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_candidatos_job ON candidatos(job_id);
-`;
+${SCHEMA_RENDERS}`;
 
 /** Colunas adicionadas depois da criação do banco (CREATE IF NOT EXISTS não altera tabela existente). */
 function migrar(d: DatabaseSync): void {
   const novas: Record<string, Record<string, string>> = {
     candidatos: { contexto: "TEXT", custo_llm: "REAL" },
   };
+  d.exec(SCHEMA_RENDERS);
   for (const [tabela, colunas] of Object.entries(novas)) {
     const existentes = new Set((d.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map((c) => c.name));
     for (const [col, tipo] of Object.entries(colunas)) {
@@ -141,7 +159,7 @@ function migrar(d: DatabaseSync): void {
 const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
 // incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
 // migração precisa rodar sem reiniciar o servidor (e os workers em curso)
-const VERSAO_SCHEMA = 2;
+const VERSAO_SCHEMA = 3;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -153,6 +171,11 @@ export function db(): DatabaseSync {
     d.prepare(
       `UPDATE jobs SET status = 'erro', erro = 'Interrompido: o servidor foi reiniciado.',
        atualizado_em = datetime('now') WHERE status IN ('baixando', 'detectando')`,
+    ).run();
+    d.exec(SCHEMA_RENDERS);
+    d.prepare(
+      `UPDATE renders SET status = 'erro', erro = 'Interrompido: o servidor foi reiniciado.',
+       atualizado_em = datetime('now') WHERE status IN ('na_fila', 'renderizando')`,
     ).run();
     g.__contadorDb = d;
   }
@@ -312,4 +335,39 @@ export function resumoSugestoes(jobId: string): { total: number; ok: number; fal
     )
     .get(jobId) as { total: number; ok: number | null; falhou: number | null; custo: number };
   return { total: r.total, ok: r.ok ?? 0, falhou: r.falhou ?? 0, custo: r.custo };
+}
+
+export type StatusRender = "na_fila" | "renderizando" | "pronto" | "erro";
+
+export type Render = {
+  id: string;
+  nome: string;
+  jobs: string; // JSON de string[]
+  status: StatusRender;
+  progresso: number;
+  mensagem: string | null;
+  erro: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export function criarRender(id: string, nome: string, jobs: string[]): void {
+  db().prepare("INSERT INTO renders (id, nome, jobs) VALUES (?, ?, ?)").run(id, nome, JSON.stringify(jobs));
+}
+
+export function obterRender(id: string): Render | undefined {
+  const linha = db().prepare("SELECT * FROM renders WHERE id = ?").get(id);
+  return linha ? (simples(linha) as Render) : undefined;
+}
+
+export function listarRenders(): Render[] {
+  return db().prepare("SELECT * FROM renders ORDER BY criado_em DESC").all().map(simples) as Render[];
+}
+
+export function atualizarRender(id: string, campos: Partial<Pick<Render, "status" | "progresso" | "mensagem" | "erro">>): void {
+  const chaves = Object.keys(campos) as (keyof typeof campos)[];
+  if (!chaves.length) return;
+  db()
+    .prepare(`UPDATE renders SET ${chaves.map((k) => `${k} = ?`).join(", ")}, atualizado_em = datetime('now') WHERE id = ?`)
+    .run(...chaves.map((k) => campos[k] ?? null), id);
 }

@@ -11,3 +11,7 @@ export const ARQUIVO_DB = path.join(DIR_DADOS, "app.db");
 export function dirJob(jobId: string): string {
   return path.join(DIR_DADOS, "jobs", jobId);
 }
+
+export function dirRender(renderId: string): string {
+  return path.join(DIR_DADOS, "renders", renderId);
+}

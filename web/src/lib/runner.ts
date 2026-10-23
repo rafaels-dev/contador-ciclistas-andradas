@@ -5,7 +5,9 @@ import path from "node:path";
 import readline from "node:readline";
 import {
   atualizarJob,
+  atualizarRender,
   listarCandidatos,
+  obterRender,
   obterJob,
   registrarSugestao,
   resumoSugestoes,
@@ -15,7 +17,7 @@ import {
 } from "./db";
 import { baixarDoDrive } from "./drive";
 import { ErroOpenRouter, sugerirCategoria } from "./openrouter";
-import { RAIZ_REPO, dirJob } from "./paths";
+import { RAIZ_REPO, dirJob, dirRender } from "./paths";
 
 /**
  * Orquestra as etapas pesadas de um job fora do ciclo de request: download
@@ -26,9 +28,9 @@ import { RAIZ_REPO, dirJob } from "./paths";
 const PYTHON = process.env.PYTHON ?? "python3";
 
 type EventoWorker =
-  | { tipo: "progresso"; etapa: string; p: number; fps?: number; candidatos?: number }
+  | { tipo: "progresso"; etapa: string; p: number; fps?: number; candidatos?: number; video?: number; videos?: number }
   | { tipo: "info"; fps: number; frames: number; largura: number; altura: number; duracao_s: number }
-  | { tipo: "fim"; candidatos: number }
+  | { tipo: "fim"; candidatos?: number; eventos?: number; duracao_s?: number; codec?: string }
   | { tipo: "erro"; mensagem: string };
 
 const g = globalThis as {
@@ -332,4 +334,65 @@ export function iniciarSugestoes(jobId: string): void {
   })()
     .catch((e) => falhar(jobId, e))
     .finally(() => sugerindo.delete(jobId));
+}
+
+// ----------------------------------------------------------------------
+// Vídeo final: um ou mais jobs revisados num único vídeo, contador somando
+// entre eles. O plano congela as decisões humanas do momento do pedido.
+// ----------------------------------------------------------------------
+
+export function iniciarRender(renderId: string): void {
+  const render = obterRender(renderId);
+  if (!render) return;
+  const dir = dirRender(renderId);
+  fs.mkdirSync(dir, { recursive: true });
+  const videos = (JSON.parse(render.jobs) as string[]).map((jobId) => {
+    const job = obterJob(jobId);
+    if (!job) throw new Error(`Job ${jobId} não existe mais.`);
+    const djob = dirJob(jobId);
+    return {
+      job: jobId,
+      titulo: job.nome_arquivo ?? jobId,
+      video: path.join(djob, job.arquivo_video ?? "video.mp4"),
+      trilhas: path.join(djob, "trilhas.json.gz"),
+      linhas: JSON.parse(job.linhas) as Linha[],
+      eventos: listarCandidatos(jobId)
+        .filter((c) => c.rotulo && c.rotulo !== "descartado")
+        .map((c) => ({ id: c.id, frame: c.frame, linha_id: c.linha_id, categoria: c.rotulo, direcao: c.direcao, track: c.track })),
+    };
+  });
+  const arqPlano = path.join(dir, "plano.json");
+  fs.writeFileSync(arqPlano, JSON.stringify({ videos }, null, 1));
+  for (const f of ["video_final.mp4", "relatorio.json", "eventos.csv"]) fs.rmSync(path.join(dir, f), { force: true });
+  atualizarRender(renderId, { status: "na_fila", progresso: 0, erro: null, mensagem: "Na fila da GPU…" });
+
+  cancelados.delete(renderId);
+  void naFilaDaGpu(async () => {
+    if (cancelados.has(renderId) || obterRender(renderId)?.status !== "na_fila") return;
+    atualizarRender(renderId, { status: "renderizando", mensagem: "Começando…" });
+    const args = ["--plano", arqPlano, "--saida", dir];
+    if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos
+    let fim: EventoWorker | null = null;
+    await rodarWorker("renderizar.py", args, (ev) => {
+      if (ev.tipo === "fim") fim = ev;
+      if (ev.tipo !== "progresso") return;
+      const qual = ev.videos && ev.videos > 1 ? ` vídeo ${ev.video} de ${ev.videos}` : "";
+      atualizarRender(renderId, { progresso: ev.p, mensagem: `Gerando${qual}…${ev.fps ? ` (${ev.fps} fps)` : ""}` });
+    });
+    const f = fim as Extract<EventoWorker, { tipo: "fim" }> | null;
+    atualizarRender(renderId, {
+      status: "pronto",
+      progresso: 1,
+      mensagem: f ? `${f.eventos} contagens · ${Math.round((f.duracao_s ?? 0) / 60)} min de vídeo` : null,
+    });
+  }).catch((e) => {
+    const erro = cancelados.delete(renderId) ? "Cancelado pelo usuário." : e instanceof Error ? e.message : String(e);
+    atualizarRender(renderId, { status: "erro", erro, mensagem: null });
+  });
+}
+
+export function cancelarRender(renderId: string): void {
+  cancelados.add(renderId);
+  spawnSync("pkill", ["-f", `worker/renderizar.py --plano ${path.join(dirRender(renderId), "plano.json")}`]);
+  atualizarRender(renderId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
 }

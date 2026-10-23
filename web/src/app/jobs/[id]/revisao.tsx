@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Candidato, Categoria, Linha } from "@/lib/db";
 import { calcularTotais, NOME_CATEGORIA, proposta, type Classe } from "@/lib/revisao";
+import Link from "next/link";
+import { gerarVideoFinal } from "../../renders/actions";
 import { revisar } from "./actions";
 
 function mmss(s: number) {
@@ -47,6 +49,7 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
   const [ultimas, setUltimas] = useState<{ id: number; antes: Classe | null }[][]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [, iniciar] = useTransition();
+  const [gerando, iniciarRender] = useTransition();
 
   const props = useMemo(() => Object.fromEntries(candidatos.map((c) => [c.id, proposta(c, porId)])), [candidatos, porId]);
   const rotulo = (c: Candidato) => rotulos[c.id] ?? null;
@@ -223,12 +226,20 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
           <span>
             {totais.pendentes
               ? `Faltam ${totais.pendentes} de ${candidatos.length} para liberar o vídeo final.`
-              : "Revisão completa."}
+              : "Revisão completa."}{" "}
+            <Link href="/" className="text-emerald-700 hover:underline dark:text-emerald-400">
+              Juntar com outros vídeos
+            </Link>
           </span>
           <button
-            disabled
-            title="O render do vídeo final chega na fase 4."
-            className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white disabled:opacity-40"
+            disabled={totais.pendentes > 0 || gerando}
+            onClick={() =>
+              iniciarRender(async () => {
+                const r = await gerarVideoFinal([jobId]);
+                if (r.erro) setErro(r.erro);
+              })
+            }
+            className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
           >
             Gerar vídeo final
           </button>
