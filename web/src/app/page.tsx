@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { listarCandidatos, listarJobs, listarRenders, resumoRevisao } from "@/lib/db";
+import { AutoRefresh } from "./jobs/[id]/auto-refresh";
 import { FormNovoJob } from "./form-novo-job";
 import { SeletorVideoFinal, type OpcaoVideo } from "./seletor-video-final";
 
@@ -46,14 +47,24 @@ async function ListaJobs() {
 
   return (
     <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
+      {jobs.some((j) => j.status === "baixando") && <AutoRefresh ms={2000} />}
       {jobs.map((job) => (
         <li key={job.id}>
-          <Link
-            href={`/jobs/${job.id}`}
-            className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900"
-          >
-            <span className="truncate">{job.nome_arquivo ?? job.drive_id}</span>
-            <span className="shrink-0 text-sm text-zinc-500">{job.status}</span>
+          <Link href={`/jobs/${job.id}`} className="flex flex-col gap-2 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900">
+            <span className="flex items-center justify-between gap-4">
+              <span className="truncate">{job.nome_arquivo ?? job.drive_id}</span>
+              <span className="shrink-0 text-sm text-zinc-500">{job.status}</span>
+            </span>
+            {job.status === "baixando" && (
+              <span className="flex flex-col gap-1" data-testid="download">
+                <span className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
+                  <span className="block h-full bg-emerald-600 transition-all" style={{ width: `${Math.round(job.progresso * 100)}%` }} />
+                </span>
+                <span className="text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
+                  {job.mensagem} {job.progresso > 0 && `· ${Math.round(job.progresso * 100)}%`}
+                </span>
+              </span>
+            )}
           </Link>
         </li>
       ))}

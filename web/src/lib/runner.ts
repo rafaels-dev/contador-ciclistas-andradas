@@ -97,6 +97,28 @@ export function cancelarJob(jobId: string): void {
   atualizarJob(jobId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
 }
 
+const JANELA_VELOCIDADE_MS = 5000;
+
+/** 1536 → "1,5 KB" (potências de 1000, como o Drive mostra os tamanhos). */
+function formatarBytes(n: number): string {
+  const unidades = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  while (n >= 1000 && i < unidades.length - 1) {
+    n /= 1000;
+    i++;
+  }
+  const casas = i === 0 || n >= 100 ? 0 : 1;
+  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })} ${unidades[i]}`;
+}
+
+function formatarDuracao(s: number): string {
+  s = Math.ceil(s);
+  if (s < 60) return `${s} s`;
+  const h = Math.floor(s / 3600);
+  const min = Math.floor((s % 3600) / 60);
+  return h ? `${h} h ${min} min` : `${min} min ${s % 60} s`;
+}
+
 /** Etapa 1: download + metadados + 1º frame → aguardando_linhas. */
 export function iniciarDownload(jobId: string): void {
   void (async () => {
@@ -115,12 +137,17 @@ export function iniciarDownload(jobId: string): void {
     } else {
       const controle = new AbortController();
       downloads.set(jobId, controle);
+      const amostras: [number, number][] = []; // [ms, bytes] dos últimos segundos → velocidade
       const { nome } = await baixarDoDrive(job.drive_id, destino, controle.signal, (feito, total) => {
-        const mb = (feito / 1e6).toFixed(0);
-        atualizarJob(jobId, {
-          progresso: total ? feito / total : 0,
-          mensagem: total ? `Baixando… ${mb} de ${(total / 1e6).toFixed(0)} MB` : `Baixando… ${mb} MB`,
-        });
+        const agora = Date.now();
+        amostras.push([agora, feito]);
+        while (amostras.length > 2 && agora - amostras[0][0] > JANELA_VELOCIDADE_MS) amostras.shift();
+        const [t0, b0] = amostras[0];
+        const porSeg = agora > t0 ? ((feito - b0) * 1000) / (agora - t0) : 0;
+        const partes = [total ? `${formatarBytes(feito)} de ${formatarBytes(total)}` : formatarBytes(feito)];
+        if (porSeg > 0) partes.push(`${formatarBytes(porSeg)}/s`);
+        if (porSeg > 0 && total) partes.push(`faltam ${formatarDuracao((total - feito) / porSeg)}`);
+        atualizarJob(jobId, { progresso: total ? feito / total : 0, mensagem: `Baixando… ${partes.join(" · ")}` });
       });
       downloads.delete(jobId);
       atualizarJob(jobId, { nome_arquivo: nome ?? job.nome_arquivo });
