@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useSyncExternalStore, useTransition } from "react";
 import { BOTAO, CAMPO } from "@/lib/ui";
 import { criarJobsLocais, navegarPasta, type EstadoPasta } from "./actions";
 
@@ -32,6 +32,12 @@ export function SeletorLocal({ grupo }: { grupo: string }) {
   const [digitado, setDigitado] = useState("");
   const [marcados, setMarcados] = useState<string[]>([]);
   const [ocupado, iniciar] = useTransition();
+  // app desktop: diálogo nativo de arquivos (só existe depois da hidratação)
+  const nativo = useSyncExternalStore(
+    () => () => {},
+    () => !!window.contadorDesktop?.escolherVideos,
+    () => false,
+  );
 
   function abrir(caminho: string | null) {
     iniciar(async () => {
@@ -59,6 +65,19 @@ export function SeletorLocal({ grupo }: { grupo: string }) {
   const c = estado?.conteudo;
   return (
     <div className="flex flex-col gap-3" data-testid="seletor-local">
+      {nativo && (
+        <button
+          type="button"
+          disabled={ocupado}
+          className={`${BOTAO.primario} self-start`}
+          onClick={async () => {
+            const caminhos = (await window.contadorDesktop?.escolherVideos?.()) ?? [];
+            if (caminhos.length) iniciar(() => criarJobsLocais(caminhos, grupo || null));
+          }}
+        >
+          Escolher vídeos…
+        </button>
+      )}
       <form
         className="flex gap-2"
         onSubmit={(e) => {

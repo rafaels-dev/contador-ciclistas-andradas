@@ -1,0 +1,67 @@
+# Instaladores do app desktop para Windows, macOS e Linux. Ao criar uma tag
+# v* (ex.: git tag v0.2.0 && git push --tags) os três são publicados no mesmo
+# GitHub Release — é de lá que o electron-updater dos apps instalados baixa a
+# atualização. Rodar à mão (workflow_dispatch) só gera os artefatos.
+name: App desktop
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  instaladores:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+
+      - name: Dependências do app desktop
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Versão a partir da tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: desktop
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${GITHUB_REF_NAME#v}"
+
+      - name: Servidor, motor e uv
+        working-directory: desktop
+        env:
+          # fine-tune de bicicletas (runs/ft_blur/weights/best.pt), anexado a um release
+          PESOS_BICICLETAS_URL: ${{ vars.PESOS_BICICLETAS_URL }}
+        run: npm run preparar
+
+      - name: Instalador
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # sem certificado de assinatura por enquanto (o Windows/macOS avisam na 1ª abertura)
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        shell: bash
+        run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instalador-${{ matrix.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+          if-no-files-found: ignore

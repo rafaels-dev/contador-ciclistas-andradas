@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 type Tema = "dark" | "light";
 
@@ -23,16 +23,18 @@ function assinar(f: () => void) {
   };
 }
 
-declare global {
-  interface Window {
-    contadorDesktop?: { plataforma: "win" | "mac" | "linux"; tema?: (t: Tema) => void };
-  }
-}
-
 /** Alterna entre o tema escuro e o claro; a escolha fica salva neste computador. */
 export function BotaoTema() {
   const tema = useSyncExternalStore<Tema | null>(assinar, temaAtual, () => null);
   const proximo: Tema = tema === "light" ? "dark" : "light";
+
+  // app desktop: os botões da janela acompanham o tema da página
+  useEffect(() => {
+    const desktop = window.contadorDesktop;
+    if (!desktop) return;
+    document.documentElement.setAttribute("data-desktop", desktop.plataforma);
+    if (tema) desktop.tema?.(tema);
+  }, [tema]);
 
   function trocar() {
     document.documentElement.setAttribute("data-theme", proximo);

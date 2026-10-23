@@ -11,13 +11,20 @@ const ICONES = {
   grupo: <path d="M1.75 4.25c0-.6.4-1 1-1h3.5l1.5 1.5h5.5c.6 0 1 .4 1 1v6.5c0 .6-.4 1-1 1H2.75c-.6 0-1-.4-1-1Z" />,
   solto: <rect x="2.25" y="3.25" width="11.5" height="9.5" rx="1.5" />,
   exportar: <path d="M8 2v8M4.75 6.75 8 10l3.25-3.25M2.5 13.5h11" />,
+  config: (
+    <>
+      <path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" />
+      <circle cx="10" cy="4.5" r="1.5" />
+      <circle cx="6" cy="11.5" r="1.5" />
+    </>
+  ),
 };
 
 type Props = {
   href: string;
   /** grupo que o item representa (null = todos; undefined = não é item de grupo) */
   grupo: string | null | undefined;
-  n: number;
+  n: number | null;
   icone: keyof typeof ICONES;
   children: React.ReactNode;
 };
@@ -38,7 +45,7 @@ export function ItemNav({ href, grupo, n, icone, children }: Props) {
         {ICONES[icone]}
       </svg>
       <span className="flex-1 truncate">{children}</span>
-      <span className="font-mono text-[0.7rem] tabular-nums text-faint">{n}</span>
+      {n !== null && <span className="font-mono text-[0.7rem] tabular-nums text-faint">{n}</span>}
     </Link>
   );
 }

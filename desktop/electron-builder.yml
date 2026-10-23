@@ -1,0 +1,60 @@
+# Instaladores do Contador de Tráfego (npm run dist:win | dist:mac | dist:linux).
+# Como o Spotify: instala por usuário, sem pedir administrador, abre ao fim e
+# se atualiza sozinho pelos GitHub Releases (electron-updater).
+appId: br.com.contadortrafego.app
+productName: Contador de Tráfego
+copyright: Copyright © 2026 Rafael Schettino
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.cjs
+  - preload.cjs
+  - package.json
+  - build/icon.png
+extraResources:
+  - from: recursos/web
+    to: web
+  # o electron-builder exclui node_modules por padrão — o servidor precisa dele
+  - from: recursos/web/node_modules
+    to: web/node_modules
+    filter: ["**/*"]
+  - from: recursos/motor
+    to: motor
+  - from: recursos/bin
+    to: bin
+asar: true
+
+win:
+  target: nsis
+  artifactName: ContadorDeTrafego-Setup-${version}.${ext}
+nsis:
+  oneClick: true
+  perMachine: false
+  runAfterFinish: true
+  createDesktopShortcut: always
+  shortcutName: Contador de Tráfego
+  deleteAppDataOnUninstall: false
+
+mac:
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  category: public.app-category.video
+  # assinatura ad-hoc: sem certificado da Apple, o Mac com chip M exige ao menos
+  # isto para abrir (o usuário ainda confirma em Ajustes → Privacidade)
+  identity: "-"
+  artifactName: ContadorDeTrafego-${version}-${arch}.${ext}
+
+linux:
+  target: [AppImage, deb]
+  category: AudioVideo
+  syncDesktopName: true
+  maintainer: Rafael Schettino <rcschettino@gmail.com>
+  artifactName: ContadorDeTrafego-${version}-${arch}.${ext}
+
+publish:
+  provider: github
+  owner: rafaels-dev
+  repo: contador-ciclistas-andradas
+  releaseType: release

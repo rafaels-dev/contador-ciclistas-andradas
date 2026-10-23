@@ -45,6 +45,12 @@ export async function Biblioteca() {
           Exportações
         </ItemNav>
       </nav>
+
+      <nav className="mt-auto flex flex-col gap-0.5">
+        <ItemNav href="/configuracoes" grupo={undefined} n={null} icone="config">
+          Configurações
+        </ItemNav>
+      </nav>
     </aside>
   );
 }

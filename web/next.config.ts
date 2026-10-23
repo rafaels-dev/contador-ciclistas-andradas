@@ -7,9 +7,15 @@ import type { NextConfig } from "next";
 loadEnvConfig(path.resolve(__dirname, ".."));
 
 const nextConfig: NextConfig = {
+  // servidor autocontido em .next/standalone — é o que o app desktop embute
+  // (desktop/scripts/preparar.mjs). Não muda o `next dev`.
+  output: "standalone",
+  // os dados (vídeos, banco) são lidos em tempo de execução, nunca empacotados
+  outputFileTracingExcludes: { "*": ["data/**", "scripts/**"] },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {
+    root: path.resolve(__dirname),
     rules: {
       "*.css": {
         loaders: ["@tailwindcss/turbopack"],

@@ -1,5 +1,5 @@
 import "./env";
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
@@ -16,6 +16,7 @@ import {
   type Linha,
 } from "./db";
 import { baixarDoDrive } from "./drive";
+import { pythonDoMotor } from "./motor";
 import { ErroOpenRouter, sugerirCategoria } from "./openrouter";
 import { RAIZ_REPO, dirJob, dirRender } from "./paths";
 
@@ -24,8 +25,6 @@ import { RAIZ_REPO, dirJob, dirRender } from "./paths";
  * (Node) e scripts Python do worker/ (GPU). Detecções rodam em fila única —
  * a GPU de 8 GB não comporta dois vídeos em paralelo com folga.
  */
-
-const PYTHON = process.env.PYTHON ?? "python3";
 
 type EventoWorker =
   | { tipo: "progresso"; etapa: string; p: number; fps?: number; candidatos?: number; video?: number; videos?: number }
@@ -38,10 +37,38 @@ const g = globalThis as {
   __contadorDownloads?: Map<string, AbortController>;
   __contadorCancelados?: Set<string>;
   __contadorSugerindo?: Set<string>;
+  __contadorProcessos?: Map<string, Set<ChildProcess>>;
 };
 const downloads = (g.__contadorDownloads ??= new Map());
 const cancelados = (g.__contadorCancelados ??= new Set());
 const sugerindo = (g.__contadorSugerindo ??= new Set());
+// processos do worker por job/render, para cancelar sem depender do pkill
+const processos = (g.__contadorProcessos ??= new Map());
+
+// app desktop: ao fechar a janela o servidor é encerrado — os workers (Python,
+// ffmpeg) não podem ficar órfãos rodando na GPU
+if (!(globalThis as { __contadorSaida?: boolean }).__contadorSaida) {
+  (globalThis as { __contadorSaida?: boolean }).__contadorSaida = true;
+  const encerrarTodos = () => {
+    for (const dono of processos.keys()) encerrarProcessos(dono);
+  };
+  process.on("exit", encerrarTodos);
+  for (const sinal of ["SIGTERM", "SIGINT"] as const) {
+    process.once(sinal, () => {
+      encerrarTodos();
+      process.exit(0);
+    });
+  }
+}
+
+/** Encerra os workers de um job/render, com os filhos (ffmpeg) junto. */
+function encerrarProcessos(dono: string): void {
+  for (const proc of processos.get(dono) ?? []) {
+    if (proc.exitCode !== null || !proc.pid) continue;
+    if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { windowsHide: true });
+    else proc.kill("SIGTERM");
+  }
+}
 
 function naFilaDaGpu<T>(tarefa: () => Promise<T>): Promise<T> {
   const anterior = g.__contadorFilaGpu ?? Promise.resolve();
@@ -50,12 +77,21 @@ function naFilaDaGpu<T>(tarefa: () => Promise<T>): Promise<T> {
   return proxima;
 }
 
-function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker) => void): Promise<void> {
+function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker) => void, dono?: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(PYTHON, [path.join("worker", script), ...args], {
+    const proc = spawn(pythonDoMotor(), [path.join("worker", script), ...args], {
       cwd: RAIZ_REPO,
       env: { ...process.env, PYTHONUNBUFFERED: "1" },
+      windowsHide: true,
     });
+    if (dono) {
+      const doDono = processos.get(dono) ?? new Set<ChildProcess>();
+      processos.set(dono, doDono.add(proc));
+      proc.on("close", () => {
+        doDono.delete(proc);
+        if (!doDono.size) processos.delete(dono);
+      });
+    }
     let erroWorker: string | null = null;
     let stderr = "";
     readline.createInterface({ input: proc.stdout }).on("line", (linha) => {
@@ -92,7 +128,9 @@ function falhar(jobId: string, e: unknown): void {
 export function cancelarJob(jobId: string): void {
   cancelados.add(jobId);
   downloads.get(jobId)?.abort();
-  spawnSync("pkill", ["-f", `worker/.*${dirJob(jobId)}(/| |$)`]);
+  encerrarProcessos(jobId);
+  // processos de antes de um hot reload do `next dev` (não estão no mapa)
+  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/.*${dirJob(jobId)}(/| |$)`]);
   // na fila da GPU (ainda sem processo): a tarefa confere o status ao começar
   atualizarJob(jobId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
 }
@@ -172,7 +210,7 @@ export function iniciarDownload(jobId: string): void {
 /** Vídeo do job: o arquivo local original (caminho absoluto) ou o baixado na pasta do job. */
 function caminhoVideo(jobId: string): string {
   const arquivo = obterJob(jobId)?.arquivo_video ?? "video.mp4";
-  return path.isAbsolute(arquivo) ? arquivo : path.join(dirJob(jobId), arquivo);
+  return path.isAbsolute(arquivo) ? arquivo : path.join(/* turbopackIgnore: true */ dirJob(jobId), arquivo);
 }
 
 /** Metadados + 1º frame do vídeo já em disco → aguardando_linhas. */
@@ -190,7 +228,7 @@ async function lerVideo(jobId: string): Promise<void> {
         duracao_s: ev.duracao_s,
       });
     }
-  });
+  }, jobId);
   atualizarJob(jobId, { status: "aguardando_linhas", mensagem: null, progresso: 0 });
 }
 
@@ -253,7 +291,7 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
       const fps = ev.fps ? ` (${ev.fps} fps)` : "";
       const n = ev.candidatos != null ? ` — ${ev.candidatos} candidatos` : "";
       atualizarJob(jobId, { progresso: ev.p, mensagem: `${ROTULO_ETAPA[ev.etapa] ?? ev.etapa}…${fps}${n}` });
-    });
+    }, jobId);
 
     const itens = JSON.parse(fs.readFileSync(path.join(saida, "candidatos.json"), "utf8")) as CandidatoWorker[];
     substituirCandidatos(
@@ -412,7 +450,7 @@ export function iniciarRender(renderId: string): void {
   });
   const arqPlano = path.join(dir, "plano.json");
   fs.writeFileSync(arqPlano, JSON.stringify({ videos }, null, 1));
-  for (const f of ["video_final.mp4", "relatorio.json", "eventos.csv"]) fs.rmSync(path.join(dir, f), { force: true });
+  for (const f of ["video_final.mp4", "relatorio.json", "eventos.csv"]) fs.rmSync(path.join(/* turbopackIgnore: true */ dir, f), { force: true });
   atualizarRender(renderId, { status: "na_fila", progresso: 0, erro: null, mensagem: "Na fila da GPU…" });
 
   cancelados.delete(renderId);
@@ -427,7 +465,7 @@ export function iniciarRender(renderId: string): void {
       if (ev.tipo !== "progresso") return;
       const qual = ev.videos && ev.videos > 1 ? ` vídeo ${ev.video} de ${ev.videos}` : "";
       atualizarRender(renderId, { progresso: ev.p, mensagem: `Gerando${qual}…${ev.fps ? ` (${ev.fps} fps)` : ""}` });
-    });
+    }, renderId);
     const f = fim as Extract<EventoWorker, { tipo: "fim" }> | null;
     atualizarRender(renderId, {
       status: "pronto",
@@ -442,6 +480,7 @@ export function iniciarRender(renderId: string): void {
 
 export function cancelarRender(renderId: string): void {
   cancelados.add(renderId);
-  spawnSync("pkill", ["-f", `worker/renderizar.py --plano ${path.join(dirRender(renderId), "plano.json")}`]);
+  encerrarProcessos(renderId);
+  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/renderizar.py --plano ${path.join(dirRender(renderId), "plano.json")}`]);
   atualizarRender(renderId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
 }

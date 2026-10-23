@@ -68,8 +68,9 @@ def bgr(rgb) -> tuple[int, int, int]:
 
 
 def fonte(tamanho: int, negrito: bool = False) -> ImageFont.ImageFont:
-    nomes = (["DejaVuSans-Bold.ttf", "arialbd.ttf"] if negrito else ["DejaVuSans.ttf", "arial.ttf"])
-    pastas = ["/usr/share/fonts/truetype/dejavu", "C:/Windows/Fonts", "/Library/Fonts", ""]
+    nomes = (["DejaVuSans-Bold.ttf", "arialbd.ttf", "Arial Bold.ttf"] if negrito else ["DejaVuSans.ttf", "arial.ttf", "Arial.ttf"])
+    pastas = ["/usr/share/fonts/truetype/dejavu", "C:/Windows/Fonts", "/Library/Fonts",
+              "/System/Library/Fonts/Supplemental", ""]
     for n in nomes:
         for p in pastas:
             try:
