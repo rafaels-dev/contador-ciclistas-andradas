@@ -57,6 +57,7 @@ export type Job = {
   camera_id: string | null;
   linhas: string; // JSON de Linha[] — cópia congelada no momento da detecção
   arquivo_video: string | null; // relativo ao dir do job, ou absoluto (vídeo local usado onde está)
+  grupo_id: string | null; // grupo da biblioteca (null = sem grupo)
   fps: number | null;
   largura: number | null;
   altura: number | null;
@@ -68,6 +69,17 @@ export type Job = {
   criado_em: string;
   atualizado_em: string;
 };
+
+/** Grupo da biblioteca (um local, um dia de coleta…): só organiza e facilita o vídeo final. */
+export type Grupo = { id: string; nome: string; criado_em: string };
+
+const SCHEMA_GRUPOS = `
+CREATE TABLE IF NOT EXISTS grupos (
+  id         TEXT PRIMARY KEY,
+  nome       TEXT NOT NULL,
+  criado_em  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
 
 const SCHEMA_RENDERS = `
 CREATE TABLE IF NOT EXISTS renders (
@@ -138,14 +150,17 @@ CREATE TABLE IF NOT EXISTS candidatos (
   revisado_em        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_candidatos_job ON candidatos(job_id);
-${SCHEMA_RENDERS}`;
+${SCHEMA_RENDERS}
+${SCHEMA_GRUPOS}`;
 
 /** Colunas adicionadas depois da criação do banco (CREATE IF NOT EXISTS não altera tabela existente). */
 function migrar(d: DatabaseSync): void {
   const novas: Record<string, Record<string, string>> = {
     candidatos: { contexto: "TEXT", custo_llm: "REAL" },
+    jobs: { grupo_id: "TEXT REFERENCES grupos(id) ON DELETE SET NULL" },
   };
   d.exec(SCHEMA_RENDERS);
+  d.exec(SCHEMA_GRUPOS);
   for (const [tabela, colunas] of Object.entries(novas)) {
     const existentes = new Set((d.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map((c) => c.name));
     for (const [col, tipo] of Object.entries(colunas)) {
@@ -159,7 +174,7 @@ function migrar(d: DatabaseSync): void {
 const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
 // incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
 // migração precisa rodar sem reiniciar o servidor (e os workers em curso)
-const VERSAO_SCHEMA = 3;
+const VERSAO_SCHEMA = 4;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -285,10 +300,43 @@ export function obterJob(id: string): Job | undefined {
   return linha ? (simples(linha) as Job) : undefined;
 }
 
-export function criarJob(dados: { id: string; link_drive: string; drive_id: string }): void {
+export function criarJob(dados: { id: string; link_drive: string; drive_id: string; grupo_id?: string | null }): void {
   db()
-    .prepare("INSERT INTO jobs (id, link_drive, drive_id) VALUES (?, ?, ?)")
-    .run(dados.id, dados.link_drive, dados.drive_id);
+    .prepare("INSERT INTO jobs (id, link_drive, drive_id, grupo_id) VALUES (?, ?, ?, ?)")
+    .run(dados.id, dados.link_drive, dados.drive_id, dados.grupo_id ?? null);
+}
+
+export function listarGrupos(): (Grupo & { n: number })[] {
+  return db()
+    .prepare(
+      `SELECT g.*, (SELECT COUNT(*) FROM jobs j WHERE j.grupo_id = g.id) AS n
+       FROM grupos g ORDER BY g.nome COLLATE NOCASE`,
+    )
+    .all()
+    .map(simples) as (Grupo & { n: number })[];
+}
+
+export function obterGrupo(id: string): Grupo | undefined {
+  const linha = db().prepare("SELECT * FROM grupos WHERE id = ?").get(id);
+  return linha ? (simples(linha) as Grupo) : undefined;
+}
+
+export function salvarGrupo(id: string, nome: string): void {
+  db()
+    .prepare("INSERT INTO grupos (id, nome) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET nome = excluded.nome")
+    .run(id, nome);
+}
+
+/** Apaga só o grupo: os vídeos continuam na biblioteca, sem grupo. */
+export function excluirGrupo(id: string): void {
+  const d = db();
+  d.prepare("UPDATE jobs SET grupo_id = NULL WHERE grupo_id = ?").run(id);
+  d.prepare("DELETE FROM grupos WHERE id = ?").run(id);
+}
+
+export function moverJobs(ids: string[], grupoId: string | null): void {
+  const upd = db().prepare("UPDATE jobs SET grupo_id = ? WHERE id = ?");
+  for (const id of ids) upd.run(grupoId, id);
 }
 
 export function registrarSugestao(

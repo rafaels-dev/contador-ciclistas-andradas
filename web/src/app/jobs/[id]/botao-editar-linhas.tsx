@@ -1,5 +1,6 @@
 "use client";
 
+import { BOTAO } from "@/lib/ui";
 import { editarLinhas } from "./actions";
 
 /** Pede confirmação: refazer os candidatos descarta sugestões e revisões. */
@@ -14,7 +15,7 @@ export function BotaoEditarLinhas({ jobId, rapido }: { jobId: string; rapido: bo
         if (!confirm(aviso)) e.preventDefault();
       }}
     >
-      <button className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:border-zinc-700 dark:hover:bg-zinc-800">
+      <button className={BOTAO.secundario}>
         Editar linhas
       </button>
     </form>

@@ -3,14 +3,9 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Candidato, Categoria, Linha } from "@/lib/db";
 import { calcularTotais, NOME_CATEGORIA, possiveisDuplicados, proposta, type Classe } from "@/lib/revisao";
-import Link from "next/link";
+import { BOTAO, CAMPO, COR_CLASSE, TITULO_PAINEL, timecode } from "@/lib/ui";
 import { gerarVideoFinal } from "../../renders/actions";
 import { revisar } from "./actions";
-
-function mmss(s: number) {
-  const m = Math.floor(s / 60);
-  return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-}
 
 // teclas 1–8 e 0, na ordem dos botões
 const ATALHOS: [Classe, string][] = [
@@ -28,16 +23,36 @@ const POR_TECLA: Record<string, Classe> = { ...Object.fromEntries(ATALHOS.map(([
 
 type Filtro = "pendentes" | "revisados" | "todos" | "divergentes" | "fora" | "duplicados" | Classe;
 
+const PRINCIPAIS: Filtro[] = ["pendentes", "revisados", "todos"];
+const OUTROS_FILTROS: Filtro[] = ["duplicados", "fora", "divergentes", "ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado"];
+const NOME_FILTRO: Partial<Record<Filtro, string>> = {
+  pendentes: "Pendentes",
+  revisados: "Revisados",
+  todos: "Todos",
+  divergentes: "Modelo ≠ detector",
+  fora: "Fora da linha",
+  duplicados: "Possível duplicado",
+};
+const nomeFiltro = (f: Filtro) => NOME_FILTRO[f] ?? NOME_CATEGORIA[f as Classe];
+
 type Props = {
   jobId: string;
   base: string;
   candidatos: Candidato[];
   linhas: Linha[];
-  /** false enquanto há sugestões em curso ou depois do render: só leitura */
+  duracao: number;
+  /** false enquanto há sugestões em curso: só leitura */
   editavel: boolean;
+  /** painel "o que cada linha conta", mostrado no inspetor */
+  painelLinhas?: React.ReactNode;
 };
 
-export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
+/**
+ * Revisão humana no formato de um editor: lista de candidatos (o "bin"),
+ * monitor com o clipe do candidato em foco, inspetor com a decisão e uma
+ * timeline do vídeo inteiro com uma trilha por linha de contagem.
+ */
+export function Revisao({ jobId, base, candidatos, linhas, duracao, editavel, painelLinhas }: Props) {
   const porId = useMemo(() => Object.fromEntries(linhas.map((l) => [l.id, l])), [linhas]);
   const [rotulos, setRotulos] = useState<Record<number, Classe | null>>(() =>
     Object.fromEntries(candidatos.map((c) => [c.id, c.rotulo])),
@@ -75,6 +90,7 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
   };
   const naLinha = candidatos.filter((c) => !linhaFiltro || c.linha_id === linhaFiltro);
   const visiveis = naLinha.filter((c) => passa(c, filtro));
+  const visivel = new Set(visiveis.map((c) => c.id));
   const totais = calcularTotais(candidatos.map((c) => ({ ...c, rotulo: rotulo(c) })));
   const confiaveis = visiveis.filter((c) => !rotulo(c) && props[c.id].classe && (c.conf_llm ?? 0) >= limiar);
 
@@ -110,11 +126,20 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
     if (ultima.length === 1) setFoco(ultima[0].id);
   }
 
+  /** leva a um candidato mesmo que o filtro atual o esconda */
+  function irPara(id: number, filtroSeOculto: Filtro = "todos") {
+    if (!visivel.has(id)) {
+      setFiltro(filtroSeOculto);
+      setLinhaFiltro("");
+    }
+    setFoco(id);
+  }
+
   // o foco precisa estar na lista visível (troca de filtro, item decidido sumiu)
   const focado = visiveis.find((c) => c.id === foco) ?? visiveis[0] ?? null;
 
   useEffect(() => {
-    if (focado) document.getElementById(`cand-${focado.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (focado) document.getElementById(`cand-${focado.id}`)?.scrollIntoView({ block: "nearest" });
   }, [focado?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -136,32 +161,40 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
     return () => window.removeEventListener("keydown", tecla);
   });
 
-  const filtros: Filtro[] = ["pendentes", "revisados", "todos", "ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado", "fora", "divergentes", "duplicados"];
-  const nomeFiltro = (f: Filtro) =>
-    ({ pendentes: "Pendentes", revisados: "Revisados", todos: "Todos", divergentes: "Modelo ≠ detector", fora: "Fora da linha", duplicados: "Possível duplicado" } as Record<string, string>)[f] ??
-    NOME_CATEGORIA[f as Classe];
+  const contar = (f: Filtro) => naLinha.filter((c) => passa(c, f)).length;
 
   return (
-    <div className="flex flex-col gap-4">
-      <QuadroTotais totais={totais} linhas={linhas} total={candidatos.length} />
-
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        {filtros.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFiltro(f)}
-            className={`rounded-full px-3 py-1 ${filtro === f ? "bg-emerald-600 text-white" : "bg-zinc-100 dark:bg-zinc-800"}`}
-          >
-            {nomeFiltro(f)} ({naLinha.filter((c) => passa(c, f)).length})
-          </button>
-        ))}
+    <div className="flex flex-col lg:min-h-0 lg:flex-1">
+      {/* barra de ferramentas */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-line bg-panel px-3 py-1.5 text-sm">
+        <div className="flex overflow-hidden rounded-md border border-line" role="group" aria-label="Filtro">
+          {PRINCIPAIS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setFiltro(f)}
+              aria-pressed={filtro === f}
+              className={`px-2.5 py-1 ${filtro === f ? "bg-accent font-semibold text-accent-ink" : "bg-raised text-muted hover:bg-hover hover:text-fg"}`}
+            >
+              {nomeFiltro(f)} <span className="font-mono text-xs opacity-70">{contar(f)}</span>
+            </button>
+          ))}
+        </div>
+        <select
+          value={PRINCIPAIS.includes(filtro) ? "" : filtro}
+          onChange={(e) => setFiltro((e.target.value || "pendentes") as Filtro)}
+          className={`${CAMPO} py-1 ${PRINCIPAIS.includes(filtro) ? "" : "border-accent"}`}
+          aria-label="Mais filtros"
+        >
+          <option value="">Mais filtros…</option>
+          {OUTROS_FILTROS.map((f) => (
+            <option key={f} value={f}>
+              {nomeFiltro(f)} ({contar(f)})
+            </option>
+          ))}
+        </select>
         {linhas.length > 1 && (
-          <select
-            value={linhaFiltro}
-            onChange={(e) => setLinhaFiltro(e.target.value)}
-            className="rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-            aria-label="Filtrar por linha"
-          >
+          <select value={linhaFiltro} onChange={(e) => setLinhaFiltro(e.target.value)} className={`${CAMPO} py-1`} aria-label="Filtrar por linha">
             <option value="">Todas as linhas</option>
             {linhas.map((l) => (
               <option key={l.id} value={l.id}>
@@ -170,281 +203,422 @@ export function Revisao({ jobId, base, candidatos, linhas, editavel }: Props) {
             ))}
           </select>
         )}
-      </div>
 
-      {editavel && (
-        <div className="flex flex-col gap-2 rounded-lg bg-zinc-50 p-3 text-sm dark:bg-zinc-900">
-          <div className="flex flex-wrap items-center gap-2">
+        {editavel && (
+          <>
+            <span className="mx-1 h-5 w-px bg-line" />
             <button
+              type="button"
               onClick={() => decidir(confiaveis.map((c) => ({ id: c.id, rotulo: props[c.id].classe })))}
               disabled={!confiaveis.length}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+              className={BOTAO.secundario}
+              title="Aceita a proposta dos pendentes do filtro atual com confiança mínima"
             >
-              Aceitar {confiaveis.length} proposta(s) com confiança ≥
+              Aceitar {confiaveis.length} com confiança ≥
             </button>
-            <select
-              value={limiar}
-              onChange={(e) => setLimiar(Number(e.target.value))}
-              className="rounded border border-zinc-300 bg-white px-2 py-1 dark:border-zinc-700 dark:bg-zinc-900"
-              aria-label="Confiança mínima"
-            >
+            <select value={limiar} onChange={(e) => setLimiar(Number(e.target.value))} className={`${CAMPO} py-1`} aria-label="Confiança mínima">
               {[0.8, 0.9, 0.95].map((v) => (
                 <option key={v} value={v}>
                   {Math.round(v * 100)}%
                 </option>
               ))}
             </select>
-            <span className="text-zinc-500">entre os pendentes do filtro atual</span>
-            <button onClick={desfazer} disabled={!ultimas.length} className="ml-auto rounded px-2 py-1 hover:bg-zinc-200 disabled:opacity-40 dark:hover:bg-zinc-800">
-              Desfazer (U)
+            <button type="button" onClick={desfazer} disabled={!ultimas.length} className={BOTAO.fantasma} title="Desfazer (U)">
+              ↶ Desfazer
             </button>
-          </div>
-          <p className="text-xs text-zinc-500">
-            Teclado: <kbd>↑</kbd>/<kbd>↓</kbd> navega · <kbd>Enter</kbd> aceita a proposta · <kbd>1</kbd> ciclista ·{" "}
-            <kbd>2</kbd> pedestre · <kbd>3</kbd> automóvel · <kbd>4</kbd> moto · <kbd>5</kbd> patinete · <kbd>6</kbd> scooter elétrico · <kbd>7</kbd> monociclo ·{" "}
-            <kbd>8</kbd> outros · <kbd>0</kbd> descartar · <kbd>U</kbd> desfaz
-          </p>
-          {erro && <p className="text-red-600">{erro}</p>}
-        </div>
-      )}
+          </>
+        )}
 
-      {visiveis.length === 0 && (
-        <p className="py-8 text-center text-zinc-500">{filtro === "pendentes" ? "Nada pendente neste filtro. 🎉" : "Nenhum candidato neste filtro."}</p>
-      )}
-
-      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {visiveis.map((c) => (
-          <Cartao
-            key={c.id}
-            c={c}
-            base={base}
-            linha={c.linha_id ? porId[c.linha_id] : undefined}
-            prop={props[c.id]}
-            rotulo={rotulo(c)}
-            focado={focado?.id === c.id}
-            editavel={editavel}
-            aoFocar={() => setFoco(c.id)}
-            aoDecidir={(classe) => decidirFoco(c, classe)}
-            aoDesfazer={() => decidir([{ id: c.id, rotulo: null }])}
-            numero={numero[c.id]}
-            duplicadoDe={(duplicados.get(c.id) ?? []).map((id) => ({ c: porIdCand[id], numero: numero[id] }))}
-            aoIrPara={(id) => {
-              if (!visiveis.some((v) => v.id === id)) setFiltro("duplicados");
-              setFoco(id);
-            }}
-          />
-        ))}
-      </ul>
-
-      {editavel && (
-        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-zinc-200 bg-white/95 py-3 text-sm dark:border-zinc-800 dark:bg-zinc-950/95">
-          <span>
-            {totais.pendentes
-              ? `Faltam ${totais.pendentes} de ${candidatos.length} para liberar o vídeo final.`
-              : "Revisão completa."}{" "}
-            {duplicados.size > 0 && (
-              <button onClick={() => setFiltro("duplicados")} className="text-amber-700 hover:underline dark:text-amber-300">
-                ⚠ {duplicados.size} possíveis duplicados — conferir.
-              </button>
-            )}{" "}
-            <Link href="/" className="text-emerald-700 hover:underline dark:text-emerald-400">
-              Juntar com outros vídeos
-            </Link>
-          </span>
-          <button
-            disabled={totais.pendentes > 0 || gerando}
-            onClick={() =>
-              iniciarRender(async () => {
-                const r = await gerarVideoFinal([jobId]);
-                if (r.erro) setErro(r.erro);
-              })
-            }
-            className="rounded-lg bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
-          >
-            Gerar vídeo final
+        <span className="flex-1" />
+        {duplicados.size > 0 && (
+          <button type="button" onClick={() => setFiltro("duplicados")} className="rounded-md px-2 py-1 text-warn hover:bg-warn/10">
+            ⚠ {duplicados.size} possíveis duplicados
           </button>
-        </div>
-      )}
+        )}
+        {erro && <span className="text-danger">{erro}</span>}
+        {editavel && (
+          <>
+            <span className="font-mono text-xs text-muted">{totais.pendentes ? `faltam ${totais.pendentes}` : "revisão completa"}</span>
+            <button
+              type="button"
+              disabled={totais.pendentes > 0 || gerando}
+              onClick={() =>
+                iniciarRender(async () => {
+                  const r = await gerarVideoFinal([jobId]);
+                  if (r.erro) setErro(r.erro);
+                })
+              }
+              className={BOTAO.primario}
+              title={totais.pendentes ? "Revise todos os candidatos para liberar" : "Gera o vídeo com o contador"}
+            >
+              Gerar vídeo final
+            </button>
+          </>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:min-h-0 lg:flex-1 lg:grid-cols-[19rem_minmax(0,1fr)_19rem]">
+        <ListaCandidatos
+          visiveis={visiveis}
+          base={base}
+          focado={focado?.id ?? null}
+          numero={numero}
+          classeDe={classeDe}
+          rotulo={rotulo}
+          conf={(c) => (c.status_llm === "ok" ? c.conf_llm : null)}
+          porLinha={porId}
+          duplicados={duplicados}
+          aoFocar={setFoco}
+          vazio={filtro === "pendentes" ? "Nada pendente neste filtro." : "Nenhum candidato neste filtro."}
+        />
+
+        <Monitor c={focado} base={base} numero={focado ? numero[focado.id] : 0} linha={focado?.linha_id ? porId[focado.linha_id] : undefined} />
+
+        <aside className="flex flex-col border-line bg-panel lg:min-h-0 lg:overflow-y-auto lg:border-l">
+          {focado ? (
+            <Inspetor
+              c={focado}
+              linha={focado.linha_id ? porId[focado.linha_id] : undefined}
+              prop={props[focado.id]}
+              rotulo={rotulo(focado)}
+              editavel={editavel}
+              numero={numero[focado.id]}
+              duplicadoDe={(duplicados.get(focado.id) ?? []).map((id) => ({ c: porIdCand[id], numero: numero[id] }))}
+              aoDecidir={(classe) => decidirFoco(focado, classe)}
+              aoDesfazer={() => decidir([{ id: focado.id, rotulo: null }])}
+              aoIrPara={(id) => irPara(id, "duplicados")}
+            />
+          ) : (
+            <p className="p-4 text-sm text-muted">Nenhum candidato em foco.</p>
+          )}
+          <QuadroTotais totais={totais} linhas={linhas} total={candidatos.length} />
+          {painelLinhas}
+          {editavel && (
+            <details className="border-t border-line px-4 py-3 text-xs text-muted">
+              <summary className={`${TITULO_PAINEL} cursor-pointer`}>Atalhos de teclado</summary>
+              <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>anterior / próximo</dd>
+                <dt><kbd>Enter</kbd></dt><dd>aceita a proposta</dd>
+                {ATALHOS.map(([c, k]) => (
+                  <span key={k} className="contents">
+                    <dt><kbd>{k}</kbd></dt>
+                    <dd>{c === "descartado" ? "descartar" : NOME_CATEGORIA[c]}</dd>
+                  </span>
+                ))}
+                <dt><kbd>U</kbd></dt><dd>desfaz</dd>
+              </dl>
+            </details>
+          )}
+        </aside>
+      </div>
+
+      <Timeline
+        candidatos={candidatos}
+        linhas={linhas}
+        duracao={duracao}
+        focado={focado?.id ?? null}
+        visivel={visivel}
+        classeDe={classeDe}
+        decidido={(c) => !!rotulo(c)}
+        numero={numero}
+        aoFocar={(id) => irPara(id)}
+      />
     </div>
   );
 }
 
-type PropsCartao = {
-  c: Candidato;
+function Amostra({ classe, vazado = false }: { classe: Classe | null; vazado?: boolean }) {
+  if (!classe) return <span className="h-2.5 w-2.5 shrink-0 rounded-sm border border-faint" />;
+  const cor = COR_CLASSE[classe];
+  return <span className={`h-2.5 w-2.5 shrink-0 rounded-sm ${vazado ? `border-2 ${cor.borda}` : cor.fundo}`} />;
+}
+
+type PropsLista = {
+  visiveis: Candidato[];
   base: string;
-  linha: Linha | undefined;
-  prop: ReturnType<typeof proposta>;
-  rotulo: Classe | null;
-  focado: boolean;
-  editavel: boolean;
-  aoFocar: () => void;
-  aoDecidir: (c: Classe) => void;
-  aoDesfazer: () => void;
-  /** candidatos que podem ser o mesmo objeto (mesma linha, sentido e classe, quase juntos) */
-  duplicadoDe: { c: Candidato; numero: number }[];
-  numero: number;
-  aoIrPara: (id: number) => void;
+  focado: number | null;
+  numero: Record<number, number>;
+  classeDe: (c: Candidato) => Classe | null;
+  rotulo: (c: Candidato) => Classe | null;
+  conf: (c: Candidato) => number | null;
+  porLinha: Record<string, Linha>;
+  duplicados: Map<number, number[]>;
+  aoFocar: (id: number) => void;
+  vazio: string;
 };
 
-function Cartao({ c, base, linha, prop, rotulo, focado, editavel, aoFocar, aoDecidir, aoDesfazer, duplicadoDe, aoIrPara, numero }: PropsCartao) {
-  const corrigido = rotulo && rotulo !== prop.classe;
+function ListaCandidatos({ visiveis, base, focado, numero, classeDe, rotulo, conf, porLinha, duplicados, aoFocar, vazio }: PropsLista) {
   return (
-    <li
-      id={`cand-${c.id}`}
-      onClick={aoFocar}
-      data-testid="candidato"
-      data-rotulo={rotulo ?? ""}
-      className={`scroll-mb-24 scroll-mt-4 overflow-hidden rounded-lg border ${
-        focado ? "border-emerald-500 ring-2 ring-emerald-500" : "border-zinc-200 dark:border-zinc-800"
-      } ${rotulo && !focado ? "opacity-70" : ""}`}
-    >
-      <div className="bg-black">
-        {focado && c.clipe ? (
-          <video src={`${base}/${c.clipe}`} autoPlay loop muted playsInline className="mx-auto max-h-64" />
+    <ul className="flex max-h-[60vh] flex-col overflow-y-auto border-line bg-panel lg:max-h-none lg:min-h-0 lg:border-r" aria-label="Candidatos">
+      {visiveis.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted">{vazio}</li>}
+      {visiveis.map((c) => {
+        const r = rotulo(c);
+        const classe = classeDe(c);
+        const ativo = focado === c.id;
+        const p = conf(c);
+        const linha = c.linha_id ? porLinha[c.linha_id] : undefined;
+        return (
+          <li
+            key={c.id}
+            id={`cand-${c.id}`}
+            data-testid="candidato"
+            data-rotulo={r ?? ""}
+            onClick={() => aoFocar(c.id)}
+            className={`flex cursor-pointer items-center gap-2.5 border-b border-line/60 px-2.5 py-1.5 ${
+              ativo ? "bg-accent/15 shadow-[inset_3px_0_0_var(--accent)]" : "hover:bg-hover"
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={`${base}/${c.filmstrip}`} alt="" loading="lazy" className={`h-10 w-24 shrink-0 rounded-sm bg-viewer object-cover ${r && !ativo ? "opacity-60" : ""}`} />
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span className="flex items-center gap-1.5 text-sm">
+                <span
+                  className={`rounded px-1 font-mono text-[0.7rem] font-semibold tabular-nums ${duplicados.has(c.id) ? "bg-warn text-white" : "bg-raised text-muted"}`}
+                  data-testid="numero"
+                >
+                  #{numero[c.id]}
+                </span>
+                <Amostra classe={classe} vazado={!r} />
+                <span className={`truncate ${r ? "text-muted" : "font-medium"}`}>
+                  {classe ? (classe === "descartado" ? "Descartar" : NOME_CATEGORIA[classe]) : c.status_llm === "falhou" ? "Sugestão falhou" : "Aguardando…"}
+                </span>
+                {!r && p !== null && <span className="font-mono text-[0.7rem] text-faint">{Math.round(p * 100)}%</span>}
+              </span>
+              <span className="flex items-center gap-1.5 font-mono text-[0.7rem] text-faint">
+                <span>{timecode(c.tempo_s)}</span>
+                {linha && (
+                  <span className="truncate">
+                    {linha.nome} {c.direcao}
+                  </span>
+                )}
+              </span>
+            </span>
+            {r && (
+              <span className={`shrink-0 text-xs ${r === "descartado" ? "text-faint" : "text-ok"}`} title="Revisado">
+                ✓
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** O clipe do candidato em foco, grande, como o monitor de programa de um editor. */
+function Monitor({ c, base, numero, linha }: { c: Candidato | null; base: string; numero: number; linha: Linha | undefined }) {
+  const [aba, setAba] = useState<"clipe" | "quadro">("clipe");
+  const temClipe = !!c?.clipe;
+  const mostrar = aba === "quadro" && c?.contexto ? "quadro" : temClipe ? "clipe" : "quadro";
+  return (
+    <section className="flex min-w-0 flex-col bg-viewer lg:min-h-0" aria-label="Monitor">
+      <div className="relative flex min-h-64 flex-1 items-center justify-center overflow-hidden">
+        {!c ? (
+          <span className="text-sm text-white/50">Escolha um candidato</span>
+        ) : mostrar === "clipe" ? (
+          <video key={c.id} src={`${base}/${c.clipe}`} autoPlay loop muted playsInline className="max-h-full max-w-full" />
+        ) : c.contexto ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`${base}/${c.contexto}`} alt={`Quadro do cruzamento do candidato ${numero}`} className="max-h-full max-w-full object-contain" />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={`${base}/${c.filmstrip}`} alt={`Candidato ${c.id}`} loading="lazy" className="mx-auto h-28 object-contain" />
+          <img src={`${base}/${c.filmstrip}`} alt={`Candidato ${numero}`} className="max-h-full max-w-full object-contain" />
         )}
-      </div>
-      <div className="flex flex-col gap-1.5 px-3 py-2 text-sm">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span
-            className={`rounded px-1.5 py-0.5 font-mono text-xs font-semibold tabular-nums ${
-              duplicadoDe.length ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100" : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-            }`}
-            data-testid="numero"
-          >
-            #{numero}
+        {c && (
+          <span className="absolute left-3 top-3 rounded bg-black/70 px-2 py-0.5 font-mono text-xs text-white">
+            #{numero} · {timecode(c.tempo_s, true)}
+            {linha && ` · ${linha.nome} ${c.direcao ?? ""}`}
           </span>
-          {c.status_llm === "ok" && prop.classe ? (
-            <span className="font-medium">
-              {prop.foraDaLinha ? (
-                <>
-                  Descartar{" "}
-                  <span className="font-normal text-amber-700 dark:text-amber-300">
-                    ({NOME_CATEGORIA[prop.foraDaLinha]} não conta em {linha?.nome ?? "esta linha"})
-                  </span>
-                </>
-              ) : (
-                NOME_CATEGORIA[prop.classe]
-              )}{" "}
-              <span className="font-normal text-zinc-500">{Math.round((c.conf_llm ?? 0) * 100)}%</span>
-            </span>
-          ) : c.status_llm === "falhou" ? (
-            <span className="font-medium text-red-600">Sugestão falhou</span>
-          ) : (
-            <span className="text-zinc-500">Aguardando sugestão…</span>
-          )}
-          <span className="text-zinc-500">{mmss(c.tempo_s)}</span>
-          {linha && (
-            <span className="text-zinc-500">
-              {linha.nome} {c.direcao}
-            </span>
-          )}
-        </div>
-        {c.justificativa_llm && <p className="text-xs text-zinc-600 dark:text-zinc-400">{c.justificativa_llm}</p>}
-        {duplicadoDe.length > 0 && (
-          <p className="text-xs text-amber-700 dark:text-amber-300" data-testid="duplicado">
-            ⚠ Pode ser o mesmo objeto que{" "}
-            {duplicadoDe.map((d, i) => (
-              <span key={d.c.id}>
-                {i > 0 && ", "}
-                <button onClick={(e) => (e.stopPropagation(), aoIrPara(d.c.id))} className="font-medium underline">
-                  o #{d.numero}
-                </button>{" "}
-                ({mmss(d.c.tempo_s)})
-              </span>
-            ))}{" "}
-            — confira se não está contando duas vezes.
-          </p>
         )}
-        <div className="text-xs text-zinc-500">
-          Detector: {c.classe_yolo ? NOME_CATEGORIA[c.classe_yolo] : "?"}
-          {c.alternativa && ` ou ${NOME_CATEGORIA[c.alternativa]}`}
-          {c.origem && c.origem !== "track" && ` · ${c.origem.replaceAll("_", " ")}`}
-        </div>
-
-        {rotulo && (
-          <div className="flex items-center gap-2">
-            <span
-              className={`rounded px-2 py-0.5 text-xs font-medium ${
-                corrigido ? "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-100" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100"
-              }`}
-            >
-              {corrigido ? "Corrigido" : "Confirmado"}: {NOME_CATEGORIA[rotulo]}
-            </span>
-            {editavel && (
-              <button onClick={(e) => (e.stopPropagation(), aoDesfazer())} className="text-xs text-zinc-500 hover:underline">
-                desfazer
-              </button>
-            )}
-          </div>
-        )}
-
-        {editavel && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {prop.classe && (
+        {c && (c.clipe || c.contexto) && (
+          <div className="absolute right-3 top-3 flex overflow-hidden rounded border border-white/15 text-xs" role="group" aria-label="Mostrar">
+            {(
+              [
+                ["clipe", "Clipe", !!c.clipe],
+                ["quadro", "Cruzamento", !!c.contexto],
+              ] as const
+            ).map(([k, nome, ok]) => (
               <button
-                onClick={(e) => (e.stopPropagation(), aoDecidir(prop.classe!))}
-                className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700"
-                title="Enter"
+                key={k}
+                type="button"
+                disabled={!ok}
+                onClick={() => setAba(k)}
+                aria-pressed={mostrar === k}
+                className={`px-2 py-0.5 ${mostrar === k ? "bg-accent font-semibold text-accent-ink" : "bg-black/60 text-white/80 hover:bg-black/80"} disabled:opacity-30`}
               >
-                ✓ Aceitar
-              </button>
-            )}
-            {ATALHOS.map(([classe, k]) => (
-              <button
-                key={classe}
-                onClick={(e) => (e.stopPropagation(), aoDecidir(classe))}
-                className={`rounded px-2 py-1 text-xs ${
-                  rotulo === classe ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-zinc-900" : "bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700"
-                }`}
-              >
-                {classe === "descartado" ? "Descartar" : NOME_CATEGORIA[classe as Categoria]} <span className="opacity-50">{k}</span>
+                {nome}
               </button>
             ))}
           </div>
         )}
       </div>
-    </li>
+      {c?.filmstrip && (
+        <div className="border-t border-white/10 bg-black/40 px-3 py-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${base}/${c.filmstrip}`} alt="Recortes do objeto ao longo do tempo" className="mx-auto h-20 max-w-full object-contain" />
+        </div>
+      )}
+    </section>
+  );
+}
+
+type PropsInspetor = {
+  c: Candidato;
+  linha: Linha | undefined;
+  prop: ReturnType<typeof proposta>;
+  rotulo: Classe | null;
+  editavel: boolean;
+  numero: number;
+  /** candidatos que podem ser o mesmo objeto (mesma linha, sentido e classe, quase juntos) */
+  duplicadoDe: { c: Candidato; numero: number }[];
+  aoDecidir: (c: Classe) => void;
+  aoDesfazer: () => void;
+  aoIrPara: (id: number) => void;
+};
+
+function Inspetor({ c, linha, prop, rotulo, editavel, numero, duplicadoDe, aoDecidir, aoDesfazer, aoIrPara }: PropsInspetor) {
+  const corrigido = rotulo && rotulo !== prop.classe;
+  const conf = c.conf_llm ?? 0;
+  return (
+    <div className="flex flex-col gap-4 px-4 py-3" data-testid="inspetor">
+      <div className="flex flex-col gap-2">
+        <h2 className={TITULO_PAINEL}>Sugestão do modelo</h2>
+        {c.status_llm === "ok" && prop.classe ? (
+          <>
+            <p className="flex items-center gap-2 text-lg font-semibold">
+              <Amostra classe={prop.foraDaLinha ?? prop.classe} />
+              {prop.foraDaLinha ? NOME_CATEGORIA[prop.foraDaLinha] : NOME_CATEGORIA[prop.classe]}
+              <span className="ml-auto font-mono text-sm font-normal text-muted">{Math.round(conf * 100)}%</span>
+            </p>
+            <span className="h-1 overflow-hidden rounded-full bg-line" aria-hidden>
+              <span className={`block h-full ${conf >= 0.9 ? "bg-ok" : conf >= 0.7 ? "bg-accent" : "bg-warn"}`} style={{ width: `${conf * 100}%` }} />
+            </span>
+            {prop.foraDaLinha && (
+              <p className="text-xs text-warn">
+                {NOME_CATEGORIA[prop.foraDaLinha]} não conta em {linha?.nome ?? "esta linha"} — proposta: descartar.
+              </p>
+            )}
+          </>
+        ) : c.status_llm === "falhou" ? (
+          <p className="font-medium text-danger">A sugestão falhou</p>
+        ) : (
+          <p className="text-muted">Aguardando sugestão…</p>
+        )}
+        {c.justificativa_llm && <p className="text-sm text-muted">{c.justificativa_llm}</p>}
+        <p className="text-xs text-faint">
+          Detector: {c.classe_yolo ? NOME_CATEGORIA[c.classe_yolo] : "?"}
+          {c.alternativa && ` ou ${NOME_CATEGORIA[c.alternativa]}`}
+          {c.origem && c.origem !== "track" && ` · ${c.origem.replaceAll("_", " ")}`}
+        </p>
+      </div>
+
+      {duplicadoDe.length > 0 && (
+        <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" data-testid="duplicado">
+          ⚠ Pode ser o mesmo objeto que{" "}
+          {duplicadoDe.map((d, i) => (
+            <span key={d.c.id}>
+              {i > 0 && ", "}
+              <button type="button" onClick={() => aoIrPara(d.c.id)} className="font-semibold underline">
+                o #{d.numero}
+              </button>{" "}
+              ({timecode(d.c.tempo_s)})
+            </span>
+          ))}{" "}
+          — confira se não está contando duas vezes.
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <h2 className={TITULO_PAINEL}>Decisão · #{numero}</h2>
+        {rotulo ? (
+          <p className="flex items-center gap-2 text-sm">
+            <span className={`rounded px-2 py-0.5 text-xs font-semibold text-white ${corrigido ? "bg-info" : "bg-ok"}`}>{corrigido ? "Corrigido" : "Confirmado"}</span>
+            <Amostra classe={rotulo} />
+            {NOME_CATEGORIA[rotulo]}
+            {editavel && (
+              <button type="button" onClick={aoDesfazer} className={`${BOTAO.fantasma} ml-auto text-xs`}>
+                desfazer
+              </button>
+            )}
+          </p>
+        ) : (
+          <p className="text-sm text-muted">Pendente</p>
+        )}
+        {editavel && (
+          <>
+            {prop.classe && (
+              <button type="button" onClick={() => aoDecidir(prop.classe!)} className={`${BOTAO.primario} justify-between py-2`}>
+                <span>Aceitar: {prop.classe === "descartado" ? "descartar" : NOME_CATEGORIA[prop.classe]}</span>
+                <kbd className="border-accent-ink/30 bg-transparent text-accent-ink">Enter</kbd>
+              </button>
+            )}
+            <div className="grid grid-cols-2 gap-1">
+              {ATALHOS.map(([classe, k]) => (
+                <button
+                  key={classe}
+                  type="button"
+                  onClick={() => aoDecidir(classe)}
+                  aria-pressed={rotulo === classe}
+                  className={`flex items-center gap-1.5 rounded-md border px-2 py-1.5 text-left text-xs ${
+                    rotulo === classe ? "border-fg bg-fg text-app" : "border-line bg-raised hover:bg-hover"
+                  } ${classe === "descartado" ? "col-span-2" : ""}`}
+                >
+                  <Amostra classe={classe} />
+                  <span className="flex-1 truncate">{classe === "descartado" ? "Descartar (não é objeto)" : NOME_CATEGORIA[classe as Categoria]}</span>
+                  <span className="font-mono opacity-50">{k}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
 const ORDEM: Categoria[] = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "motocicletas", "automoveis", "outros"];
 
+/** Totais confirmados (só decisões humanas): categoria × linha, com os sentidos no hover. */
 function QuadroTotais({ totais, linhas, total }: { totais: ReturnType<typeof calcularTotais>; linhas: Linha[]; total: number }) {
   const ids = linhas.length ? linhas.map((l) => l.id) : [""];
-  const nome = (id: string) => linhas.find((l) => l.id === id)?.nome ?? "Sem linha";
-  const sentidos = linhas.length ? ["A→B", "B→A"] : ["—"];
+  const nome = (id: string) => linhas.find((l) => l.id === id)?.nome ?? "Total";
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-800" data-testid="totais">
+    <section className="flex flex-col gap-2 border-t border-line px-4 py-3" data-testid="totais">
+      <h2 className={TITULO_PAINEL}>Contagem confirmada</h2>
       <table className="w-full text-sm">
-        <thead className="bg-zinc-50 text-left dark:bg-zinc-900">
-          <tr>
-            <th className="px-3 py-2 font-medium">Confirmados</th>
-            {ORDEM.map((c) => (
-              <th key={c} className="px-3 py-2 text-right font-medium">
-                {NOME_CATEGORIA[c]}
+        <thead>
+          <tr className="text-xs text-faint">
+            <th className="py-1 text-left font-normal" />
+            {ids.map((id) => (
+              <th key={id} className="max-w-20 truncate py-1 text-right font-normal" title={nome(id)}>
+                {nome(id)}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {ids.map((id) => {
-            const linha = linhas.find((l) => l.id === id);
+          {ORDEM.map((cat) => {
+            const valores = ids.map((id) => Object.values(totais.porLinha[id]?.[cat] ?? {}).reduce((a, b) => a + b, 0));
+            const algum = valores.some((n) => n > 0);
             return (
-              <tr key={id} className="border-t border-zinc-200 dark:border-zinc-800">
-                <td className="px-3 py-2">{nome(id)}</td>
-                {ORDEM.map((cat) => {
-                  const porSentido = totais.porLinha[id]?.[cat] ?? {};
-                  const n = Object.values(porSentido).reduce((a, b) => a + b, 0);
+              <tr key={cat} className={algum ? "" : "text-faint"}>
+                <td className="py-0.5">
+                  <span className="flex items-center gap-1.5">
+                    <Amostra classe={cat} />
+                    {NOME_CATEGORIA[cat]}
+                  </span>
+                </td>
+                {ids.map((id, i) => {
+                  const linha = linhas.find((l) => l.id === id);
                   const conta = !linha?.categorias?.length || linha.categorias.includes(cat);
+                  const s = totais.porLinha[id]?.[cat] ?? {};
                   return (
-                    <td key={cat} className={`px-3 py-2 text-right tabular-nums ${conta ? "" : "text-zinc-400"}`}>
-                      <span className="font-medium">{n}</span>
-                      {sentidos.length > 1 && n > 0 && (
-                        <span className="ml-1 text-xs text-zinc-500">({sentidos.map((s) => `${s} ${porSentido[s] ?? 0}`).join(" · ")})</span>
-                      )}
+                    <td
+                      key={id}
+                      className={`py-0.5 text-right font-mono tabular-nums ${conta ? "" : "opacity-40"}`}
+                      title={Object.keys(s).length ? Object.entries(s).map(([k, v]) => `${k}: ${v}`).join(" · ") : undefined}
+                    >
+                      {valores[i]}
                     </td>
                   );
                 })}
@@ -453,10 +627,87 @@ function QuadroTotais({ totais, linhas, total }: { totais: ReturnType<typeof cal
           })}
         </tbody>
       </table>
-      <p className="border-t border-zinc-200 px-3 py-2 text-xs text-zinc-500 dark:border-zinc-800">
-        {total - totais.pendentes} de {total} revisados · {totais.contados} contados · {totais.descartados} descartados ·{" "}
-        {totais.pendentes} pendentes
+      <p className="font-mono text-[0.7rem] text-faint">
+        {total - totais.pendentes}/{total} revisados · {totais.contados} contados · {totais.descartados} descartados
       </p>
-    </div>
+    </section>
+  );
+}
+
+/** Passo das marcas da régua: no máximo ~10 marcas no vídeo todo. */
+function passoRegua(duracao: number): number {
+  const passos = [10, 30, 60, 120, 300, 600, 900, 1800, 3600];
+  return passos.find((p) => duracao / p <= 10) ?? 3600;
+}
+
+type PropsTimeline = {
+  candidatos: Candidato[];
+  linhas: Linha[];
+  duracao: number;
+  focado: number | null;
+  visivel: Set<number>;
+  classeDe: (c: Candidato) => Classe | null;
+  decidido: (c: Candidato) => boolean;
+  numero: Record<number, number>;
+  aoFocar: (id: number) => void;
+};
+
+/**
+ * O vídeo inteiro de ponta a ponta, uma trilha por linha de contagem; cada
+ * candidato é uma marca na cor da classe (vazada enquanto pendente). O
+ * playhead amarelo é o candidato em foco.
+ */
+function Timeline({ candidatos, linhas, duracao, focado, visivel, classeDe, decidido, numero, aoFocar }: PropsTimeline) {
+  const fim = Math.max(duracao, ...candidatos.map((c) => c.tempo_s), 1);
+  const trilhas = linhas.length ? linhas.map((l) => ({ id: l.id as string | null, nome: l.nome })) : [{ id: null, nome: "Candidatos" }];
+  const passo = passoRegua(fim);
+  const marcas = Array.from({ length: Math.floor(fim / passo) + 1 }, (_, i) => i * passo).filter((s) => fim - s > passo / 3);
+  const cFocado = candidatos.find((c) => c.id === focado);
+  const pct = (s: number) => `${(s / fim) * 100}%`;
+
+  return (
+    <section className="shrink-0 overflow-hidden border-t border-line bg-panel" aria-label="Linha do tempo" data-testid="timeline">
+      <div className="grid grid-cols-[7.5rem_minmax(0,1fr)]">
+        <div className="flex h-6 items-center border-b border-r border-line px-3 font-mono text-[0.7rem] text-faint">{timecode(fim, true)}</div>
+        <div className="relative h-6 overflow-hidden border-b border-line">
+          {marcas.map((s) => (
+            <span key={s} className="absolute top-0 flex h-full items-end border-l border-line pb-0.5 pl-1 font-mono text-[0.65rem] text-faint" style={{ left: pct(s) }}>
+              {timecode(s, fim >= 3600)}
+            </span>
+          ))}
+          {cFocado && <span className="absolute top-0 h-full w-0.5 -translate-x-1/2 bg-accent" style={{ left: pct(cFocado.tempo_s) }} aria-hidden />}
+        </div>
+        {trilhas.map((t) => (
+          <div key={t.id ?? "-"} className="contents">
+            <div className="flex h-9 items-center truncate border-b border-r border-line px-3 text-xs font-medium text-muted" title={t.nome}>
+              {t.nome}
+            </div>
+            <div className="relative h-9 overflow-hidden border-b border-line bg-raised/50">
+              {cFocado && <span className="absolute top-0 z-10 h-full w-0.5 -translate-x-1/2 bg-accent" style={{ left: pct(cFocado.tempo_s) }} aria-hidden />}
+              {candidatos
+                .filter((c) => (t.id === null ? true : c.linha_id === t.id))
+                .map((c) => {
+                  const classe = classeDe(c);
+                  const cor = classe ? COR_CLASSE[classe] : null;
+                  const ok = decidido(c);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => aoFocar(c.id)}
+                      title={`#${numero[c.id]} · ${classe ? NOME_CATEGORIA[classe] : "sem sugestão"} · ${timecode(c.tempo_s)}`}
+                      aria-label={`Ir para o candidato ${numero[c.id]}`}
+                      className={`absolute bottom-1.5 top-1.5 w-1 -translate-x-1/2 rounded-[1px] ${
+                        ok ? (cor?.fundo ?? "bg-faint") : `border ${cor?.borda ?? "border-faint"} bg-transparent`
+                      } ${visivel.has(c.id) ? "" : "opacity-25"} hover:bottom-0.5 hover:top-0.5`}
+                      style={{ left: pct(c.tempo_s) }}
+                    />
+                  );
+                })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -1,26 +1,164 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Tema de editor de vídeo: painéis em grafite (ou papel, no claro) e um único
+ * destaque — o amarelo de sinalização viária, a mesma cor das linhas de
+ * contagem — para foco, playhead e ação principal. As categorias têm cor
+ * própria, como rótulos de clipe num editor.
+ *
+ * O tema vem de data-theme no <html> (script inline em layout.tsx, antes da
+ * pintura); sem escolha salva, segue o sistema.
+ */
+:root,
+:root[data-theme="dark"] {
+  --app: #1a1b1e;
+  --panel: #222327;
+  --raised: #2b2d32;
+  --hover: #33353b;
+  --line: #3a3d44;
+  --fg: #e7e7e3;
+  --muted: #a0a3a9;
+  --faint: #6f727a;
+  --accent: #f6b40e;
+  --accent-hover: #ffc433;
+  --accent-ink: #1a1b1e;
+  --accent-text: #f6b40e;
+  --danger: #f0645a;
+  --ok: #46bd82;
+  --info: #5aaee6;
+  --warn: #ef8d45;
+  --viewer: #0d0d0e;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root[data-theme="light"] {
+  --app: #e6e6e2;
+  --panel: #f5f5f2;
+  --raised: #ffffff;
+  --hover: #eaeae6;
+  --line: #d3d3ce;
+  --fg: #1c1d20;
+  --muted: #5c5f66;
+  --faint: #8a8d93;
+  --accent: #f6b40e;
+  --accent-hover: #e5a500;
+  --accent-ink: #1c1d20;
+  --accent-text: #8a5c00;
+  --danger: #c8372d;
+  --ok: #1f8a55;
+  --info: #1f6fae;
+  --warn: #b85a12;
+  --viewer: #16171a;
+  color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --app: #e6e6e2;
+    --panel: #f5f5f2;
+    --raised: #ffffff;
+    --hover: #eaeae6;
+    --line: #d3d3ce;
+    --fg: #1c1d20;
+    --muted: #5c5f66;
+    --faint: #8a8d93;
+    --accent-hover: #e5a500;
+    --accent-ink: #1c1d20;
+    --accent-text: #8a5c00;
+    --danger: #c8372d;
+    --ok: #1f8a55;
+    --info: #1f6fae;
+    --warn: #b85a12;
+    --viewer: #16171a;
+    color-scheme: light;
   }
 }
 
+@theme inline {
+  --color-app: var(--app);
+  --color-panel: var(--panel);
+  --color-raised: var(--raised);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-text: var(--accent-text);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-info: var(--info);
+  --color-warn: var(--warn);
+  --color-viewer: var(--viewer);
+
+  /* cores de clipe por categoria (iguais nos dois temas, como num editor) */
+  --color-cat-ciclistas: #2fbf62;
+  --color-cat-pedestres: #3d82f0;
+  --color-cat-automoveis: #f47b20;
+  --color-cat-motocicletas: #d24bea;
+  --color-cat-patinetes: #17b3a3;
+  --color-cat-scooters: #8b64f0;
+  --color-cat-monociclos: #ea4f73;
+  --color-cat-outros: #a09a93;
+  --color-cat-descartado: #5d6068;
+
+  --font-sans: var(--font-barlow);
+  --font-display: var(--font-barlow-condensed);
+  --font-mono: var(--font-jetbrains);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--app);
+  color: var(--fg);
+}
+
+/* janela do app desktop (Electron, barra de título própria) */
+.regiao-arrasto {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+.regiao-arrasto :where(a, button, input, select, label) {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+[data-desktop="mac"] .barra-titulo {
+  padding-left: 5.5rem; /* semáforo do macOS */
+}
+[data-desktop="win"] .barra-titulo,
+[data-desktop="linux"] .barra-titulo {
+  padding-right: 9rem; /* minimizar / maximizar / fechar */
+}
+
+/* rolagem discreta, como nos painéis de um editor */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+kbd {
+  font-family: var(--font-jetbrains);
+  font-size: 0.7rem;
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
 }

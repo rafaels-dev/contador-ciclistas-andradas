@@ -1,124 +1,88 @@
+import fs from "node:fs";
+import path from "node:path";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-import { listarCandidatos, listarJobs, listarRenders, resumoRevisao, type Job } from "@/lib/db";
-import { sugestoesAtivas } from "@/lib/runner";
+import { jobTrabalhando } from "@/lib/atividade";
+import { listarCandidatos, listarGrupos, listarJobs, obterGrupo, resumoRevisao } from "@/lib/db";
+import { dirJob } from "@/lib/paths";
 import { rotuloStatus } from "@/lib/status";
+import { BOTAO } from "@/lib/ui";
+import { CabecalhoGrupo } from "./cabecalho-grupo";
+import { GradeVideos, type VideoNaGrade } from "./grade-videos";
 import { AutoRefresh } from "./jobs/[id]/auto-refresh";
-import { FormNovoJob } from "./form-novo-job";
-import { SeletorLocal } from "./seletor-local";
-import { SeletorVideoFinal, type OpcaoVideo } from "./seletor-video-final";
 
-export default function Home() {
+export default function Home(props: PageProps<"/">) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-10">
-      <header>
-        <h1 className="text-2xl font-semibold">Contador de tráfego</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">
-          Cole o link de um vídeo do Google Drive ou escolha um vídeo do computador. O app detecta os objetos em movimento, pede uma
-          sugestão de classificação ao modelo de visão e você confirma antes do vídeo final.
-        </p>
-      </header>
-
-      <FormNovoJob />
-      <SeletorLocal />
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium">Jobs</h2>
-        <Suspense fallback={<p className="text-zinc-500">Carregando…</p>}>
-          <ListaJobs />
-        </Suspense>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <h2 className="text-lg font-medium">Vídeo final</h2>
-        <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Marque um ou mais vídeos já revisados para gerar um único vídeo, com o contador somando entre eles
-          (linhas com o mesmo nome somam juntas).
-        </p>
-        <Suspense fallback={<p className="text-zinc-500">Carregando…</p>}>
-          <VideoFinal />
-        </Suspense>
-      </section>
-    </main>
+    <Suspense fallback={<p className="p-6 text-muted">Carregando…</p>}>
+      <Painel searchParams={props.searchParams} />
+    </Suspense>
   );
 }
 
-/** Etapa em andamento (com processo vivo): mostra barra e mensagem e atualiza a página. */
-function trabalhando(job: Job): boolean {
-  return job.status === "baixando" || job.status === "detectando" || (job.status === "sugerindo" && sugestoesAtivas(job.id));
-}
-
-function Progresso({ progresso, mensagem }: { progresso: number; mensagem: string | null }) {
-  return (
-    <span className="flex flex-col gap-1" data-testid="progresso">
-      <span className="h-1.5 overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800">
-        <span className="block h-full bg-emerald-600 transition-all" style={{ width: `${Math.round(progresso * 100)}%` }} />
-      </span>
-      <span className="text-sm tabular-nums text-zinc-600 dark:text-zinc-400">
-        {mensagem} {progresso > 0 && `· ${Math.round(progresso * 100)}%`}
-      </span>
-    </span>
-  );
-}
-
-async function ListaJobs() {
+async function Painel({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   await connection();
-  const jobs = listarJobs();
-  if (jobs.length === 0) return <p className="text-zinc-500">Nenhum job ainda.</p>;
+  const sp = await searchParams;
+  const filtro = typeof sp.grupo === "string" ? sp.grupo : null;
+  const grupo = filtro && filtro !== "sem" ? obterGrupo(filtro) : undefined;
+  const grupos = listarGrupos();
+
+  const jobs = listarJobs()
+    .filter((j) => (filtro === "sem" ? !j.grupo_id : grupo ? j.grupo_id === grupo.id : true))
+    .sort((a, b) => (a.nome_arquivo ?? a.drive_id).localeCompare(b.nome_arquivo ?? b.drive_id, "pt-BR", { numeric: true }));
+
+  const videos: VideoNaGrade[] = jobs.map((j) => {
+    const r = resumoRevisao(j.id);
+    const naRevisao = j.status === "aguardando_revisao";
+    return {
+      id: j.id,
+      nome: j.nome_arquivo ?? j.drive_id,
+      local: j.drive_id === "local",
+      grupo: grupos.find((g) => g.id === j.grupo_id)?.nome ?? null,
+      status: j.status,
+      rotulo: rotuloStatus(j),
+      trabalhando: jobTrabalhando(j),
+      progresso: j.progresso,
+      mensagem: j.mensagem,
+      erro: j.status === "erro" ? j.erro : null,
+      duracao_s: j.duracao_s,
+      miniatura: fs.existsSync(path.join(dirJob(j.id), "frame0.jpg")) ? `/api/jobs/${j.id}/arquivos/frame0.jpg` : null,
+      revisados: r.revisados,
+      total: r.total,
+      contagens: naRevisao ? listarCandidatos(j.id).filter((c) => c.rotulo && c.rotulo !== "descartado").length : 0,
+      // por que ainda não entra num vídeo final (null = pode)
+      impedimento: !naRevisao ? (j.status === "sugerindo" ? "aguardando sugestões" : "revisão não começou") : r.revisados < r.total ? `faltam ${r.total - r.revisados} na revisão` : null,
+    };
+  });
+
+  const titulo = grupo?.nome ?? (filtro === "sem" ? "Sem grupo" : "Todos os vídeos");
 
   return (
-    <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-      {jobs.some(trabalhando) && <AutoRefresh ms={2000} />}
-      {jobs.map((job) => (
-        <li key={job.id}>
-          <Link href={`/jobs/${job.id}`} className="flex flex-col gap-2 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900">
-            <span className="flex items-center justify-between gap-4">
-              <span className="truncate">{job.nome_arquivo ?? job.drive_id}</span>
-              <span className={`shrink-0 text-sm ${job.status === "erro" ? "text-red-600" : "text-zinc-500"}`}>{rotuloStatus(job)}</span>
-            </span>
-            {trabalhando(job) && <Progresso progresso={job.progresso} mensagem={job.mensagem} />}
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
+    <div className="flex flex-col gap-4 p-5">
+      {videos.some((v) => v.trabalhando) && <AutoRefresh ms={2000} />}
+      <CabecalhoGrupo grupo={grupo ?? null} titulo={titulo} videos={videos.length} />
 
-const STATUS_RENDER = { na_fila: "na fila", renderizando: "gerando", pronto: "pronto", erro: "erro" } as const;
-
-async function VideoFinal() {
-  await connection();
-  const opcoes: OpcaoVideo[] = listarJobs()
-    .filter((j) => j.status === "sugerindo" || j.status === "aguardando_revisao")
-    .map((j) => {
-      const r = resumoRevisao(j.id);
-      const motivo =
-        j.status !== "aguardando_revisao" ? "aguardando sugestões" : r.revisados < r.total ? `faltam ${r.total - r.revisados} na revisão` : null;
-      const contagens = listarCandidatos(j.id).filter((c) => c.rotulo && c.rotulo !== "descartado").length;
-      return { id: j.id, nome: j.nome_arquivo ?? j.drive_id, motivo, contagens };
-    })
-    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR", { numeric: true }));
-  const renders = listarRenders();
-  return (
-    <>
-      <SeletorVideoFinal opcoes={opcoes} />
-      {renders.some((r) => r.status === "na_fila" || r.status === "renderizando") && <AutoRefresh ms={2000} />}
-      {renders.length > 0 && (
-        <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-          {renders.map((r) => (
-            <li key={r.id}>
-              <Link href={`/renders/${r.id}`} className="flex flex-col gap-2 px-4 py-3 hover:bg-zinc-50 dark:hover:bg-zinc-900">
-                <span className="flex items-center justify-between gap-4">
-                  <span className="truncate">{r.nome}</span>
-                  <span className="shrink-0 text-sm text-zinc-500">{STATUS_RENDER[r.status]}</span>
-                </span>
-                {(r.status === "na_fila" || r.status === "renderizando") && <Progresso progresso={r.progresso} mensagem={r.mensagem} />}
-              </Link>
-            </li>
-          ))}
-        </ul>
+      {videos.length === 0 ? (
+        <Vazio grupo={!!filtro} />
+      ) : (
+        <GradeVideos key={filtro ?? ""} videos={videos} grupos={grupos.map((g) => ({ id: g.id, nome: g.nome }))} grupoAtual={grupo?.id ?? null} />
       )}
-    </>
+    </div>
+  );
+}
+
+function Vazio({ grupo }: { grupo: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line px-6 py-16 text-center">
+      <p className="text-lg font-medium">{grupo ? "Nenhum vídeo neste grupo" : "A biblioteca está vazia"}</p>
+      <p className="max-w-md text-sm text-muted">
+        {grupo
+          ? "Selecione vídeos em “Todos os vídeos” e use “Mover para grupo”, ou importe novos direto para cá."
+          : "Importe um vídeo do Google Drive ou do computador. O app detecta o que se move, o modelo de visão sugere a classe de cada objeto e você confirma antes do vídeo final."}
+      </p>
+      <Link href="/importar" className={BOTAO.primario}>
+        Importar vídeos
+      </Link>
+    </div>
   );
 }

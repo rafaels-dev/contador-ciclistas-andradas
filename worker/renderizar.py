@@ -47,10 +47,11 @@ NOME = {"ciclistas": "Ciclistas", "patinetes": "Patinetes", "scooters": "Scooter
 NOME_UM = {"ciclistas": "Ciclista", "patinetes": "Patinete", "scooters": "Scooter elétrico",
            "monociclos": "Monociclo", "pedestres": "Pedestre", "automoveis": "Automóvel",
            "motocicletas": "Motocicleta", "outros": "Outro"}
-# RGB (PIL); o OpenCV recebe invertido
-COR = {"ciclistas": (34, 197, 94), "patinetes": (6, 182, 212), "scooters": (14, 165, 233),
-       "monociclos": (168, 85, 247), "pedestres": (59, 130, 246), "automoveis": (249, 115, 22),
-       "motocicletas": (217, 70, 239), "outros": (168, 162, 158)}
+# RGB (PIL); o OpenCV recebe invertido. As mesmas cores de categoria do app
+# (--color-cat-* em web/src/app/globals.css)
+COR = {"ciclistas": (47, 191, 98), "patinetes": (23, 179, 163), "scooters": (139, 100, 240),
+       "monociclos": (234, 79, 115), "pedestres": (61, 130, 240), "automoveis": (244, 123, 32),
+       "motocicletas": (210, 75, 234), "outros": (160, 154, 147)}
 COR_LINHA = (250, 204, 21)
 
 ANTES_S, DEPOIS_S = 1.5, 1.0  # caixa do objeto em volta do evento

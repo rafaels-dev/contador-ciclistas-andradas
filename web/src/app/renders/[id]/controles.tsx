@@ -1,22 +1,40 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { BOTAO } from "@/lib/ui";
 import { gerarDeNovo } from "../actions";
 
+type PropsPular = {
+  s: number;
+  children?: React.ReactNode;
+  /** marca na timeline: classe de cor de fundo, posição e dica */
+  marca?: string;
+  left?: string;
+  titulo?: string;
+};
+
 /** Pula o player do vídeo final para um instante (segundos). */
-export function PularPara({ s, children }: { s: number; children: React.ReactNode }) {
+export function PularPara({ s, children, marca, left, titulo }: PropsPular) {
+  function pular() {
+    const v = document.querySelector<HTMLVideoElement>("video[data-final]");
+    if (!v) return;
+    v.currentTime = Math.max(0, s - 2);
+    void v.play();
+  }
+  if (marca) {
+    return (
+      <button
+        type="button"
+        onClick={pular}
+        title={titulo}
+        aria-label={titulo}
+        className={`absolute bottom-1.5 top-1.5 w-1 -translate-x-1/2 rounded-[1px] ${marca} hover:bottom-0.5 hover:top-0.5`}
+        style={{ left }}
+      />
+    );
+  }
   return (
-    <button
-      type="button"
-      className="tabular-nums text-emerald-700 hover:underline dark:text-emerald-400"
-      onClick={() => {
-        const v = document.querySelector<HTMLVideoElement>("video[data-final]");
-        if (!v) return;
-        v.currentTime = Math.max(0, s - 2);
-        v.scrollIntoView({ behavior: "smooth", block: "center" });
-        void v.play();
-      }}
-    >
+    <button type="button" className="font-mono text-xs tabular-nums text-accent-text hover:underline" onClick={pular}>
       {children}
     </button>
   );
@@ -26,15 +44,11 @@ export function BotaoGerarDeNovo({ renderId, rotulo }: { renderId: string; rotul
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciar] = useTransition();
   return (
-    <div className="flex flex-col items-start gap-1">
-      <button
-        disabled={pendente}
-        onClick={() => iniciar(async () => setErro((await gerarDeNovo(renderId)).erro ?? null))}
-        className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm text-white hover:bg-zinc-700 disabled:opacity-50"
-      >
+    <div className="flex flex-col gap-1">
+      <button disabled={pendente} onClick={() => iniciar(async () => setErro((await gerarDeNovo(renderId)).erro ?? null))} className={BOTAO.secundario}>
         {rotulo}
       </button>
-      {erro && <p className="text-sm text-red-600">{erro}</p>}
+      {erro && <p className="text-sm text-danger">{erro}</p>}
     </div>
   );
 }

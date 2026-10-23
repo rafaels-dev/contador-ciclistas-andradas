@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import type { Categoria, Linha } from "@/lib/db";
 import { NOME_CATEGORIA } from "@/lib/revisao";
+import { COR_CLASSE, TITULO_PAINEL } from "@/lib/ui";
 import { definirCategoriasLinhas } from "./actions";
 
 const TODAS: Categoria[] = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "motocicletas", "automoveis", "outros"];
@@ -24,10 +25,11 @@ export function ChipsCategorias({ valor, aoMudar, rotulo }: { valor: Categoria[]
               if (!nova.length) return; // linha que não conta nada não faz sentido
               aoMudar(nova.length === TODAS.length ? undefined : TODAS.filter((x) => nova.includes(x)));
             }}
-            className={`rounded-full px-2 py-0.5 text-xs ${
-              on ? "bg-emerald-600 text-white" : "bg-zinc-100 text-zinc-400 line-through dark:bg-zinc-800"
+            className={`flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs ${
+              on ? "border-line bg-raised text-fg" : "border-transparent text-faint line-through"
             }`}
           >
+            <span className={`h-2 w-2 rounded-sm ${on ? COR_CLASSE[c].fundo : "border border-faint"}`} />
             {NOME_CATEGORIA[c]}
           </button>
         );
@@ -41,14 +43,12 @@ export function CategoriasDasLinhas({ jobId, linhas }: { jobId: string; linhas: 
   const [salvando, iniciar] = useTransition();
   if (!linhas.length) return null;
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 p-3 text-sm dark:border-zinc-800">
-      <p className="text-zinc-600 dark:text-zinc-400">
-        O que cada linha conta — o que o modelo sugerir fora disso chega já proposto como descarte (você pode reverter).
-        {salvando && " Salvando…"}
-      </p>
+    <section className="flex flex-col gap-2 border-t border-line px-4 py-3 text-sm">
+      <h2 className={TITULO_PAINEL}>O que cada linha conta {salvando && <span className="font-normal">· salvando…</span>}</h2>
+      <p className="text-xs text-muted">Fora disso, a sugestão do modelo chega proposta como descarte (dá para reverter).</p>
       {linhas.map((l) => (
-        <div key={l.id} className="flex flex-wrap items-center gap-3">
-          <span className="min-w-32 font-medium">{l.nome}</span>
+        <div key={l.id} className="flex flex-col gap-1">
+          <span className="text-xs font-medium">{l.nome}</span>
           <ChipsCategorias
             valor={l.categorias}
             rotulo={`Categorias da linha ${l.nome}`}
@@ -56,6 +56,6 @@ export function CategoriasDasLinhas({ jobId, linhas }: { jobId: string; linhas: 
           />
         </div>
       ))}
-    </div>
+    </section>
   );
 }
