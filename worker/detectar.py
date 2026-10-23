@@ -78,6 +78,9 @@ MOV_EXPLICADO = 0.3      # fração da mancha dentro de caixas do YOLO → já �
 MOV_AQUECER_S = 3.0      # o modelo de fundo precisa de alguns segundos para estabilizar
 MOV_MIN_S = 0.6          # track de movimento: duração mínima
 MOV_DESLOC_ALTURAS = 1.5 # ... e deslocamento mínimo, em alturas da própria caixa
+LARGO_FAIXA = 3.0        # linha que não conta automóveis (ciclovia, calçada): objeto com
+                         # comprimento, no sentido da travessia, > 3× a linha não cabe na faixa
+                         # (carro/ônibus na pista ao lado cuja base invade a ciclovia)
 
 
 def emitir(**dados) -> None:
@@ -507,10 +510,22 @@ def _movimento_real(tr: Track, fps: float) -> bool:
     return np.hypot(p1[0] - p0[0], p1[1] - p0[1]) >= MOV_DESLOC_ALTURAS * alturas[len(alturas) // 2]
 
 
+def _largo_demais(tr: Track, j: int, a, b) -> bool:
+    """Comprimento da caixa ao longo da normal da linha (mediana perto do
+    cruzamento) maior que LARGO_FAIXA × o comprimento da linha."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L = max(1e-6, (dx * dx + dy * dy) ** 0.5)
+    nx, ny = abs(dy) / L, abs(dx) / L
+    ext = sorted(nx * (c[2] - c[0]) + ny * (c[3] - c[1]) for c in tr.caixas[max(0, j - 3):j + 4])
+    return ext[len(ext) // 2] > LARGO_FAIXA * L
+
+
 def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int,
                      fps: float, escala: float) -> list[dict]:
     segs = [(l["id"], (l["x1"] * largura, l["y1"] * altura), (l["x2"] * largura, l["y2"] * altura))
             for l in linhas]
+    so_faixa = {l["id"] for l in linhas
+                if l.get("categorias") and "automoveis" not in l["categorias"]}
     diag = (largura ** 2 + altura ** 2) ** 0.5
     eventos: list[dict] = []
 
@@ -528,6 +543,8 @@ def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int
                     if t is None:
                         continue
                     j = i if t < 0.5 else i + 1
+                    if lid in so_faixa and _largo_demais(tr, j, a, b):
+                        break
                     eventos.append({**base, "linha_id": lid,
                                     "frame": int(round(tr.frames[i] + t * (tr.frames[i + 1] - tr.frames[i]))),
                                     "direcao": "A→B" if _lado(a, b, pts[i]) < 0 else "B→A",
