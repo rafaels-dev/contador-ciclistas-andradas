@@ -6,7 +6,8 @@
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
-    "lint": "eslint"
+    "lint": "eslint",
+    "producao": "node scripts/producao.mjs"
   },
   "dependencies": {
     "@next/env": "^16.4.2",

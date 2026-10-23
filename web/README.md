@@ -11,7 +11,8 @@ Fluxo de um job (ordem fixa):
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # desenvolvimento (hot reload), http://localhost:3000
+npm run producao   # modo produção com os mesmos dados (compila numa cópia limpa e sobe na 3000)
 ```
 
 `OPENROUTER_API_KEY` vem do `.env` da raiz do repositório (carregado em `next.config.ts`).

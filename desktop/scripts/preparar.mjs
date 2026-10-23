@@ -18,6 +18,9 @@ const PREPARO = path.join(DESKTOP, ".preparo");
 const RECURSOS = path.join(DESKTOP, "recursos");
 const WIN = process.platform === "win32";
 
+// --so-web: só o servidor Next (usado por `npm run producao` em web/)
+const SO_WEB = process.argv.includes("--so-web");
+
 // versão do uv baixada quando não há um no PATH (CI)
 const VERSAO_UV = "0.12.1";
 
@@ -38,11 +41,16 @@ copiar(path.join(RAIZ, "web"), staging, (src) => !ignorar.has(path.basename(src)
 rodar("npm", ["ci", "--no-audit", "--no-fund", "--prefer-offline"], staging);
 rodar("npx", ["next", "build"], staging);
 
-fs.rmSync(RECURSOS, { recursive: true, force: true });
 const web = path.join(RECURSOS, "web");
+fs.rmSync(SO_WEB ? web : RECURSOS, { recursive: true, force: true });
 copiar(path.join(staging, ".next", "standalone"), web);
 copiar(path.join(staging, ".next", "static"), path.join(web, ".next", "static"));
 if (fs.existsSync(path.join(staging, "public"))) copiar(path.join(staging, "public"), path.join(web, "public"));
+
+if (SO_WEB) {
+  console.log(`\nservidor pronto em ${web}`);
+  process.exit(0);
+}
 
 // 2. motor (o que worker/ usa em tempo de execução). Os pesos não vão para o
 // git: no CI vêm de URLs (o fine-tune de bicicletas, de um release do projeto)

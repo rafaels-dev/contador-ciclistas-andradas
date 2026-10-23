@@ -26,8 +26,19 @@ const BARRA = {
 };
 const FUNDO = { dark: "#1a1b1e", light: "#e6e6e2" };
 
-// em desenvolvimento: aponta para o `next dev` em vez de subir o servidor embutido
+// em desenvolvimento: aponta para um servidor já rodando em vez de subir o embutido
 const URL_DEV = process.env.CONTADOR_DESKTOP_URL;
+
+const WSL = process.platform === "linux" && (() => {
+  try {
+    return fs.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft");
+  } catch {
+    return false;
+  }
+})();
+// no WSL, janela desenhada pela GPU vira "[WARN:COPY MODE]" no título (o WSLg
+// não compartilha esses buffers com o Windows): desenha pelo processador
+if (WSL) app.disableHardwareAcceleration();
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -116,7 +127,7 @@ async function subirServidor() {
  * nativos o Electron já acompanha o tema do computador.
  */
 function seguirTemaDoWindowsNoWsl() {
-  if (process.platform !== "linux" || !fs.readFileSync("/proc/version", "utf8").toLowerCase().includes("microsoft")) return;
+  if (!WSL) return;
   try {
     const saida = execFileSync("reg.exe", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], {
       encoding: "utf8",
