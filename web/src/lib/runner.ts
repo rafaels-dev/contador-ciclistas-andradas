@@ -81,7 +81,9 @@ function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker)
   return new Promise((resolve, reject) => {
     const proc = spawn(pythonDoMotor(), [path.join("worker", script), ...args], {
       cwd: RAIZ_REPO,
-      env: { ...process.env, PYTHONUNBUFFERED: "1", ...ambienteDoWorker() },
+      // PYTHONUTF8: no Windows o Python usa cp1252 no stdout e nos open() sem
+      // encoding — o JSON dos eventos ("A→B", "…") derrubava o worker
+      env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", ...ambienteDoWorker() },
       windowsHide: true,
     });
     if (dono) {

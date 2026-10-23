@@ -39,6 +39,10 @@ import bisect
 import gzip
 import json
 import sys
+
+# os eventos JSON levam "→" e "…": no Windows o stdout nasce em cp1252
+if (sys.stdout.encoding or "").lower().replace("-", "") != "utf8":
+    sys.stdout.reconfigure(encoding="utf-8")
 import time
 import warnings
 from collections import Counter
@@ -56,7 +60,7 @@ import supervision as sv  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
 
 import config  # noqa: E402
-from leitor import LeitorVideo, info_video  # noqa: E402
+from leitor import LeitorVideo, gravar_jpg, info_video  # noqa: E402
 
 _PERSON, _BICYCLE, _MOTORCYCLE = 0, 1, 3
 
@@ -494,7 +498,7 @@ def salvar_pontos(caminho: Path, tracks: dict, largura: int, altura: int, max_po
     for g, pts in por_grupo.items():
         if len(pts) > max_por_grupo:
             por_grupo[g] = [pts[i] for i in sorted(rng.choice(len(pts), max_por_grupo, replace=False))]
-    caminho.write_text(json.dumps(por_grupo))
+    caminho.write_text(json.dumps(por_grupo), encoding="utf-8")
 
 
 # ----------------------------------------------------------------------
@@ -643,7 +647,7 @@ def salvar_filmstrip(tr: Track, destino: Path, n: int = 5) -> None:
         imgs.append(cv2.resize(img, (max(1, int(img.shape[1] * h / img.shape[0])), h)))
         imgs.append(np.full((h, 4, 3), 32, np.uint8))
     if imgs:
-        cv2.imwrite(str(destino), np.hstack(imgs[:-1]), [cv2.IMWRITE_JPEG_QUALITY, 85])
+        gravar_jpg(destino, np.hstack(imgs[:-1]))
 
 
 # ----------------------------------------------------------------------
@@ -739,8 +743,7 @@ def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: 
             if idx == a["c"]["frame"]:
                 # quadro do evento com caixa e linhas: contexto para o modelo de
                 # visão (em que faixa o objeto está; à noite o recorte é pouco)
-                cv2.imwrite(str(saida / "contextos" / f"{a['c']['id']}.jpg"), img,
-                            [cv2.IMWRITE_JPEG_QUALITY, 85])
+                gravar_jpg(saida / "contextos" / f"{a['c']['id']}.jpg", img)
             if idx >= a["fim"]:
                 a["w"].close()
                 ativos.remove(a)
@@ -772,7 +775,7 @@ def main() -> None:
 
     saida = Path(args.saida)
     arq_trilhas = Path(args.trilhas) if args.trilhas else saida.parent / "trilhas.json.gz"
-    linhas = json.loads(Path(args.linhas).read_text()) if args.linhas else []
+    linhas = json.loads(Path(args.linhas).read_text(encoding="utf-8")) if args.linhas else []
     fps = info_video(args.video)["fps"]
 
     tracks = None
@@ -810,7 +813,7 @@ def main() -> None:
         d["clipe"] = f"clipes/{c['id']}.mp4"
         d["contexto"] = f"contextos/{c['id']}.jpg"
         saida_json.append(d)
-    (saida / "candidatos.json").write_text(json.dumps(saida_json, ensure_ascii=False, indent=1))
+    (saida / "candidatos.json").write_text(json.dumps(saida_json, ensure_ascii=False, indent=1), encoding="utf-8")
     emitir(tipo="fim", candidatos=len(saida_json))
 
 

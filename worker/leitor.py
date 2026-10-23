@@ -36,6 +36,15 @@ def _ffmpeg() -> str:
     return imageio_ffmpeg.get_ffmpeg_exe()
 
 
+def gravar_jpg(caminho: str | Path, img: np.ndarray, qualidade: int = 85) -> None:
+    """cv2.imwrite falha em silêncio em caminhos com acento no Windows (a
+    pasta de dados do app é "Contador de Tráfego"): codifica e grava os bytes."""
+    ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, qualidade])
+    if not ok:
+        raise RuntimeError(f"não consegui codificar {caminho}")
+    Path(caminho).write_bytes(buf.tobytes())
+
+
 def info_video(caminho: str) -> dict:
     cap = cv2.VideoCapture(caminho)
     if not cap.isOpened():

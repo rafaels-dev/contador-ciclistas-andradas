@@ -117,6 +117,14 @@ async function subirServidor() {
   });
   const url = `http://127.0.0.1:${porta}`;
   await esperarServidor(url);
+  // downloads (vídeo final, CSV): sem isto o diálogo "Salvar como" do
+  // Chromium vem com a URL no título; propõe a pasta Downloads do usuário
+  session.defaultSession.on("will-download", (_e, item) => {
+    item.setSaveDialogOptions({
+      title: "Salvar como",
+      defaultPath: path.join(app.getPath("downloads"), item.getFilename()),
+    });
+  });
   await session.defaultSession.cookies.set({ url, name: "contador_token", value: TOKEN, httpOnly: true, sameSite: "strict" });
   return url;
 }

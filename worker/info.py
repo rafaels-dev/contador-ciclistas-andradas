@@ -8,9 +8,16 @@ Escreve DIR_SAIDA/frame0.jpg e imprime uma linha JSON:
 """
 import json
 import sys
+
+# os eventos JSON levam "→" e "…": no Windows o stdout nasce em cp1252
+if (sys.stdout.encoding or "").lower().replace("-", "") != "utf8":
+    sys.stdout.reconfigure(encoding="utf-8")
 from pathlib import Path
 
 import cv2
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from leitor import gravar_jpg  # noqa: E402
 
 
 def main() -> None:
@@ -36,7 +43,7 @@ def main() -> None:
         print(json.dumps({"tipo": "erro", "mensagem": "vídeo sem frames legíveis"}), flush=True)
         sys.exit(1)
 
-    cv2.imwrite(str(saida / "frame0.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    gravar_jpg(saida / "frame0.jpg", frame, 90)
     altura, largura = frame.shape[:2]
     print(json.dumps({
         "tipo": "info",

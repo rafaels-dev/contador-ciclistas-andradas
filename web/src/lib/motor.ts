@@ -68,7 +68,7 @@ export function statusMotor(): Promise<StatusMotor> {
   return new Promise((resolve) => {
     let saida = "";
     let erro = "";
-    const proc = spawn(/* turbopackIgnore: true */ python, ["-c", SONDA], { cwd: RAIZ_REPO, windowsHide: true });
+    const proc = spawn(/* turbopackIgnore: true */ python, ["-c", SONDA], { cwd: RAIZ_REPO, windowsHide: true, env: { ...process.env, PYTHONUTF8: "1" } });
     const limite = setTimeout(() => proc.kill(), 60_000);
     proc.stdout.on("data", (d) => (saida += d));
     proc.stderr.on("data", (d) => (erro = (erro + d).slice(-2000)));

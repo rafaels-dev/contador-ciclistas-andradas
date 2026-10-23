@@ -28,6 +28,10 @@ import json
 import queue
 import subprocess
 import sys
+
+# os eventos JSON levam "→" e "…": no Windows o stdout nasce em cp1252
+if (sys.stdout.encoding or "").lower().replace("-", "") != "utf8":
+    sys.stdout.reconfigure(encoding="utf-8")
 import threading
 import time
 from datetime import datetime
@@ -256,7 +260,7 @@ def main() -> None:
     ap.add_argument("--saida", required=True)
     ap.add_argument("--fim", type=float, default=None, help="segundos por vídeo (testes)")
     args = ap.parse_args()
-    plano = json.loads(Path(args.plano).read_text())
+    plano = json.loads(Path(args.plano).read_text(encoding="utf-8"))
     saida = Path(args.saida)
     saida.mkdir(parents=True, exist_ok=True)
     videos = plano["videos"]
@@ -276,6 +280,11 @@ def main() -> None:
             cats = linhas_cats.setdefault(nome, [])
             if ev["categoria"] not in cats:
                 cats.append(ev["categoria"])
+    # categorias escolhidas para este vídeo final (o runner já filtrou os
+    # eventos; aqui some do painel o que o usuário deixou de fora)
+    escolhidas = plano.get("categorias")
+    if escolhidas:
+        linhas_cats = {k: [c for c in cats if c in escolhidas] for k, cats in linhas_cats.items()}
     linhas_cats = {k: sorted(c, key=CATEGORIAS.index) for k, c in linhas_cats.items() if c}
 
     leitores = [LeitorVideo(v["video"]) for v in videos]
@@ -385,7 +394,7 @@ def main() -> None:
 
     relatorio = {"gerado_em": datetime.now().isoformat(timespec="seconds"), "codec": cod.codec,
                  "totais": totais, "por_sentido": sentidos, "videos": resumo_videos, "eventos": linhas_rel}
-    (saida / "relatorio.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=1))
+    (saida / "relatorio.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=1), encoding="utf-8")
     with open(saida / "eventos.csv", "w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel abre com acentos
         w = csv.writer(f, delimiter=";")
         w.writerow(["video", "tempo_no_video", "tempo_no_video_final", "linha", "categoria", "sentido", "candidato"])
