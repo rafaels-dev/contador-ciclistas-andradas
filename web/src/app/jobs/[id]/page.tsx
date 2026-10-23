@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { listarCameras, listarCandidatos, obterJob, type Job, type Linha } from "@/lib/db";
+import { listarCameras, listarCandidatos, obterJob, type Linha } from "@/lib/db";
 import { sugestoesAtivas, temTrilhas } from "@/lib/runner";
+import { rotuloStatus } from "@/lib/status";
 import { cancelar, retomarSugestoes, tentarNovamente } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
 import { BotaoEditarLinhas } from "./botao-editar-linhas";
@@ -10,16 +11,6 @@ import { EditorLinhas } from "./editor-linhas";
 import { CategoriasDasLinhas } from "./categorias-linha";
 import { Revisao } from "./revisao";
 
-const ROTULO_STATUS: Record<Job["status"], string> = {
-  baixando: "Baixando",
-  aguardando_linhas: "Defina as linhas de contagem",
-  detectando: "Detectando objetos",
-  sugerindo: "Sugestão de classificação",
-  aguardando_revisao: "Aguardando revisão",
-  renderizando: "Gerando vídeo final",
-  concluido: "Concluído",
-  erro: "Erro",
-};
 
 export default function PaginaJob(props: PageProps<"/jobs/[id]">) {
   return (
@@ -49,7 +40,7 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
       <header className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold break-all">{job.nome_arquivo ?? job.drive_id}</h1>
         <p className="text-sm text-zinc-500">
-          {ROTULO_STATUS[job.status]}
+          {rotuloStatus(job)}
           {job.duracao_s ? ` · ${Math.round(job.duracao_s / 60)} min de vídeo` : ""}
           {job.largura ? ` · ${job.largura}×${job.altura} @ ${job.fps?.toFixed(1)} fps` : ""}
         </p>

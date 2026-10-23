@@ -7,6 +7,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { atualizarJob, criarJob } from "@/lib/db";
 import { extrairIdDrive, extrairIdPastaDrive, listarVideosDaPasta, type ArquivoDrive } from "@/lib/drive";
+import { ehVideo, listarPasta, normalizarCaminho, raizes, type ConteudoPasta, type ItemPasta } from "@/lib/locais";
 import { iniciarDownload } from "@/lib/runner";
 
 export type EstadoNovoJob = { erro?: string; pasta?: { id: string; arquivos: ArquivoDrive[] } };
@@ -25,17 +26,57 @@ export async function novoJob(_anterior: EstadoNovoJob, formData: FormData): Pro
     }
   }
 
-  let driveId = extrairIdDrive(link);
-  // modo de teste: caminho de um vídeo local em vez de link do Drive
-  if (!driveId && process.env.CONTADOR_PERMITIR_LOCAL === "1" && path.isAbsolute(link) && fs.existsSync(link)) {
-    driveId = "local";
+  const driveId = extrairIdDrive(link);
+  if (!driveId) {
+    // caminho colado de um vídeo do computador também vale
+    const local = /^[A-Za-z]:[\\/]|^["/]/.test(link) ? normalizarCaminho(link) : null;
+    if (local && fs.existsSync(local) && fs.statSync(local).isFile() && ehVideo(local)) {
+      redirect(`/jobs/${criarJobLocal(local)}`);
+    }
+    return { erro: local ? "Vídeo não encontrado nesse caminho." : "Link do Google Drive inválido." };
   }
-  if (!driveId) return { erro: "Link do Google Drive inválido." };
 
   const id = randomUUID().slice(0, 8);
   criarJob({ id, link_drive: link, drive_id: driveId });
   iniciarDownload(id);
   redirect(`/jobs/${id}`);
+}
+
+/** Job de um vídeo do computador: o arquivo é lido onde está, sem cópia. */
+function criarJobLocal(caminho: string): string {
+  const id = randomUUID().slice(0, 8);
+  criarJob({ id, link_drive: caminho, drive_id: "local" });
+  atualizarJob(id, { nome_arquivo: path.basename(caminho) });
+  iniciarDownload(id);
+  return id;
+}
+
+export type EstadoPasta = { conteudo?: ConteudoPasta; raizes: ItemPasta[]; erro?: string; selecionado?: string };
+
+/** Navegador de pastas do computador (o app roda localmente). Sem caminho: pasta do usuário. */
+export async function navegarPasta(caminho: string | null): Promise<EstadoPasta> {
+  const base = { raizes: raizes() };
+  try {
+    let alvo = caminho ? normalizarCaminho(caminho) : base.raizes[0].caminho;
+    let selecionado: string | undefined;
+    if (fs.statSync(alvo).isFile()) {
+      // colou o caminho de um vídeo: abre a pasta dele com o vídeo marcado
+      selecionado = alvo;
+      alvo = path.dirname(alvo);
+    }
+    return { ...base, conteudo: listarPasta(alvo), selecionado };
+  } catch {
+    return { ...base, erro: "Pasta não encontrada ou sem permissão de leitura." };
+  }
+}
+
+export async function criarJobsLocais(caminhos: string[]): Promise<void> {
+  const ids = caminhos
+    .map(normalizarCaminho)
+    .filter((c) => ehVideo(c) && fs.existsSync(c) && fs.statSync(c).isFile())
+    .map(criarJobLocal);
+  if (ids.length === 1) redirect(`/jobs/${ids[0]}`);
+  refresh();
 }
 
 /** Um job por vídeo marcado na pasta; downloads começam em paralelo. */

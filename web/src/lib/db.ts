@@ -56,7 +56,7 @@ export type Job = {
   nome_arquivo: string | null;
   camera_id: string | null;
   linhas: string; // JSON de Linha[] — cópia congelada no momento da detecção
-  arquivo_video: string | null; // relativo ao dir do job
+  arquivo_video: string | null; // relativo ao dir do job, ou absoluto (vídeo local usado onde está)
   fps: number | null;
   largura: number | null;
   altura: number | null;

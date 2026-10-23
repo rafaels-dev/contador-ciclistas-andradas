@@ -85,14 +85,14 @@ function falhar(jobId: string, e: unknown): void {
 }
 
 /**
- * Interrompe download ou worker de um job. Os workers são achados pelo
- * caminho do vídeo na linha de comando (funciona mesmo para processos
+ * Interrompe download ou worker de um job. Os workers são achados pela
+ * pasta do job na linha de comando (funciona mesmo para processos
  * iniciados antes de um hot reload ou de outra instância do módulo).
  */
 export function cancelarJob(jobId: string): void {
   cancelados.add(jobId);
   downloads.get(jobId)?.abort();
-  spawnSync("pkill", ["-f", `worker/.*${path.join(dirJob(jobId), "video.mp4")}`]);
+  spawnSync("pkill", ["-f", `worker/.*${dirJob(jobId)}(/| |$)`]);
   // na fila da GPU (ainda sem processo): a tarefa confere o status ao começar
   atualizarJob(jobId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
 }
@@ -119,6 +119,25 @@ function formatarDuracao(s: number): string {
   return h ? `${h} h ${min} min` : `${min} min ${s % 60} s`;
 }
 
+/**
+ * Texto de progresso de uma transferência ("417 MB de 3,7 GB · 64,4 MB/s ·
+ * faltam 52 s"); a velocidade é a média dos últimos JANELA_VELOCIDADE_MS.
+ */
+function medidorTransferencia(): (feito: number, total: number | null) => string {
+  const amostras: [number, number][] = []; // [ms, bytes]
+  return (feito, total) => {
+    const agora = Date.now();
+    amostras.push([agora, feito]);
+    while (amostras.length > 2 && agora - amostras[0][0] > JANELA_VELOCIDADE_MS) amostras.shift();
+    const [t0, b0] = amostras[0];
+    const porSeg = agora > t0 ? ((feito - b0) * 1000) / (agora - t0) : 0;
+    const partes = [total ? `${formatarBytes(feito)} de ${formatarBytes(total)}` : formatarBytes(feito)];
+    if (porSeg > 0) partes.push(`${formatarBytes(porSeg)}/s`);
+    if (porSeg > 0 && total) partes.push(`faltam ${formatarDuracao((total - feito) / porSeg)}`);
+    return partes.join(" · ");
+  };
+}
+
 /** Etapa 1: download + metadados + 1º frame → aguardando_linhas. */
 export function iniciarDownload(jobId: string): void {
   void (async () => {
@@ -127,49 +146,52 @@ export function iniciarDownload(jobId: string): void {
     const dir = dirJob(jobId);
     fs.mkdirSync(dir, { recursive: true });
     const destino = path.join(dir, "video.mp4");
-    atualizarJob(jobId, { status: "baixando", progresso: 0, erro: null, mensagem: "Baixando do Google Drive…" });
 
     if (job.drive_id === "local") {
-      // modo de teste (CONTADOR_PERMITIR_LOCAL=1): link é um caminho local
-      fs.rmSync(destino, { force: true });
-      fs.symlinkSync(path.resolve(job.link_drive), destino);
-      atualizarJob(jobId, { nome_arquivo: path.basename(job.link_drive) });
+      // vídeo do próprio computador: usado onde está, sem cópia
+      if (!fs.existsSync(job.link_drive)) throw new Error(`Arquivo não encontrado: ${job.link_drive}`);
+      atualizarJob(jobId, { status: "baixando", progresso: 0, erro: null, arquivo_video: job.link_drive });
     } else {
+      atualizarJob(jobId, { status: "baixando", progresso: 0, erro: null, mensagem: "Baixando do Google Drive…" });
       const controle = new AbortController();
       downloads.set(jobId, controle);
-      const amostras: [number, number][] = []; // [ms, bytes] dos últimos segundos → velocidade
+      const medir = medidorTransferencia();
       const { nome } = await baixarDoDrive(job.drive_id, destino, controle.signal, (feito, total) => {
-        const agora = Date.now();
-        amostras.push([agora, feito]);
-        while (amostras.length > 2 && agora - amostras[0][0] > JANELA_VELOCIDADE_MS) amostras.shift();
-        const [t0, b0] = amostras[0];
-        const porSeg = agora > t0 ? ((feito - b0) * 1000) / (agora - t0) : 0;
-        const partes = [total ? `${formatarBytes(feito)} de ${formatarBytes(total)}` : formatarBytes(feito)];
-        if (porSeg > 0) partes.push(`${formatarBytes(porSeg)}/s`);
-        if (porSeg > 0 && total) partes.push(`faltam ${formatarDuracao((total - feito) / porSeg)}`);
-        atualizarJob(jobId, { progresso: total ? feito / total : 0, mensagem: `Baixando… ${partes.join(" · ")}` });
+        atualizarJob(jobId, { progresso: total ? feito / total : 0, mensagem: `Baixando… ${medir(feito, total)}` });
       });
       downloads.delete(jobId);
       atualizarJob(jobId, { nome_arquivo: nome ?? job.nome_arquivo });
     }
-
-    atualizarJob(jobId, { mensagem: "Lendo o vídeo…", progresso: 1 });
-    await rodarWorker("info.py", [destino, dir], (ev) => {
-      if (ev.tipo === "info") {
-        atualizarJob(jobId, {
-          arquivo_video: "video.mp4",
-          fps: ev.fps,
-          largura: ev.largura,
-          altura: ev.altura,
-          duracao_s: ev.duracao_s,
-        });
-      }
-    });
-    atualizarJob(jobId, { status: "aguardando_linhas", mensagem: null, progresso: 0 });
+    await lerVideo(jobId);
   })().catch((e) => {
     downloads.delete(jobId);
     falhar(jobId, e);
   });
+}
+
+/** Vídeo do job: o arquivo local original (caminho absoluto) ou o baixado na pasta do job. */
+function caminhoVideo(jobId: string): string {
+  const arquivo = obterJob(jobId)?.arquivo_video ?? "video.mp4";
+  return path.isAbsolute(arquivo) ? arquivo : path.join(dirJob(jobId), arquivo);
+}
+
+/** Metadados + 1º frame do vídeo já em disco → aguardando_linhas. */
+async function lerVideo(jobId: string): Promise<void> {
+  const dir = dirJob(jobId);
+  atualizarJob(jobId, { mensagem: "Lendo o vídeo…", progresso: 1 });
+  const job = obterJob(jobId);
+  if (!job?.arquivo_video) atualizarJob(jobId, { arquivo_video: "video.mp4" });
+  await rodarWorker("info.py", [caminhoVideo(jobId), dir], (ev) => {
+    if (ev.tipo === "info") {
+      atualizarJob(jobId, {
+        fps: ev.fps,
+        largura: ev.largura,
+        altura: ev.altura,
+        duracao_s: ev.duracao_s,
+      });
+    }
+  });
+  atualizarJob(jobId, { status: "aguardando_linhas", mensagem: null, progresso: 0 });
 }
 
 type CandidatoWorker = {
@@ -223,7 +245,7 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
   void naFilaDaGpu(async () => {
     if (cancelados.has(jobId) || obterJob(jobId)?.status !== "detectando") return;
     const saida = path.join(dir, "candidatos");
-    const args = ["--video", path.join(dir, "video.mp4"), "--saida", saida, "--linhas", arqLinhas,
+    const args = ["--video", caminhoVideo(jobId), "--saida", saida, "--linhas", arqLinhas,
       "--trilhas", path.join(dir, "trilhas.json.gz"), "--etapa", soCandidatos ? "candidatos" : "tudo"];
     if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos
     await rodarWorker("detectar.py", args, (ev) => {
@@ -380,7 +402,7 @@ export function iniciarRender(renderId: string): void {
     return {
       job: jobId,
       titulo: job.nome_arquivo ?? jobId,
-      video: path.join(djob, job.arquivo_video ?? "video.mp4"),
+      video: caminhoVideo(job.id),
       trilhas: path.join(djob, "trilhas.json.gz"),
       linhas: JSON.parse(job.linhas) as Linha[],
       eventos: listarCandidatos(jobId)

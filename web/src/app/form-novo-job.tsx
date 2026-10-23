@@ -12,7 +12,7 @@ export function FormNovoJob() {
         <input
           name="link"
           required
-          placeholder="Link de um vídeo ou de uma pasta do Google Drive"
+          placeholder="Link do Google Drive (vídeo ou pasta) ou caminho de um vídeo no computador"
           className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-900"
         />
         <button
