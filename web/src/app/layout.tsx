@@ -3,6 +3,7 @@ import { Barlow, Barlow_Semi_Condensed, JetBrains_Mono } from "next/font/google"
 import { Suspense } from "react";
 import { BarraStatus } from "./_shell/barra-status";
 import { BarraTitulo } from "./_shell/barra-titulo";
+import { Atualizacao } from "./_shell/atualizacao";
 import { Biblioteca } from "./_shell/biblioteca";
 import "./globals.css";
 
@@ -32,6 +33,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex h-dvh flex-col overflow-hidden bg-app font-sans text-fg">
         <BarraTitulo />
+        <Suspense fallback={null}>
+          <Atualizacao />
+        </Suspense>
         <div className="flex min-h-0 flex-1">
           <Suspense fallback={<aside className="w-60 shrink-0 border-r border-line bg-panel" />}>
             <Biblioteca />

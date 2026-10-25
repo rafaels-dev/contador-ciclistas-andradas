@@ -270,10 +270,69 @@ app.whenReady().then(async () => {
     app.quit();
     return;
   }
-  if (app.isPackaged) {
-    // atualizações como no Spotify: baixa em segundo plano e instala ao fechar
-    const { autoUpdater } = require("electron-updater");
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+  if (app.isPackaged) iniciarAtualizacoes();
+});
+
+// ----------------------------------------------------------------------
+// Atualização: baixa em segundo plano e instala ao fechar (como antes), mas
+// agora a janela mostra uma faixa "Versão X pronta — Reiniciar e atualizar".
+// A notificação nativa do checkForUpdatesAndNotify não aparecia no Windows e
+// quem deixava o app aberto nunca sabia que havia versão nova.
+// ----------------------------------------------------------------------
+/** @type {{ fase: "nenhuma" | "baixando" | "pronta", versao: string | null, progresso: number | null }} */
+let atualizacao = { fase: "nenhuma", versao: null, progresso: null };
+let atualizador = null;
+const CHECAR_A_CADA_MS = 4 * 60 * 60 * 1000; // app que fica aberto o dia todo também recebe
+
+function avisarAtualizacao(mudanca) {
+  atualizacao = { ...atualizacao, ...mudanca };
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send("atualizacao", atualizacao);
+}
+
+function iniciarAtualizacoes() {
+  const { autoUpdater } = require("electron-updater");
+  atualizador = autoUpdater;
+  autoUpdater.autoDownload = true;
+  // a instalação ao fechar é feita por instalarAtualizacao() (visível), não a silenciosa do electron-updater
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.on("update-available", (info) => avisarAtualizacao({ fase: "baixando", versao: info.version, progresso: 0 }));
+  autoUpdater.on("download-progress", (p) => avisarAtualizacao({ fase: "baixando", progresso: (p.percent ?? 0) / 100 }));
+  autoUpdater.on("update-downloaded", (info) => avisarAtualizacao({ fase: "pronta", versao: info.version, progresso: 1 }));
+  autoUpdater.on("error", (e) => {
+    console.error(`[atualizacao] ${e?.message ?? e}`);
+    // sem internet etc.: some a faixa de download; a próxima checagem tenta de novo
+    if (atualizacao.fase === "baixando") avisarAtualizacao({ fase: "nenhuma", progresso: null });
+  });
+  const checar = () => {
+    if (atualizacao.fase !== "pronta") autoUpdater.checkForUpdates().catch((e) => console.error(`[atualizacao] ${e?.message ?? e}`));
+  };
+  checar();
+  setInterval(checar, CHECAR_A_CADA_MS).unref?.();
+}
+
+let instalando = false;
+/**
+ * Instala a versão baixada. NÃO silencioso: a instalação silenciosa remove a
+ * versão velha e leva 1–2 min para pôr a nova, sem nada na tela — parecia
+ * que o app tinha sido desinstalado. Assim o Windows mostra o progresso do
+ * instalador e o app abre de novo no fim.
+ */
+function instalarAtualizacao() {
+  if (!atualizador || atualizacao.fase !== "pronta" || instalando) return false;
+  instalando = true;
+  app.isQuitting = true; // sem o aviso "o servidor do app parou"
+  servidor?.kill();
+  atualizador.quitAndInstall(false, true);
+  return true;
+}
+
+ipcMain.handle("atualizacao-estado", () => atualizacao);
+ipcMain.on("atualizacao-instalar", () => instalarAtualizacao());
+// fechar o app com uma versão já baixada também instala (como antes), mas à vista
+app.on("before-quit", (e) => {
+  if (!instalando && atualizacao.fase === "pronta") {
+    e.preventDefault();
+    instalarAtualizacao();
   }
 });
 
