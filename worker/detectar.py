@@ -639,12 +639,20 @@ def salvar_filmstrip(tr: Track, destino: Path, n: int = 5) -> None:
         return
     pos = np.linspace(0, len(recs) - 1, min(n, len(recs))).round().astype(int)
     imgs = []
+    h, w_max = 160, 480
     for p in pos:
         img = cv2.imdecode(np.frombuffer(recs[p][1], np.uint8), cv2.IMREAD_COLOR)
         if img is None:
             continue
-        h = 160
-        imgs.append(cv2.resize(img, (max(1, int(img.shape[1] * h / img.shape[0])), h)))
+        # cada recorte cabe em w_max×h: manchas de movimento muito largas (a guia
+        # inteira da calçada no amanhecer) viravam tiras de 8–14 mil px, e o
+        # modelo de visão recusa imagem com lado > 8000 px ("Provider returned error")
+        escala = min(h / img.shape[0], w_max / img.shape[1])
+        img = cv2.resize(img, (max(1, round(img.shape[1] * escala)), max(1, round(img.shape[0] * escala))))
+        if img.shape[0] < h:
+            pad = h - img.shape[0]
+            img = cv2.copyMakeBorder(img, pad // 2, pad - pad // 2, 0, 0, cv2.BORDER_CONSTANT, value=(32, 32, 32))
+        imgs.append(img)
         imgs.append(np.full((h, 4, 3), 32, np.uint8))
     if imgs:
         gravar_jpg(destino, np.hstack(imgs[:-1]))

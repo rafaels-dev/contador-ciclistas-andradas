@@ -102,6 +102,34 @@ function dataUrl(caminho: string): string {
   return `data:image/jpeg;base64,${fs.readFileSync(caminho).toString("base64")}`;
 }
 
+/** Os modelos recusam imagem com lado > 8000 px (Claude) — margem para os outros. */
+export const LADO_MAX_IMAGEM = 7900;
+
+/** Largura × altura de um JPEG lendo só o cabeçalho (marcador SOF), sem biblioteca de imagem. */
+export function dimensoesJpeg(caminho: string): { largura: number; altura: number } | null {
+  let b: Buffer;
+  try {
+    b = fs.readFileSync(caminho);
+  } catch {
+    return null;
+  }
+  let i = 2;
+  while (i + 9 < b.length) {
+    if (b[i] !== 0xff) return null;
+    const m = b[i + 1];
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+      return { altura: b.readUInt16BE(i + 5), largura: b.readUInt16BE(i + 7) };
+    }
+    i += 2 + b.readUInt16BE(i + 2);
+  }
+  return null;
+}
+
+function cabeNoModelo(caminho: string): boolean {
+  const d = dimensoesJpeg(caminho);
+  return !d || (d.largura <= LADO_MAX_IMAGEM && d.altura <= LADO_MAX_IMAGEM);
+}
+
 export class ErroOpenRouter extends Error {
   readonly status: number | null;
   /** vale tentar de novo (rede, 429, 5xx, resposta malformada) */
@@ -139,8 +167,14 @@ export async function sugerirCategoria(
   const modelos = modelosDaSugestao(opcoes);
   const modelo = modelos[0];
 
-  const conteudo: object[] = [{ type: "text", text: "FILMSTRIP:" }, { type: "image_url", image_url: { url: dataUrl(entrada.filmstrip) } }];
-  if (entrada.contexto && fs.existsSync(entrada.contexto)) {
+  // filmstrip grande demais (gerado antes do limite no worker): vai só o
+  // contexto — sem isto o candidato falhava para sempre, mesmo em "Tentar de novo"
+  const temContexto = !!entrada.contexto && fs.existsSync(entrada.contexto);
+  const conteudo: object[] =
+    cabeNoModelo(entrada.filmstrip) || !temContexto
+      ? [{ type: "text", text: "FILMSTRIP:" }, { type: "image_url", image_url: { url: dataUrl(entrada.filmstrip) } }]
+      : [{ type: "text", text: "(sem FILMSTRIP: o objeto é muito largo e baixo; use só o CONTEXTO)" }];
+  if (entrada.contexto && temContexto) {
     conteudo.push({ type: "text", text: "CONTEXTO:" }, { type: "image_url", image_url: { url: dataUrl(entrada.contexto) } });
   }
   if (entrada.dicaDetector) {
