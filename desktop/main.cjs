@@ -107,6 +107,8 @@ async function subirServidor() {
       CONTADOR_MOTOR: path.join(dados, "motor"),
       CONTADOR_RAIZ: recursos("motor"),
       CONTADOR_TOKEN: TOKEN,
+      CONTADOR_VERSAO: app.getVersion(),
+      CONTADOR_LOG: path.join(dados, "servidor.log"), // o relatório de diagnóstico inclui o fim dele
       ...(fs.existsSync(uv) ? { CONTADOR_UV: uv } : {}),
     },
   });

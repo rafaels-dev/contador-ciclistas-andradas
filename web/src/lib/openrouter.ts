@@ -26,6 +26,27 @@ const DO_PROMPT = Object.fromEntries(Object.entries(ROTULO_PROMPT).map(([k, v]) 
 // acerto a ~US$ 0,18/mil; Gemini 3.1 Flash Lite igual a 4×; YOLO sozinho 87%
 export const MODELO_PADRAO = "anthropic/claude-haiku-5.5";
 
+/**
+ * Reservas, em ordem: o OpenRouter passa para a próxima quando a anterior
+ * falha (provedor fora, limite de taxa, "Provider returned error", recusa
+ * de moderação) e cobra só a que respondeu. Escolhidas pela calibração —
+ * ver CLAUDE.md. OPENROUTER_MODELOS_RESERVA (lista separada por vírgula)
+ * troca a lista; vazia ou "nenhum" desliga.
+ */
+// calibração out/2026 (142 noturnos auditados / 31 diurnos): DeepSeek V4.1 Flash 100%/97% a
+// US$ 0,15/mil; Gemini 3.1 Flash Lite 99%/100% a 0,83/mil — provedores diferentes do Haiku
+export const RESERVAS_PADRAO = ["deepseek/deepseek-v4.1-flash-1017", "google/gemini-3.1-flash-lite"];
+
+/** Modelo principal + reservas, sem repetição (o principal sempre primeiro). */
+export function modelosDaSugestao(opcoes: { modelo?: string; reservas?: string[] } = {}): string[] {
+  const principal = opcoes.modelo ?? process.env.OPENROUTER_MODEL ?? MODELO_PADRAO;
+  const env = process.env.OPENROUTER_MODELOS_RESERVA;
+  const reservas =
+    opcoes.reservas ??
+    (env === undefined ? RESERVAS_PADRAO : /^\s*(nenhum)?\s*$/i.test(env) ? [] : env.split(",").map((m) => m.trim()).filter(Boolean));
+  return [...new Set([principal, ...reservas])];
+}
+
 const INSTRUCOES = `Você classifica objetos em movimento vistos por uma câmera fixa de trânsito (rua com ciclovia, calçada e pista de veículos). Pode ser dia ou noite; à noite há borrão de movimento forte e faróis.
 
 Você recebe:
@@ -85,21 +106,38 @@ export class ErroOpenRouter extends Error {
   readonly status: number | null;
   /** vale tentar de novo (rede, 429, 5xx, resposta malformada) */
   readonly transitorio: boolean;
+  /** o que o OpenRouter/provedor devolveu de fato (p/ diagnóstico; a mensagem é curta) */
+  readonly detalhe: string | null;
 
-  constructor(message: string, status: number | null, transitorio: boolean) {
+  constructor(message: string, status: number | null, transitorio: boolean, detalhe: string | null = null) {
     super(message);
     this.status = status;
     this.transitorio = transitorio;
+    this.detalhe = detalhe;
   }
+}
+
+/** Resume o erro do OpenRouter com o que o provedor respondeu ("Provider returned error" sozinho não diz nada). */
+function detalheDoErro(status: number, corpo: unknown, texto: string): string {
+  const e = (corpo as { error?: { code?: unknown; message?: unknown; metadata?: { provider_name?: unknown; raw?: unknown } } } | null)?.error;
+  const partes = [`HTTP ${status}`];
+  if (e?.code != null) partes.push(`código ${String(e.code)}`);
+  if (e?.message) partes.push(String(e.message));
+  if (e?.metadata?.provider_name) partes.push(`provedor ${String(e.metadata.provider_name)}`);
+  if (e?.metadata?.raw != null) partes.push(`resposta: ${typeof e.metadata.raw === "string" ? e.metadata.raw : JSON.stringify(e.metadata.raw)}`);
+  if (!e && texto) partes.push(`corpo: ${texto}`);
+  return partes.join(" · ").slice(0, 1500);
 }
 
 export async function sugerirCategoria(
   entrada: EntradaSugestao,
-  opcoes: { modelo?: string; chave?: string; sinal?: AbortSignal } = {},
+  /** reservas: [] desliga o fallback (a calibração mede um modelo por vez) */
+  opcoes: { modelo?: string; reservas?: string[]; chave?: string; sinal?: AbortSignal } = {},
 ): Promise<ResultadoSugestao> {
   const chave = opcoes.chave ?? process.env.OPENROUTER_API_KEY;
   if (!chave) throw new ErroOpenRouter("OPENROUTER_API_KEY não configurada (.env na raiz do projeto).", 401, false);
-  const modelo = opcoes.modelo ?? process.env.OPENROUTER_MODEL ?? MODELO_PADRAO;
+  const modelos = modelosDaSugestao(opcoes);
+  const modelo = modelos[0];
 
   const conteudo: object[] = [{ type: "text", text: "FILMSTRIP:" }, { type: "image_url", image_url: { url: dataUrl(entrada.filmstrip) } }];
   if (entrada.contexto && fs.existsSync(entrada.contexto)) {
@@ -116,14 +154,16 @@ export async function sugerirCategoria(
     res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       cache: "no-store",
-      signal: opcoes.sinal ?? AbortSignal.timeout(60_000),
+      // com reservas o OpenRouter pode tentar mais de um modelo na mesma chamada
+      signal: opcoes.sinal ?? AbortSignal.timeout(modelos.length > 1 ? 120_000 : 60_000),
       headers: {
         Authorization: `Bearer ${chave}`,
         "Content-Type": "application/json",
         "X-Title": "Contador de trafego",
       },
       body: JSON.stringify({
-        model: modelo,
+        // `models` = fallback no OpenRouter; a resposta diz em `model` quem respondeu
+        ...(modelos.length > 1 ? { models: modelos } : { model: modelo }),
         temperature: 0,
         messages: [
           { role: "system", content: INSTRUCOES },
@@ -136,15 +176,22 @@ export async function sugerirCategoria(
     throw new ErroOpenRouter(`Falha de rede: ${(e as Error).message}`, null, true);
   }
 
-  const corpo = (await res.json().catch(() => null)) as {
+  const bruto = await res.text().catch(() => "");
+  let corpo: {
     choices?: { message?: { content?: string } }[];
     usage?: { cost?: number; prompt_tokens?: number };
     error?: { message?: string };
     model?: string;
-  } | null;
+  } | null = null;
+  try {
+    corpo = JSON.parse(bruto);
+  } catch {
+    corpo = null;
+  }
   if (!res.ok || !corpo?.choices?.length) {
     const msg = corpo?.error?.message ?? `HTTP ${res.status}`;
-    throw new ErroOpenRouter(`OpenRouter: ${msg}`, res.status, res.status === 429 || res.status >= 500 || res.ok);
+    const tentados = modelos.length > 1 ? ` · modelos tentados: ${modelos.join(", ")}` : "";
+    throw new ErroOpenRouter(`OpenRouter: ${msg}`, res.status, res.status === 429 || res.status >= 500 || res.ok, detalheDoErro(res.status, corpo, bruto.slice(0, 600)) + tentados);
   }
 
   const texto = corpo.choices[0].message?.content ?? "";
@@ -153,10 +200,10 @@ export async function sugerirCategoria(
     // alguns provedores embrulham o JSON em ```json ... ```
     dados = JSON.parse(texto.replace(/^```(?:json)?\s*|\s*```$/g, ""));
   } catch {
-    throw new ErroOpenRouter(`Resposta não é JSON: ${texto.slice(0, 120)}`, res.status, true);
+    throw new ErroOpenRouter(`Resposta não é JSON: ${texto.slice(0, 120)}`, res.status, true, `modelo ${corpo.model ?? modelo} · resposta: ${texto.slice(0, 600)}`);
   }
   const categoria = DO_PROMPT[dados.categoria ?? ""];
-  if (!categoria) throw new ErroOpenRouter(`Categoria inválida: ${dados.categoria}`, res.status, true);
+  if (!categoria) throw new ErroOpenRouter(`Categoria inválida: ${dados.categoria}`, res.status, true, `modelo ${corpo.model ?? modelo} · resposta: ${texto.slice(0, 600)}`);
 
   return {
     categoria,

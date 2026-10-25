@@ -2,6 +2,7 @@ import "./env";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { EOL } from "node:os";
 import readline from "node:readline";
 import {
   atualizarJob,
@@ -12,12 +13,13 @@ import {
   registrarSugestao,
   resumoSugestoes,
   substituirCandidatos,
+  type Candidato,
   type Categoria,
   type Linha,
 } from "./db";
 import { baixarDoDrive } from "./drive";
 import { ambienteDoWorker, pythonDoMotor } from "./motor";
-import { ErroOpenRouter, sugerirCategoria } from "./openrouter";
+import { ErroOpenRouter, modelosDaSugestao, sugerirCategoria } from "./openrouter";
 import { RAIZ_REPO, dirJob, dirRender } from "./paths";
 
 /**
@@ -353,6 +355,40 @@ function mensagemChave(status: number): string {
   return `${motivo} ${SUFIXO_CHAVE}`;
 }
 
+/** Registro de cada falha de sugestão: no log do servidor e em sugestoes_erros.jsonl na pasta do job (vai no relatório de diagnóstico). */
+function registrarErroSugestao(jobId: string, c: Candidato, erro: ErroOpenRouter, tentativas: number): string {
+  const dir = dirJob(jobId);
+  const tamanho = (rel: string | null) => {
+    try {
+      return rel ? fs.statSync(path.join(dir, rel)).size : null;
+    } catch {
+      return null;
+    }
+  };
+  const registro = {
+    quando: new Date().toISOString(),
+    job: jobId,
+    candidato: c.id,
+    track: c.track,
+    status: erro.status,
+    transitorio: erro.transitorio,
+    tentativas,
+    mensagem: erro.message,
+    detalhe: erro.detalhe,
+    modelos: modelosDaSugestao(),
+    filmstrip: c.filmstrip,
+    filmstrip_bytes: tamanho(c.filmstrip),
+    contexto: c.contexto,
+    contexto_bytes: tamanho(c.contexto),
+  };
+  const linha = JSON.stringify(registro);
+  console.error(`[sugestoes] ${linha}`);
+  try {
+    fs.appendFileSync(path.join(dir, "sugestoes_erros.jsonl"), `${linha}${EOL}`);
+  } catch {}
+  return linha;
+}
+
 export function iniciarSugestoes(jobId: string): void {
   if (sugerindo.has(jobId)) return;
   sugerindo.add(jobId);
@@ -400,9 +436,10 @@ export function iniciarSugestoes(jobId: string): void {
             });
             break;
           } catch (e) {
-            const erro = e instanceof ErroOpenRouter ? e : new ErroOpenRouter(String(e), null, false);
+            const erro = e instanceof ErroOpenRouter ? e : new ErroOpenRouter(e instanceof Error ? e.message : String(e), null, false, e instanceof Error ? (e.stack ?? null) : null);
             // chave inválida / sem créditos: não adianta continuar o lote
             if (erro.status === 401 || erro.status === 402 || erro.status === 403) {
+              registrarErroSugestao(jobId, c, erro, tentativa);
               abortar = mensagemChave(erro.status);
               break;
             }
@@ -410,6 +447,7 @@ export function iniciarSugestoes(jobId: string): void {
               registrarSugestao(c.id, {
                 sugestao_llm: null, conf_llm: null, justificativa_llm: erro.message,
                 modelo_llm: null, custo_llm: null, status_llm: "falhou",
+                erro_llm: registrarErroSugestao(jobId, c, erro, tentativa),
               });
               break;
             }
@@ -426,7 +464,7 @@ export function iniciarSugestoes(jobId: string): void {
       atualizarJob(jobId, { status: "erro", erro: abortar, mensagem: null });
     } else if (r.falhou > 0 || r.ok < r.total) {
       atualizarJob(jobId, {
-        mensagem: `${r.ok} de ${r.total} com sugestão; ${r.total - r.ok} falharam — use "Retomar sugestões".`,
+        mensagem: `${r.ok} de ${r.total} com sugestão; ${r.total - r.ok} falharam.`,
       });
     } else {
       atualizarJob(jobId, {

@@ -39,7 +39,7 @@ async function rodar(modelo: string) {
             contexto: semContexto ? null : path.join(dir, c.contexto),
             dicaDetector: semDica ? null : c.yolo,
           },
-          { modelo },
+          { modelo, reservas: [] },
         );
         feitos[c.id] = { categoria: r.categoria, confianca: r.confianca, custo: r.custo_usd ?? 0 };
       } catch (e) {

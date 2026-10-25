@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { listarCameras, listarCandidatos, obterGrupo, obterJob, type Job, type Linha } from "@/lib/db";
+import { listarCameras, listarCandidatos, obterGrupo, obterJob, resumoSugestoes, type Job, type Linha } from "@/lib/db";
 import { SUFIXO_CHAVE, sugestoesAtivas, temTrilhas } from "@/lib/runner";
 import { ETAPAS, etapaAtual, rotuloStatus } from "@/lib/status";
 import { BOTAO, timecode } from "@/lib/ui";
-import { cancelar, retomarSugestoes, tentarNovamente } from "./actions";
+import { cancelar, retomarSugestoes, revisarSemSugestoes, tentarNovamente } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
 import { BotaoEditarLinhas } from "./botao-editar-linhas";
 import { CategoriasDasLinhas } from "./categorias-linha";
@@ -42,6 +42,38 @@ function Etapas({ job }: { job: Job }) {
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * Sugestões paradas: alguns candidatos ficaram sem resposta da IA. Dá para
+ * tentar de novo ou revisar assim mesmo (os sem sugestão são classificados
+ * à mão). "Salvar diagnóstico" gera o arquivo para o suporte.
+ */
+function BarraSugestoesPendentes({ job }: { job: Job }) {
+  const r = resumoSugestoes(job.id);
+  const semResposta = r.total - r.ok;
+  const soFalhas = r.ok + r.falhou >= r.total;
+  const quantos = semResposta === 1 ? "1 objeto" : `${semResposta} objetos`;
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-2 text-sm text-warn" data-testid="sugestoes-pendentes">
+      <span className="flex-1">
+        {soFalhas
+          ? `A inteligência artificial não conseguiu sugerir ${quantos} de ${r.total}. Você pode tentar de novo ou revisar assim mesmo e classificar ${semResposta === 1 ? "esse" : "esses"} à mão.`
+          : `${quantos} de ${r.total} ainda sem sugestão da inteligência artificial.`}
+      </span>
+      <form action={retomarSugestoes.bind(null, job.id)}>
+        <button className={soFalhas ? BOTAO.secundario : BOTAO.primario}>Tentar de novo</button>
+      </form>
+      {soFalhas && (
+        <form action={revisarSemSugestoes.bind(null, job.id)}>
+          <button className={BOTAO.primario}>Revisar assim mesmo</button>
+        </form>
+      )}
+      <a href="/api/diagnostico" className={BOTAO.fantasma} title="Salva um arquivo com o registro do app para enviar a quem dá suporte">
+        Salvar diagnóstico
+      </a>
+    </div>
   );
 }
 
@@ -107,6 +139,9 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
           <form action={tentarNovamente.bind(null, job.id)}>
             <button className={BOTAO.secundario}>Tentar novamente</button>
           </form>
+          <a href="/api/diagnostico" className={BOTAO.fantasma} title="Salva um arquivo com o registro do app para enviar a quem dá suporte">
+            Salvar diagnóstico
+          </a>
         </div>
       )}
 
@@ -132,12 +167,7 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
 
       {naRevisao && (
         <>
-          {job.status === "sugerindo" && !sugerindoAgora && (
-            <form action={retomarSugestoes.bind(null, job.id)} className="flex items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-2 text-sm text-warn">
-              <span className="flex-1">Há candidatos sem sugestão do modelo de visão. A revisão começa quando todos tiverem sugestão.</span>
-              <button className={BOTAO.primario}>Retomar sugestões</button>
-            </form>
-          )}
+          {job.status === "sugerindo" && !sugerindoAgora && <BarraSugestoesPendentes job={job} />}
           <Revisao
             key={job.status}
             jobId={job.id}

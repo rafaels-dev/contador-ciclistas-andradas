@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS candidatos (
   justificativa_llm  TEXT,
   modelo_llm         TEXT,
   status_llm         TEXT NOT NULL DEFAULT 'pendente', -- pendente | ok | falhou
+  erro_llm           TEXT,             -- JSON com o erro da última tentativa (status HTTP, resposta do provedor…)
   rotulo             TEXT,             -- decisão humana: categoria ou 'descartado'
   revisado_em        TEXT
 );
@@ -162,7 +163,7 @@ ${SCHEMA_GRUPOS}`;
 /** Colunas adicionadas depois da criação do banco (CREATE IF NOT EXISTS não altera tabela existente). */
 function migrar(d: DatabaseSync): void {
   const novas: Record<string, Record<string, string>> = {
-    candidatos: { contexto: "TEXT", custo_llm: "REAL" },
+    candidatos: { contexto: "TEXT", custo_llm: "REAL", erro_llm: "TEXT" },
     jobs: { grupo_id: "TEXT REFERENCES grupos(id) ON DELETE SET NULL" },
     renders: { categorias: "TEXT" }, // JSON de Categoria[]; NULL = todas
   };
@@ -181,7 +182,7 @@ function migrar(d: DatabaseSync): void {
 const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
 // incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
 // migração precisa rodar sem reiniciar o servidor (e os workers em curso)
-const VERSAO_SCHEMA = 6;
+const VERSAO_SCHEMA = 7;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -237,6 +238,7 @@ export type Candidato = {
   justificativa_llm: string | null;
   modelo_llm: string | null;
   status_llm: "pendente" | "ok" | "falhou";
+  erro_llm: string | null;
   rotulo: Categoria | "descartado" | null;
   revisado_em: string | null;
 };
@@ -263,7 +265,7 @@ export function listarCandidatos(jobId: string): Candidato[] {
 
 export function substituirCandidatos(
   jobId: string,
-  itens: Omit<Candidato, "id" | "job_id" | "sugestao_llm" | "custo_llm" | "conf_llm" | "justificativa_llm" | "modelo_llm" | "status_llm" | "rotulo" | "revisado_em">[],
+  itens: Omit<Candidato, "id" | "job_id" | "sugestao_llm" | "custo_llm" | "conf_llm" | "justificativa_llm" | "modelo_llm" | "status_llm" | "erro_llm" | "rotulo" | "revisado_em">[],
 ): void {
   const d = db();
   d.exec("BEGIN");
@@ -348,14 +350,42 @@ export function moverJobs(ids: string[], grupoId: string | null): void {
 
 export function registrarSugestao(
   id: number,
-  dados: { sugestao_llm: string | null; conf_llm: number | null; justificativa_llm: string | null; modelo_llm: string | null; custo_llm: number | null; status_llm: "ok" | "falhou" | "pendente" },
+  dados: {
+    sugestao_llm: string | null;
+    conf_llm: number | null;
+    justificativa_llm: string | null;
+    modelo_llm: string | null;
+    custo_llm: number | null;
+    status_llm: "ok" | "falhou" | "pendente";
+    /** JSON do erro (só quando falhou); omitido = limpa */
+    erro_llm?: string | null;
+  },
 ): void {
   db()
     .prepare(
-      `UPDATE candidatos SET sugestao_llm = ?, conf_llm = ?, justificativa_llm = ?, modelo_llm = ?, custo_llm = ?, status_llm = ?
+      `UPDATE candidatos SET sugestao_llm = ?, conf_llm = ?, justificativa_llm = ?, modelo_llm = ?, custo_llm = ?, status_llm = ?, erro_llm = ?
        WHERE id = ?`,
     )
-    .run(dados.sugestao_llm, dados.conf_llm, dados.justificativa_llm, dados.modelo_llm, dados.custo_llm, dados.status_llm, id);
+    .run(dados.sugestao_llm, dados.conf_llm, dados.justificativa_llm, dados.modelo_llm, dados.custo_llm, dados.status_llm, dados.erro_llm ?? null, id);
+}
+
+/** Candidatos cuja sugestão falhou, em todos os jobs (relatório de diagnóstico). */
+export function listarCandidatosComErro(limite = 200): Candidato[] {
+  return db()
+    .prepare(`SELECT * FROM candidatos WHERE status_llm = 'falhou' ORDER BY job_id, id LIMIT ?`)
+    .all(limite)
+    .map(simples) as Candidato[];
+}
+
+/** Quantos candidatos por linha, classe do detector e status da sugestão (diagnóstico de "não contou nada"). */
+export function resumoCandidatos(jobId: string): { linha_id: string | null; classe_yolo: string | null; origem: string | null; status_llm: string; sugestao_llm: string | null; rotulo: string | null; n: number }[] {
+  return db()
+    .prepare(
+      `SELECT linha_id, classe_yolo, origem, status_llm, sugestao_llm, rotulo, COUNT(*) AS n FROM candidatos
+       WHERE job_id = ? GROUP BY linha_id, classe_yolo, origem, status_llm, sugestao_llm, rotulo ORDER BY linha_id, n DESC`,
+    )
+    .all(jobId)
+    .map(simples) as ReturnType<typeof resumoCandidatos>;
 }
 
 /** Grava decisões humanas (rotulo null = volta a pendente). Só toca candidatos do job. */

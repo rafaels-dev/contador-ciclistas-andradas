@@ -33,19 +33,35 @@ export type Proposta = {
   classe: Classe | null;
   /** o modelo viu uma categoria que esta linha não conta (ex.: ônibus na linha da ciclovia) */
   foraDaLinha: Categoria | null;
+  /** a IA falhou: a proposta é a classe do detector (YOLO), sem confiança — nunca entra no aceite em lote */
+  doDetector: boolean;
 };
 
 /**
  * O que a tela oferece para o humano aceitar: a sugestão do modelo de visão,
  * trocada por "descartado" quando a categoria não é contada na linha cruzada.
+ * Se a IA falhou nesse candidato, vale a classe do detector, marcada como tal.
  */
 export function proposta(c: Candidato, linhas: Record<string, Linha>): Proposta {
-  const s = c.status_llm === "ok" ? c.sugestao_llm : null;
-  if (!s) return { classe: null, foraDaLinha: null };
+  const doDetector = c.status_llm === "falhou";
+  const s = c.status_llm === "ok" ? c.sugestao_llm : doDetector ? c.classe_yolo : null;
+  if (!s) return { classe: null, foraDaLinha: null, doDetector };
   if (s !== "descartado" && c.linha_id && !contaNaLinha(linhas[c.linha_id], s)) {
-    return { classe: "descartado", foraDaLinha: s };
+    return { classe: "descartado", foraDaLinha: s, doDetector };
   }
-  return { classe: s, foraDaLinha: null };
+  return { classe: s, foraDaLinha: null, doDetector };
+}
+
+/** Erro guardado pelo servidor quando a sugestão falhou (JSON em candidatos.erro_llm). */
+export type ErroSugestao = { quando?: string; status?: number | null; tentativas?: number; mensagem?: string; detalhe?: string | null };
+
+export function lerErroSugestao(c: Pick<Candidato, "erro_llm">): ErroSugestao | null {
+  if (!c.erro_llm) return null;
+  try {
+    return JSON.parse(c.erro_llm) as ErroSugestao;
+  } catch {
+    return null;
+  }
 }
 
 export type Totais = {

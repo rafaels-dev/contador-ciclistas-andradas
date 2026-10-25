@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { Candidato, Categoria, Linha } from "@/lib/db";
-import { calcularTotais, NOME_CATEGORIA, possiveisDuplicados, proposta, type Classe } from "@/lib/revisao";
+import { calcularTotais, lerErroSugestao, NOME_CATEGORIA, possiveisDuplicados, proposta, type Classe, type Proposta } from "@/lib/revisao";
 import { BOTAO, CAMPO, COR_CLASSE, TITULO_PAINEL, timecode } from "@/lib/ui";
 import { gerarVideoFinal } from "../../renders/actions";
 import { EscolhaCategorias } from "../../renders/escolha-categorias";
@@ -406,8 +406,13 @@ function ListaCandidatos({ visiveis, base, focado, numero, classeDe, rotulo, con
                 </span>
                 <Amostra classe={classe} vazado={!r} />
                 <span className={`truncate ${r ? "text-muted" : "font-medium"}`}>
-                  {classe ? (classe === "descartado" ? "Descartar" : NOME_CATEGORIA[classe]) : c.status_llm === "falhou" ? "Sugestão falhou" : "Aguardando…"}
+                  {classe ? (classe === "descartado" ? "Descartar" : NOME_CATEGORIA[classe]) : c.status_llm === "falhou" ? "Sem sugestão" : "Aguardando…"}
                 </span>
+                {!r && c.status_llm === "falhou" && (
+                  <span className="shrink-0 whitespace-nowrap rounded bg-danger/15 px-1 font-mono text-[0.65rem] text-danger" title="A inteligência artificial não conseguiu sugerir; a proposta é do detector">
+                    IA falhou
+                  </span>
+                )}
                 {!r && p !== null && <span className="font-mono text-[0.7rem] text-faint">{Math.round(p * 100)}%</span>}
               </span>
               <span className="flex items-center gap-1.5 font-mono text-[0.7rem] text-faint">
@@ -502,6 +507,45 @@ type PropsInspetor = {
   aoIrPara: (id: number) => void;
 };
 
+/**
+ * A IA não respondeu para este candidato: mostra a proposta do detector (para
+ * o Enter) e o erro completo — o que o OpenRouter/provedor devolveu — para
+ * quem for diagnosticar.
+ */
+function ErroDaSugestao({ c, prop, linha }: { c: Candidato; prop: Proposta; linha: Linha | undefined }) {
+  const erro = lerErroSugestao(c);
+  const classe = prop.foraDaLinha ?? prop.classe;
+  return (
+    <>
+      <p className="font-medium text-danger">A inteligência artificial não conseguiu sugerir</p>
+      {classe ? (
+        <p className="flex items-center gap-2 text-lg font-semibold">
+          <Amostra classe={classe} />
+          {NOME_CATEGORIA[classe]}
+          <span className="ml-auto text-xs font-normal text-muted">pelo detector</span>
+        </p>
+      ) : (
+        <p className="text-sm text-muted">Sem proposta: escolha a categoria com os números.</p>
+      )}
+      {prop.foraDaLinha && (
+        <p className="text-xs text-warn">
+          {NOME_CATEGORIA[prop.foraDaLinha]} não conta em {linha?.nome ?? "esta linha"} — proposta: descartar.
+        </p>
+      )}
+      <details className="text-xs text-muted">
+        <summary className="cursor-pointer">Detalhes do erro</summary>
+        <p className="mt-1 break-words font-mono" data-testid="erro-sugestao">
+          {erro?.mensagem ?? c.justificativa_llm ?? "sem registro"}
+          {erro?.status != null && ` (HTTP ${erro.status})`}
+          {erro?.tentativas ? ` · ${erro.tentativas} tentativa${erro.tentativas > 1 ? "s" : ""}` : ""}
+          {erro?.quando && ` · ${new Date(erro.quando).toLocaleString("pt-BR")}`}
+        </p>
+        {erro?.detalhe && <p className="mt-1 break-words font-mono">{erro.detalhe}</p>}
+      </details>
+    </>
+  );
+}
+
 function Inspetor({ c, linha, prop, rotulo, editavel, numero, duplicadoDe, aoDecidir, aoDesfazer, aoIrPara }: PropsInspetor) {
   const corrigido = rotulo && rotulo !== prop.classe;
   const conf = c.conf_llm ?? 0;
@@ -526,11 +570,11 @@ function Inspetor({ c, linha, prop, rotulo, editavel, numero, duplicadoDe, aoDec
             )}
           </>
         ) : c.status_llm === "falhou" ? (
-          <p className="font-medium text-danger">A sugestão falhou</p>
+          <ErroDaSugestao c={c} prop={prop} linha={linha} />
         ) : (
           <p className="text-muted">Aguardando sugestão…</p>
         )}
-        {c.justificativa_llm && <p className="text-sm text-muted">{c.justificativa_llm}</p>}
+        {c.status_llm === "ok" && c.justificativa_llm && <p className="text-sm text-muted">{c.justificativa_llm}</p>}
         <p className="text-xs text-faint">
           Detector: {c.classe_yolo ? NOME_CATEGORIA[c.classe_yolo] : "?"}
           {c.alternativa && ` ou ${NOME_CATEGORIA[c.alternativa]}`}

@@ -98,6 +98,24 @@ export async function retomarSugestoes(jobId: string): Promise<void> {
   refresh();
 }
 
+/**
+ * Abre a revisão mesmo com candidatos sem sugestão (a IA falhou neles): o
+ * humano classifica esses à mão, com a proposta do detector. Sem isto o
+ * usuário ficava preso em "Retomar sugestões" quando a falha era persistente.
+ */
+export async function revisarSemSugestoes(jobId: string): Promise<void> {
+  const job = obterJob(jobId);
+  if (!job || job.status !== "sugerindo" || sugestoesAtivas(jobId)) return;
+  const r = resumoSugestoes(jobId);
+  if (r.ok + r.falhou < r.total) return; // ainda há pendentes: retome as sugestões
+  atualizarJob(jobId, {
+    status: "aguardando_revisao",
+    progresso: 1,
+    mensagem: `${r.ok} de ${r.total} com sugestão · ${r.falhou} sem sugestão (classifique à mão) · custo US$ ${r.custo.toFixed(4)}`,
+  });
+  refresh();
+}
+
 /** Volta ao editor de linhas depois da detecção (descarta candidatos/sugestões/revisão ao confirmar). */
 export async function editarLinhas(jobId: string): Promise<void> {
   const job = obterJob(jobId);

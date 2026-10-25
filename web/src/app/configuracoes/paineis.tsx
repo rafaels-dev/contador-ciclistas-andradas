@@ -281,7 +281,7 @@ export function PainelChave({ temChave, aoFicarPronto }: { temChave: boolean; ao
                 Keys
               </a>
               , clique em <strong>Create Key</strong>, dê um nome (ex.: “Contador”) e copie a chave que aparece — ela começa com{" "}
-              <code className="font-mono text-xs">sk-or-</code>.
+              <code className="font-mono text-xs">sk-or-</code> e só é mostrada inteira nessa hora (depois a lista mostra só o começo e o fim).
             </li>
             <li>Cole a chave abaixo e clique em “Testar e salvar”.</li>
           </ol>

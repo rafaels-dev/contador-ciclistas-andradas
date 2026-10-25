@@ -49,6 +49,15 @@ export async function salvarChave(chave: string): Promise<VerificacaoChave> {
   await exigirAcesso();
   const limpa = String(chave ?? "").trim();
   if (!limpa || /\s/.test(limpa)) return { ok: false, saldo_usd: null, erro: "Cole a chave inteira, sem espaços." };
+  // a lista de chaves do OpenRouter mostra só o começo e o fim ("sk-or-v1-7f8…84f"):
+  // a chave inteira aparece uma única vez, logo depois de criar
+  if (/[.…]{1,3}/.test(limpa) || (limpa.startsWith("sk-or-") && limpa.length < 40)) {
+    return {
+      ok: false,
+      saldo_usd: null,
+      erro: "Essa chave está incompleta. O OpenRouter só mostra a chave inteira uma vez, na hora em que ela é criada — crie uma chave nova em Keys e copie na mesma hora.",
+    };
+  }
   const r = await verificarChave(limpa);
   if (r.ok) gravarVariavel("OPENROUTER_API_KEY", limpa);
   return r;
