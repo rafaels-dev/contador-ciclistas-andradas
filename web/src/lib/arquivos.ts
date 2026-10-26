@@ -6,6 +6,10 @@ const TIPOS: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".png": "image/png",
   ".mp4": "video/mp4",
+  ".m4v": "video/mp4",
+  ".mov": "video/quicktime",
+  ".mkv": "video/x-matroska",
+  ".webm": "video/webm",
   ".json": "application/json",
   ".csv": "text/csv; charset=utf-8",
 };
@@ -28,7 +32,23 @@ export function servirArquivo(request: Request, dir: string, caminho: string[]):
   } catch {
     return new Response("Não encontrado", { status: 404 });
   }
+  return responderArquivo(request, alvo, tamanho);
+}
 
+/** O vídeo original de um job, que pode estar fora da pasta do job (vídeo local usado onde está). */
+export function servirVideo(request: Request, alvo: string): Response {
+  let tamanho: number;
+  try {
+    const st = fs.statSync(alvo);
+    if (!st.isFile()) throw new Error();
+    tamanho = st.size;
+  } catch {
+    return new Response("Não encontrado", { status: 404 });
+  }
+  return responderArquivo(request, alvo, tamanho);
+}
+
+function responderArquivo(request: Request, alvo: string, tamanho: number): Response {
   const cabecalhos: Record<string, string> = {
     "Content-Type": TIPOS[path.extname(alvo).toLowerCase()] ?? "application/octet-stream",
     "Accept-Ranges": "bytes",

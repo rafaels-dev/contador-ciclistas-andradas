@@ -11,6 +11,7 @@ import {
   resumoSugestoes,
   revisarCandidatos,
   salvarCamera,
+  type Area,
   type Categoria,
   type Linha,
 } from "@/lib/db";
@@ -45,26 +46,40 @@ function validarLinhas(entrada: unknown): Linha[] {
   });
 }
 
+/** Área de análise: dentro do quadro e com tamanho útil; null = quadro inteiro. */
+function validarArea(entrada: unknown): Area | null {
+  if (!entrada || typeof entrada !== "object") return null;
+  const a = entrada as Record<string, unknown>;
+  const [x, y, w, h] = [a.x, a.y, a.w, a.h].map(Number);
+  if (![x, y, w, h].every(Number.isFinite)) throw new Error("Área de análise inválida.");
+  const area = { x: Math.max(0, x), y: Math.max(0, y), w: Math.min(1 - Math.max(0, x), w), h: Math.min(1 - Math.max(0, y), h) };
+  if (area.w < 0.03 || area.h < 0.03) throw new Error("A área de análise é pequena demais.");
+  return area.w > 0.999 && area.h > 0.999 ? null : area;
+}
+
 export async function confirmarLinhas(
   jobId: string,
   linhasBrutas: unknown,
   camera: { id: string; nome: string } | null,
+  areaBruta: unknown = null,
 ): Promise<{ erro?: string }> {
   const job = obterJob(jobId);
   if (!job) return { erro: "Job não encontrado." };
   if (job.status !== "aguardando_linhas") return { erro: `O job está em "${job.status}".` };
   let linhas: Linha[];
+  let area: Area | null;
   try {
     linhas = validarLinhas(linhasBrutas);
+    area = validarArea(areaBruta);
   } catch (e) {
     return { erro: (e as Error).message };
   }
   if (camera?.nome.trim()) {
     const id = camera.id || camera.nome.trim().toLowerCase().replace(/[^\w]+/g, "-");
-    salvarCamera(id, camera.nome.trim(), linhas);
+    salvarCamera(id, camera.nome.trim(), linhas, area);
     atualizarJob(jobId, { camera_id: id });
   }
-  iniciarDeteccao(jobId, linhas);
+  iniciarDeteccao(jobId, linhas, area);
   refresh();
   return {};
 }

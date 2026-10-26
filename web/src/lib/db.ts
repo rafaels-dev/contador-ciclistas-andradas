@@ -49,6 +49,13 @@ export type Linha = {
   categorias?: Categoria[];
 };
 
+/**
+ * Área de análise (0–1 do quadro): o worker detecta só nela, na resolução
+ * original do vídeo — numa câmera 4K alta, o ciclista distante continua com
+ * os pixels que o 1080p reduzido tirava. Não muda o vídeo final.
+ */
+export type Area = { x: number; y: number; w: number; h: number };
+
 export type Job = {
   id: string;
   link_drive: string;
@@ -56,6 +63,7 @@ export type Job = {
   nome_arquivo: string | null;
   camera_id: string | null;
   linhas: string; // JSON de Linha[] — cópia congelada no momento da detecção
+  area: string | null; // JSON de Area (null = quadro inteiro)
   arquivo_video: string | null; // relativo ao dir do job, ou absoluto (vídeo local usado onde está)
   grupo_id: string | null; // grupo da biblioteca (null = sem grupo)
   fps: number | null;
@@ -164,7 +172,8 @@ ${SCHEMA_GRUPOS}`;
 function migrar(d: DatabaseSync): void {
   const novas: Record<string, Record<string, string>> = {
     candidatos: { contexto: "TEXT", custo_llm: "REAL", erro_llm: "TEXT" },
-    jobs: { grupo_id: "TEXT REFERENCES grupos(id) ON DELETE SET NULL" },
+    jobs: { grupo_id: "TEXT REFERENCES grupos(id) ON DELETE SET NULL", area: "TEXT" },
+    cameras: { area: "TEXT" },
     renders: { categorias: "TEXT" }, // JSON de Categoria[]; NULL = todas
   };
   d.exec(SCHEMA_RENDERS);
@@ -182,7 +191,7 @@ function migrar(d: DatabaseSync): void {
 const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
 // incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
 // migração precisa rodar sem reiniciar o servidor (e os workers em curso)
-const VERSAO_SCHEMA = 7;
+const VERSAO_SCHEMA = 8;
 
 export function db(): DatabaseSync {
   if (!g.__contadorDb) {
@@ -243,7 +252,7 @@ export type Candidato = {
   revisado_em: string | null;
 };
 
-export type Camera = { id: string; nome: string; linhas: string; criado_em: string };
+export type Camera = { id: string; nome: string; linhas: string; area: string | null; criado_em: string };
 
 type CamposJob = Partial<Omit<Job, "id" | "criado_em" | "atualizado_em">>;
 
@@ -291,13 +300,15 @@ export function listarCameras(): Camera[] {
   return db().prepare("SELECT * FROM cameras ORDER BY nome").all().map(simples) as Camera[];
 }
 
-export function salvarCamera(id: string, nome: string, linhas: Linha[]): void {
+export function salvarCamera(id: string, nome: string, linhas: Linha[], area?: Area | null): void {
+  // area undefined = mantém a da câmera (ex.: só as categorias das linhas mudaram)
   db()
     .prepare(
-      `INSERT INTO cameras (id, nome, linhas) VALUES (?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, linhas = excluded.linhas`,
+      `INSERT INTO cameras (id, nome, linhas, area) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, linhas = excluded.linhas,
+         area = CASE WHEN ? THEN excluded.area ELSE cameras.area END`,
     )
-    .run(id, nome, JSON.stringify(linhas));
+    .run(id, nome, JSON.stringify(linhas), area ? JSON.stringify(area) : null, area === undefined ? 0 : 1);
 }
 
 export function listarJobs(): Job[] {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import type { Linha } from "@/lib/db";
+import type { Area, Linha } from "@/lib/db";
 import { confirmarLinhas } from "./actions";
 import { BOTAO, CAMPO, TITULO_PAINEL } from "@/lib/ui";
 import { ChipsCategorias } from "./categorias-linha";
@@ -12,7 +12,8 @@ type Props = {
   largura: number;
   altura: number;
   linhasIniciais: Linha[];
-  cameras: { id: string; nome: string; linhas: Linha[] }[];
+  areaInicial: Area | null;
+  cameras: { id: string; nome: string; linhas: Linha[]; area: Area | null }[];
   cameraInicial: string | null;
   /** pontos de chão das trajetórias já detectadas (null antes da 1ª detecção) */
   pontosUrl: string | null;
@@ -44,7 +45,45 @@ function rotulosLados(l: Linha, W: number, H: number) {
   };
 }
 
-export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIniciais, cameras, cameraInicial, pontosUrl }: Props) {
+/** Vídeos mais largos que isso são reduzidos na detecção — é onde a área de análise faz diferença. */
+const LARGURA_PROCESSADA = 1920;
+
+/**
+ * Área de análise em volta das linhas, com folga para o objeto ser
+ * acompanhado antes e depois de cruzar (e nunca menor que ~1/4 do quadro).
+ */
+function areaDasLinhas(linhas: Linha[], W: number, H: number): Area | null {
+  if (!linhas.length) return null;
+  const xs = linhas.flatMap((l) => [l.x1 * W, l.x2 * W]);
+  const ys = linhas.flatMap((l) => [l.y1 * H, l.y2 * H]);
+  let [x1, x2, y1, y2] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const folga = Math.max(0.6 * Math.max(x2 - x1, y2 - y1), 0.08 * W);
+  [x1, x2, y1, y2] = [x1 - folga, x2 + folga, y1 - folga, y2 + folga];
+  const minW = Math.min(W, Math.max(W / 2, 960));
+  const minH = Math.min(H, Math.max(H / 2, 540));
+  if (x2 - x1 < minW) [x1, x2] = [(x1 + x2 - minW) / 2, (x1 + x2 + minW) / 2];
+  if (y2 - y1 < minH) [y1, y2] = [(y1 + y2 - minH) / 2, (y1 + y2 + minH) / 2];
+  const dentro = (a: number, b: number, max: number) => {
+    const t = Math.min(b - a, max);
+    const ini = Math.min(Math.max(0, a), max - t);
+    return [ini, t];
+  };
+  const [ax, aw] = dentro(x1, x2, W);
+  const [ay, ah] = dentro(y1, y2, H);
+  return { x: ax / W, y: ay / H, w: aw / W, h: ah / H };
+}
+
+const retangulo = (r: { x0: number; y0: number; x1: number; y1: number }): Area => ({
+  x: Math.min(r.x0, r.x1),
+  y: Math.min(r.y0, r.y1),
+  w: Math.abs(r.x1 - r.x0),
+  h: Math.abs(r.y1 - r.y0),
+});
+
+const fora = (l: Linha, a: Area) =>
+  [[l.x1, l.y1], [l.x2, l.y2]].some(([x, y]) => x < a.x - 1e-3 || y < a.y - 1e-3 || x > a.x + a.w + 1e-3 || y > a.y + a.h + 1e-3);
+
+export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIniciais, areaInicial, cameras, cameraInicial, pontosUrl }: Props) {
   const [pontos, setPontos] = useState<Pontos | null>(null);
   const [visiveis, setVisiveis] = useState<Set<string>>(new Set(Object.keys(COR_PONTOS)));
   useEffect(() => {
@@ -56,6 +95,12 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
   }, [pontosUrl]);
   const [linhas, setLinhas] = useState<Linha[]>(linhasIniciais);
   const [rascunho, setRascunho] = useState<Linha | null>(null);
+  // área: ligada por padrão em vídeo maior que 1080p; segue as linhas até o usuário desenhar uma
+  const [usarArea, setUsarArea] = useState(areaInicial !== null || W > LARGURA_PROCESSADA);
+  const [areaManual, setAreaManual] = useState<Area | null>(areaInicial);
+  const [modo, setModo] = useState<"linha" | "area">("linha");
+  const [rascunhoArea, setRascunhoArea] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const area = usarArea ? (areaManual ?? areaDasLinhas(linhas, W, H)) : null;
   const [cameraId, setCameraId] = useState(cameraInicial ?? "");
   const [nomeCamera, setNomeCamera] = useState(cameras.find((c) => c.id === cameraInicial)?.nome ?? "");
   const [salvarComoCamera, setSalvarComoCamera] = useState(false);
@@ -74,6 +119,10 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
   function aoPressionar(e: React.PointerEvent) {
     const p = ponto(e);
     (e.target as Element).setPointerCapture?.(e.pointerId);
+    if (modo === "area") {
+      setRascunhoArea({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+      return;
+    }
     const n = linhas.length + 1;
     let id = `l${n}`;
     while (linhas.some((l) => l.id === id)) id += "b";
@@ -81,12 +130,26 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
   }
 
   function aoMover(e: React.PointerEvent) {
+    if (rascunhoArea) {
+      const p = ponto(e);
+      setRascunhoArea({ ...rascunhoArea, x1: p.x, y1: p.y });
+      return;
+    }
     if (!rascunho) return;
     const p = ponto(e);
     setRascunho({ ...rascunho, x2: p.x, y2: p.y });
   }
 
   function aoSoltar() {
+    if (rascunhoArea) {
+      const a = retangulo(rascunhoArea);
+      if (a.w * W > 40 && a.h * H > 40) {
+        setAreaManual(a);
+        setModo("linha");
+      }
+      setRascunhoArea(null);
+      return;
+    }
     if (rascunho && Math.hypot((rascunho.x2 - rascunho.x1) * W, (rascunho.y2 - rascunho.y1) * H) > 20) {
       setLinhas([...linhas, rascunho]);
     }
@@ -99,6 +162,10 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
     if (cam) {
       setLinhas(cam.linhas);
       setNomeCamera(cam.nome);
+      if (cam.area) {
+        setUsarArea(true);
+        setAreaManual(cam.area);
+      }
     }
   }
 
@@ -106,12 +173,15 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
     setErro(null);
     iniciar(async () => {
       const camera = salvarComoCamera && nomeCamera.trim() ? { id: cameraId, nome: nomeCamera } : null;
-      const r = await confirmarLinhas(jobId, linhas, camera);
+      const r = await confirmarLinhas(jobId, linhas, camera, area);
       if (r.erro) setErro(r.erro);
     });
   }
 
   const todas = rascunho ? [...linhas, rascunho] : linhas;
+  const areaVista = rascunhoArea ? retangulo(rascunhoArea) : area;
+  const linhasFora = area ? linhas.filter((l) => fora(l, area)) : [];
+  const pxArea = area ? { w: Math.round(area.w * W), h: Math.round(area.h * H) } : null;
 
   return (
     <div className="grid grid-cols-1 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -123,12 +193,45 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
             ref={svgRef}
             viewBox={`0 0 ${W} ${H}`}
             preserveAspectRatio="none"
-            className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
+            className={`absolute inset-0 h-full w-full touch-none ${modo === "area" ? "cursor-cell" : "cursor-crosshair"}`}
             onPointerDown={aoPressionar}
             onPointerMove={aoMover}
             onPointerUp={aoSoltar}
             data-testid="area-desenho"
           >
+            {areaVista && (
+              <g pointerEvents="none" data-testid="area-analise">
+                {/* o que fica fora da área não é analisado: escurecido */}
+                <path
+                  d={`M0 0H${W}V${H}H0Z M${areaVista.x * W} ${areaVista.y * H}v${areaVista.h * H}h${areaVista.w * W}v${-areaVista.h * H}Z`}
+                  fill="black"
+                  fillOpacity={0.55}
+                  fillRule="evenodd"
+                />
+                <rect
+                  x={areaVista.x * W}
+                  y={areaVista.y * H}
+                  width={areaVista.w * W}
+                  height={areaVista.h * H}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth={Math.max(W, H) * 0.0025}
+                  strokeDasharray={`${Math.max(W, H) * 0.012} ${Math.max(W, H) * 0.008}`}
+                />
+                <text
+                  x={areaVista.x * W + Math.max(W, H) * 0.006}
+                  y={areaVista.y * H + Math.max(W, H) * 0.02}
+                  fill="var(--accent)"
+                  fontSize={Math.max(W, H) * 0.014}
+                  fontWeight="bold"
+                  stroke="black"
+                  strokeWidth={Math.max(W, H) * 0.002}
+                  paintOrder="stroke"
+                >
+                  Área de análise
+                </text>
+              </g>
+            )}
             {pontos &&
               (Object.keys(COR_PONTOS) as (keyof Pontos)[])
                 .filter((k) => visiveis.has(k))
@@ -158,10 +261,17 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
               );
             })}
           </svg>
-          {!linhas.length && !rascunho && (
+          {modo === "area" ? (
             <span className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded bg-black/70 px-3 py-1 text-sm text-white">
-              Clique e arraste sobre o quadro para desenhar uma linha
+              Arraste sobre o quadro para marcar a área de análise
             </span>
+          ) : (
+            !linhas.length &&
+            !rascunho && (
+              <span className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded bg-black/70 px-3 py-1 text-sm text-white">
+                Clique e arraste sobre o quadro para desenhar uma linha
+              </span>
+            )
           )}
         </div>
       </section>
@@ -232,6 +342,60 @@ export function EditorLinhas({ jobId, frameUrl, largura: W, altura: H, linhasIni
             ))}
           </ul>
         )}
+
+        <section className="flex flex-col gap-2 text-sm" data-testid="painel-area">
+          <h2 className={TITULO_PAINEL}>Área de análise</h2>
+          <label className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              checked={usarArea}
+              onChange={(e) => {
+                setUsarArea(e.target.checked);
+                if (!e.target.checked) setModo("linha");
+              }}
+              className="mt-0.5 accent-[var(--accent)]"
+            />
+            <span>Analisar só uma parte do quadro</span>
+          </label>
+          <p className="text-xs text-muted">
+            Para câmeras altas ou objetos distantes: o app procura objetos só dentro da área, com toda a nitidez do vídeo original —
+            ciclistas pequenos que passariam despercebidos passam a ser detectados. O vídeo final continua mostrando o quadro inteiro.
+          </p>
+          {usarArea && (
+            <>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setModo(modo === "area" ? "linha" : "area")}
+                  aria-pressed={modo === "area"}
+                  className={modo === "area" ? BOTAO.primario : BOTAO.secundario}
+                >
+                  {modo === "area" ? "Desenhando a área…" : "Desenhar a área"}
+                </button>
+                <button type="button" onClick={() => setAreaManual(null)} disabled={!areaManual} className={BOTAO.fantasma} title="Volta à área automática, em volta das linhas">
+                  Ajustar às linhas
+                </button>
+              </div>
+              {pxArea ? (
+                <p className="font-mono text-xs text-faint">
+                  {pxArea.w}×{pxArea.h} px do vídeo
+                  {pxArea.w > LARGURA_PROCESSADA ? ` · reduzida para ${LARGURA_PROCESSADA} px de largura` : " · resolução cheia"}
+                  {!areaManual && " · automática"}
+                </p>
+              ) : (
+                <p className="text-xs text-muted">Desenhe as linhas — a área se ajusta em volta delas — ou marque-a você mesmo.</p>
+              )}
+              {pxArea && pxArea.w > LARGURA_PROCESSADA && (
+                <p className="text-xs text-warn">A área está mais larga que {LARGURA_PROCESSADA} px: o vídeo é reduzido e objetos pequenos perdem nitidez. Uma área menor ajuda.</p>
+              )}
+              {linhasFora.map((l) => (
+                <p key={l.id} className="text-xs text-warn" data-testid="linha-fora-da-area">
+                  A linha “{l.nome}” sai da área de análise: fora dela nada é detectado.
+                </p>
+              ))}
+            </>
+          )}
+        </section>
 
         {pontos && (
           <section className="flex flex-col gap-1.5 text-sm">

@@ -15,11 +15,11 @@ import {
   substituirCandidatos,
   type Candidato,
   type Categoria,
-  type Linha,
-} from "./db";
+  type Linha, type Area } from "./db";
 import { baixarDoDrive } from "./drive";
 import { ambienteDoWorker, pythonDoMotor } from "./motor";
 import { ErroOpenRouter, modelosDaSugestao, sugerirCategoria } from "./openrouter";
+import { contaNaLinha, SEM_CONSULTA } from "./revisao";
 import { RAIZ_REPO, dirJob, dirRender } from "./paths";
 
 /**
@@ -212,7 +212,7 @@ export function iniciarDownload(jobId: string): void {
 }
 
 /** Vídeo do job: o arquivo local original (caminho absoluto) ou o baixado na pasta do job. */
-function caminhoVideo(jobId: string): string {
+export function caminhoVideo(jobId: string): string {
   const arquivo = obterJob(jobId)?.arquivo_video ?? "video.mp4";
   return path.isAbsolute(arquivo) ? arquivo : path.join(/* turbopackIgnore: true */ dirJob(jobId), arquivo);
 }
@@ -264,20 +264,42 @@ export function temTrilhas(jobId: string): boolean {
   return fs.existsSync(path.join(dirJob(jobId), "trilhas.json.gz"));
 }
 
+/** Quando o worker gravou a prévia da detecção (o quadro atual), ou null se não há. */
+export function previaDeteccao(jobId: string): number | null {
+  try {
+    return fs.statSync(path.join(dirJob(jobId), "previa.jpg")).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/** A área de análise (como passada ao worker) com que as trilhas salvas foram detectadas. */
+export function areaDasTrilhas(jobId: string): string | null {
+  try {
+    const meta = JSON.parse(fs.readFileSync(path.join(dirJob(jobId), "trilhas_meta.json"), "utf8"));
+    return meta.area_arg ?? null;
+  } catch {
+    return null; // trilhas de antes da área de análise: quadro inteiro
+  }
+}
+
 /**
  * Etapa 2: detecção + candidatos (fila da GPU) → sugerindo. Se as trilhas da
  * detecção já existem (linhas editadas depois), refaz só os candidatos —
  * minutos em vez de repetir a detecção inteira.
  */
-export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
+export function iniciarDeteccao(jobId: string, linhas: Linha[], area: Area | null): void {
   const dir = dirJob(jobId);
-  const soCandidatos = temTrilhas(jobId);
+  const argArea = area ? [area.x, area.y, area.w, area.h].map((v) => v.toFixed(4)).join(",") : null;
+  // trilhas de outra área de análise não servem: a detecção é outra
+  const soCandidatos = temTrilhas(jobId) && areaDasTrilhas(jobId) === argArea;
   const arqLinhas = path.join(dir, "linhas.json");
   fs.writeFileSync(arqLinhas, JSON.stringify(linhas));
   fs.rmSync(path.join(dir, "candidatos"), { recursive: true, force: true });
   atualizarJob(jobId, {
     status: "detectando",
     linhas: JSON.stringify(linhas),
+    area: area ? JSON.stringify(area) : null,
     progresso: 0,
     erro: null,
     mensagem: soCandidatos ? "Na fila: refazendo candidatos com as novas linhas…" : "Na fila da GPU…",
@@ -289,6 +311,7 @@ export function iniciarDeteccao(jobId: string, linhas: Linha[]): void {
     const saida = path.join(dir, "candidatos");
     const args = ["--video", caminhoVideo(jobId), "--saida", saida, "--linhas", arqLinhas,
       "--trilhas", path.join(dir, "trilhas.json.gz"), "--etapa", soCandidatos ? "candidatos" : "tudo"];
+    if (argArea) args.push("--area", argArea);
     if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos
     await rodarWorker("detectar.py", args, (ev) => {
       if (ev.tipo !== "progresso") return;
@@ -394,7 +417,23 @@ export function iniciarSugestoes(jobId: string): void {
   sugerindo.add(jobId);
   void (async () => {
     const dir = dirJob(jobId);
-    const pendentes = listarCandidatos(jobId).filter((c) => c.status_llm !== "ok");
+    // Carro do YOLO numa linha que não conta automóveis (ciclovia, calçada): a
+    // proposta já é descartar e o modelo de visão sempre concordou (Augusto de
+    // Lima: 236 de 236) — não paga a consulta. Mancha de movimento continua
+    // indo ao modelo: pode ser o ciclista colado no carro.
+    const linhasJob = new Map((JSON.parse(obterJob(jobId)?.linhas || "[]") as Linha[]).map((l) => [l.id, l]));
+    const pendentes = listarCandidatos(jobId).filter((c) => {
+      if (c.status_llm === "ok") return false;
+      if (c.origem === "track" && c.classe_yolo === "automoveis" && c.linha_id
+          && !contaNaLinha(linhasJob.get(c.linha_id), "automoveis")) {
+        registrarSugestao(c.id, {
+          sugestao_llm: "automoveis", conf_llm: c.conf_yolo, modelo_llm: SEM_CONSULTA, custo_llm: 0, status_llm: "ok",
+          justificativa_llm: "Veículo reconhecido pelo detector numa linha que não conta automóveis — não foi enviado ao modelo de visão.",
+        });
+        return false;
+      }
+      return true;
+    });
     for (const c of pendentes) {
       if (c.status_llm === "falhou") {
         registrarSugestao(c.id, {

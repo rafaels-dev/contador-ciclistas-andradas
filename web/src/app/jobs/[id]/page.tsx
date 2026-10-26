@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { listarCameras, listarCandidatos, obterGrupo, obterJob, resumoSugestoes, type Job, type Linha } from "@/lib/db";
-import { SUFIXO_CHAVE, sugestoesAtivas, temTrilhas } from "@/lib/runner";
+import { listarCameras, listarCandidatos, obterGrupo, obterJob, resumoSugestoes, type Area, type Job, type Linha } from "@/lib/db";
+import { previaDeteccao, SUFIXO_CHAVE, sugestoesAtivas, temTrilhas } from "@/lib/runner";
 import { ETAPAS, etapaAtual, rotuloStatus } from "@/lib/status";
 import { BOTAO, timecode } from "@/lib/ui";
 import { cancelar, retomarSugestoes, revisarSemSugestoes, tentarNovamente } from "./actions";
@@ -146,10 +146,7 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
       )}
 
       {(job.status === "baixando" || job.status === "detectando") && job.largura && (
-        <div className="flex flex-1 items-center justify-center bg-viewer p-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={`${base}/frame0.jpg`} alt="Primeiro quadro do vídeo" className="max-h-full max-w-full opacity-60" />
-        </div>
+        <PreviaDeteccao base={base} versao={job.status === "detectando" ? previaDeteccao(job.id) : null} />
       )}
 
       {job.status === "aguardando_linhas" && job.largura && job.altura && (
@@ -159,7 +156,8 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
           largura={job.largura}
           altura={job.altura}
           linhasIniciais={linhas}
-          cameras={listarCameras().map((c) => ({ id: c.id, nome: c.nome, linhas: JSON.parse(c.linhas) as Linha[] }))}
+          areaInicial={job.area ? (JSON.parse(job.area) as Area) : null}
+          cameras={listarCameras().map((c) => ({ id: c.id, nome: c.nome, linhas: JSON.parse(c.linhas) as Linha[], area: c.area ? (JSON.parse(c.area) as Area) : null }))}
           cameraInicial={job.camera_id}
           pontosUrl={temTrilhas(job.id) ? `${base}/pontos.json` : null}
         />
@@ -175,10 +173,37 @@ async function DetalheJob({ params }: { params: Promise<{ id: string }> }) {
             candidatos={listarCandidatos(job.id)}
             linhas={linhas}
             duracao={job.duracao_s ?? 0}
+            fps={job.fps ?? 15}
+            largura={job.largura ?? 1920}
+            altura={job.altura ?? 1080}
+            videoUrl={`/api/jobs/${job.id}/video`}
+            area={job.area ? (JSON.parse(job.area) as Area) : null}
             editavel={job.status === "aguardando_revisao"}
             painelLinhas={(job.status === "sugerindo" || job.status === "aguardando_revisao") && <CategoriasDasLinhas jobId={job.id} linhas={linhas} />}
           />
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Durante a detecção, o quadro que o worker está analisando (com as caixas e
+ * as linhas), trocado a cada atualização da página — um arquivo só, que o
+ * worker sobrescreve. Antes do primeiro, o 1º quadro do vídeo, apagado.
+ */
+function PreviaDeteccao({ base, versao }: { base: string; versao: number | null }) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 bg-viewer p-6">
+      {versao ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={`${base}/previa.jpg?v=${Math.round(versao)}`} alt="Quadro sendo analisado agora" className="min-h-0 max-w-full flex-1 object-contain" />
+          <p className="text-xs text-muted">Quadro sendo analisado agora — as caixas são o que o detector está vendo.</p>
+        </>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`${base}/frame0.jpg`} alt="Primeiro quadro do vídeo" className="max-h-full max-w-full opacity-60" />
       )}
     </div>
   );

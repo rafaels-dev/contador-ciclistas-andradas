@@ -38,6 +38,7 @@ import argparse
 import bisect
 import gzip
 import json
+import os
 import sys
 
 # os eventos JSON levam "→" e "…": no Windows o stdout nasce em cp1252
@@ -60,7 +61,7 @@ import supervision as sv  # noqa: E402
 from ultralytics import YOLO  # noqa: E402
 
 import config  # noqa: E402
-from leitor import LeitorVideo, gravar_jpg, info_video  # noqa: E402
+from leitor import LeitorVideo, area_em_px, gravar_jpg, info_video  # noqa: E402
 
 _PERSON, _BICYCLE, _MOTORCYCLE = 0, 1, 3
 
@@ -69,6 +70,7 @@ CATEGORIA_GRUPO = {"pes": "pedestres", "bic": "ciclistas", "aut": "automoveis", 
                    "mov": "outros"}
 
 TRILHAS_VERSAO = 2       # 2: inclui o grupo "mov"; trilhas mais antigas forçam nova detecção
+                         # (meta["area"]: recorte analisado; trilhas de outra área também)
 MIN_OBS = 3              # observações mínimas (após emendas) para virar candidato
 MAX_RECORTES = 10        # recortes guardados por track (filmstrip)
 DESLOC_MIN_FRAC = 0.12   # sem linhas: deslocamento mínimo (fração da diagonal)
@@ -83,6 +85,14 @@ MOV_EXPLICADO = 0.3      # fração da mancha dentro de caixas do YOLO → já �
 MOV_AQUECER_S = 3.0      # o modelo de fundo precisa de alguns segundos para estabilizar
 MOV_MIN_S = 0.6          # track de movimento: duração mínima
 MOV_DESLOC_ALTURAS = 1.5 # ... e deslocamento mínimo, em alturas da própria caixa
+# Na área de análise a máscara é fina (até 1 px do 4K) e o ruído passa: manchas
+# de 10–20 px (compressão, sol entre as folhas) que o tracker encadeia numa
+# "trilha" que anda pouco. Medidas em px de um quadro 1080p (÷ escala). Augusto
+# de Lima (06h, área 768×468): os 30 descartados tinham p90 da área < 1100 ou
+# andavam < 110; ciclistas, pedestres e patinetes, p90 ≥ 1900 e ≥ 160.
+MOV_FINO_VERSAO = 3       # sobe quando a detecção na área muda (trilhas antigas são refeitas)
+MOV_FINO_AREA_P90 = 1000  # px²: o objeto precisa ter esse tamanho em algum momento
+MOV_FINO_DESLOC = 120     # px: deslocamento mínimo do início ao fim
 LARGO_FAIXA = 3.0        # linha que não conta automóveis (ciclovia, calçada): objeto com
                          # comprimento, no sentido da travessia, > 3× a linha não cabe na faixa
                          # (carro/ônibus na pista ao lado cuja base invade a ciclovia)
@@ -226,17 +236,23 @@ def _associar(tracks: dict, pessoas, bicicletas, motos, escala: float) -> None:
 
 class Movimento:
     """Manchas em movimento não explicadas pelo YOLO, como sv.Detections no
-    espaço do quadro processado. Sombras (MOG2 marca 127) ficam de fora."""
+    espaço do quadro processado. Sombras (MOG2 marca 127) ficam de fora —
+    menos na área de análise (`fino`): lá o objeto é pequeno e borrado (o
+    ciclista distante da Augusto de Lima), e o MOG2 marca a maior parte dele
+    como sombra; o que sobra se parte em pedaços. Contando a sombra e fechando
+    com um núcleo maior, ele volta a ser uma mancha só."""
 
-    def __init__(self, largura: int, altura: int, fps: float):
-        self.s = MOV_LARGURA / largura
-        self.tam = (MOV_LARGURA, max(1, int(round(altura * self.s))))
+    def __init__(self, largura: int, altura: int, fps: float, s: float | None = None, fino: bool = False):
+        self.s = s or MOV_LARGURA / largura
+        self.fino = fino
+        self.limiar = 100 if fino else 200
+        self.tam = (max(1, int(round(largura * self.s))), max(1, int(round(altura * self.s))))
         self.fundo = cv2.createBackgroundSubtractorMOG2(history=int(20 * fps), varThreshold=25,
                                                         detectShadows=True)
         self.aquecer = int(MOV_AQUECER_S * fps)
         self.n = 0
         self.k_abre = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        self.k_fecha = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+        self.k_fecha = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11) if fino else (7, 7))
 
     def detectar(self, frame, conhecidos: list[sv.Detections]) -> sv.Detections:
         pequeno = cv2.resize(frame, self.tam, interpolation=cv2.INTER_AREA)
@@ -244,9 +260,22 @@ class Movimento:
         self.n += 1
         if self.n <= self.aquecer:
             return sv.Detections.empty()
-        _, m = cv2.threshold(mascara, 200, 255, cv2.THRESH_BINARY)
+        _, m = cv2.threshold(mascara, self.limiar, 255, cv2.THRESH_BINARY)
         m = cv2.morphologyEx(m, cv2.MORPH_OPEN, self.k_abre)
         m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, self.k_fecha)
+        # Na área de análise (câmera alta), a caixa do carro da faixa colada ao
+        # meio-fio desce sobre a ciclovia: alargada, ela "explicava" o ciclista
+        # ao lado, e a mancha dos dois saía emendada. Lá, carro conta só pela
+        # caixa justa, e o que está dentro dela sai da máscara (Augusto de Lima
+        # 81 e 117 min: o ciclista colado no carro volta a ser candidato).
+        justo = self.fino
+        if justo:
+            for d in conhecidos:
+                if not len(d):
+                    continue
+                for (x1, y1, x2, y2), c in zip(d.xyxy * self.s, d.class_id):
+                    if c in config.CLASSES_AUTOMOVEIS:
+                        m[max(0, int(y1)):int(y2), max(0, int(x1)):int(x2)] = 0
         n, rot, est, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
         if n <= 1:
             return sv.Detections.empty()
@@ -254,8 +283,12 @@ class Movimento:
         # sombra colada): mancha majoritariamente dentro delas já tem modelo
         cobre = np.zeros(m.shape, np.uint8)
         for d in conhecidos:
-            for x1, y1, x2, y2 in d.xyxy * self.s:
+            if not len(d):
+                continue
+            for (x1, y1, x2, y2), c in zip(d.xyxy * self.s, d.class_id):
                 w, h = x2 - x1, y2 - y1
+                if justo and c in config.CLASSES_AUTOMOVEIS:
+                    continue
                 cv2.rectangle(cobre, (int(x1 - 0.3 * w), int(y1 - 0.1 * h)),
                               (int(x2 + 0.3 * w), int(y2 + 0.5 * h)), 1, -1)
         dentro = np.bincount(rot[cobre > 0], minlength=n)
@@ -273,10 +306,39 @@ class Movimento:
                              class_id=np.full(len(xyxy), -1, int))
 
 
+# cores das caixas na prévia (BGR; as mesmas de COR em renderizar.py)
+COR_PREVIA = {"pes": (240, 130, 61), "bic": (98, 191, 47), "aut": (32, 123, 244),
+              "mot": (234, 75, 210), "mov": (147, 154, 160)}
+
+
+def gravar_previa(destino: Path, frame, rastreados: dict, mov, linhas: list[dict]) -> None:
+    """O quadro que está sendo analisado, com as caixas e as linhas: a página
+    mostra durante a detecção, para o usuário ver que ela anda."""
+    img = frame.copy()
+    h, w = img.shape[:2]
+    esp = max(2, round(w / 640))
+    for l in linhas:
+        cv2.line(img, (round(l["x1"] * w), round(l["y1"] * h)), (round(l["x2"] * w), round(l["y2"] * h)),
+                 (21, 204, 250), esp + 1, cv2.LINE_AA)
+    for g, d in [*rastreados.items(), ("mov", mov)]:
+        for x1, y1, x2, y2 in d.xyxy:
+            cv2.rectangle(img, (int(x1), int(y1)), (int(x2), int(y2)), COR_PREVIA[g], esp)
+    if w > 1280:
+        img = cv2.resize(img, (1280, round(h * 1280 / w)), interpolation=cv2.INTER_AREA)
+    tmp = destino.with_suffix(".tmp")
+    gravar_jpg(tmp, img, 75)
+    try:
+        os.replace(tmp, destino)
+    except OSError:
+        pass  # Windows: o servidor está lendo a anterior — fica para a próxima
+
+
 def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
-                   imgsz_forcado: int | None = None, lote: int = 8):
+                   imgsz_forcado: int | None = None, lote: int = 8, area=None,
+                   previa: Path | None = None, linhas_previa: list[dict] = ()):
     """Retorna (tracks, escala, leitor_info). Coordenadas no espaço do quadro
-    processado (≤ 1920 px de largura; ver leitor.py)."""
+    processado (≤ 1920 px de largura, ou o recorte da área; ver leitor.py).
+    Com `previa`, grava ali um JPEG do quadro atual a cada segundo."""
     modelo = YOLO(str(RAIZ / config.MODELO) if (RAIZ / config.MODELO).exists() else config.MODELO)
     mb = getattr(config, "MODELO_BICICLETAS", None)
     modelo_bic = YOLO(str(RAIZ / mb)) if mb else None
@@ -289,17 +351,26 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
             return d
         return d[np.isin(d.class_id, ids)]
 
-    leitor = LeitorVideo(video)
-    escala = leitor.altura / 1080
-    movimento = Movimento(leitor.largura, leitor.altura, leitor.info["fps"])
+    leitor = LeitorVideo(video, area=area)
+    escala = escala_do(leitor)
+    # máscara de movimento: no recorte, mais fina (até 960 px) — é o mesmo
+    # objeto pequeno que motivou o recorte
+    movimento = Movimento(leitor.largura, leitor.altura, leitor.info["fps"],
+                          s=min(1.0, 960 / leitor.largura) if area else None, fino=bool(area))
     imgsz = imgsz_forcado
-    if imgsz is None:
+    if imgsz is None and area:
+        # o recorte já está na resolução que importa: inferência no tamanho
+        # dele (até 1280; recortes menores o YOLO amplia, o que ajuda)
+        imgsz = min(1280, max(640, int(round(max(leitor.largura, leitor.altura) / 32)) * 32))
+    elif imgsz is None:
         # resolução de inferência acompanha o vídeo ORIGINAL: em 4K, 640 px
         # encolhe o quadro 6× e objetos pequenos (ciclistas numa vista
         # alta) somem; 1080p → 640, 4K → 1280
         base = getattr(config, "IMGSZ", 640)
         imgsz = int(round(base * max(1.0, leitor.info["altura"] / 1080) / 32) * 32)
     emitir(tipo="progresso", etapa="detectando", p=0, imgsz=imgsz, nvdec=leitor.gpu)
+    if previa is not None:
+        previa.unlink(missing_ok=True)  # a de uma detecção anterior (outra área)
 
     tracks: dict[str, Track] = {}
     total_f = leitor.info["frames"]
@@ -336,11 +407,24 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
         for frame, i, r, rb in zip(quadros, indices, rs, rbs):
             tudo = sv.Detections.from_ultralytics(r)
             bikes = sv.Detections.from_ultralytics(rb) if rb is not None else por_classe(tudo, [_BICYCLE])
+            if rb is not None and area:
+                # o modelo ajustado é da câmera de Andradas (vista lateral);
+                # na Augusto de Lima (alta, 4K) ele não pega nada e o COCO pega
+                coco = por_classe(tudo, [_BICYCLE])
+                if len(coco):
+                    bikes = sv.Detections.merge([bikes, coco]).with_nms(threshold=0.5, class_agnostic=True) if len(bikes) else coco
+            motos = por_classe(tudo, config.CLASSES_MOTOCICLETAS)
+            if area and len(motos):
+                # o COCO alterna bicicleta/moto no mesmo ciclista pequeno; com um
+                # rastreador por classe, nenhum formava trilha. Na área, duas
+                # rodas são um grupo só — a classe quem decide é o modelo de visão
+                bikes = sv.Detections.merge([bikes, motos]).with_nms(threshold=0.5, class_agnostic=True) if len(bikes) else motos
+                motos = sv.Detections.empty()
             rastreados = {
                 "pes": trackers["pes"].update_with_detections(por_classe(tudo, [_PERSON])),
                 "bic": trackers["bic"].update_with_detections(bikes),
                 "aut": trackers["aut"].update_with_detections(por_classe(tudo, config.CLASSES_AUTOMOVEIS)),
-                "mot": trackers["mot"].update_with_detections(por_classe(tudo, config.CLASSES_MOTOCICLETAS)),
+                "mot": trackers["mot"].update_with_detections(motos),
             }
             for g, d in rastreados.items():
                 # recortes do filmstrip saem da 2ª leitura (passo_midias), só
@@ -356,17 +440,46 @@ def passo_deteccao(video: str, inicio_f: int, fim_f: int | None,
         agora = time.time()
         if agora - ultimo_emit >= 1.0:
             ultimo_emit = agora
+            if previa is not None:
+                gravar_previa(previa, frame, rastreados, mov, linhas_previa)
             feitos = idx + 1 - inicio_f
             emitir(tipo="progresso", etapa="detectando",
                    p=min(feitos / alvo, 1.0) if alvo > 0 else 0,
                    fps=round(feitos / (agora - t0), 1), frame=idx)
     leitor.fechar()
+    if previa is not None:  # um arquivo só, sobrescrito; some quando a detecção acaba
+        previa.unlink(missing_ok=True)
+        previa.with_suffix(".tmp").unlink(missing_ok=True)
     return tracks, escala, leitor
 
 
 # ----------------------------------------------------------------------
 # Emenda de trajetórias
 # ----------------------------------------------------------------------
+
+def escala_do(leitor) -> float:
+    """Densidade de pixels em relação a um quadro inteiro de 1080p: os limites
+    em px do worker (associação, emendas, clipes) foram ajustados nele. No
+    recorte 4K em resolução cheia, um objeto tem 2× os pixels → escala 2."""
+    return leitor.info["altura"] / (leitor.fator * 1080)
+
+
+def linhas_no_quadro(linhas: list[dict], meta: dict) -> list[dict]:
+    """Linhas (0–1 do quadro original) → 0–1 do quadro processado (a área)."""
+    area = meta.get("area")
+    if not area:
+        return linhas
+    W, H = meta["original"]
+    ox, oy, w, h = area
+    return [{**l, "x1": (l["x1"] * W - ox) / w, "y1": (l["y1"] * H - oy) / h,
+             "x2": (l["x2"] * W - ox) / w, "y2": (l["y2"] * H - oy) / h} for l in linhas]
+
+
+def caixa_no_original(c, meta: dict) -> list[float]:
+    ox, oy = (meta.get("area") or (0, 0))[:2]
+    f = meta["fator"]
+    return [round(ox + c[0] * f, 1), round(oy + c[1] * f, 1), round(ox + c[2] * f, 1), round(oy + c[3] * f, 1)]
+
 
 def _velocidade(tr: Track, ultimos: int = 6) -> tuple[float, float]:
     """px/frame do ponto de contato nas últimas observações."""
@@ -482,9 +595,12 @@ def carregar_trilhas(caminho: Path) -> tuple[dict, dict]:
     return tracks, dados["meta"]
 
 
-def salvar_pontos(caminho: Path, tracks: dict, largura: int, altura: int, max_por_grupo: int = 4000) -> None:
-    """Pontos de chão amostrados por categoria (coordenadas 0–1) — o editor de
-    linhas mostra onde cada tipo de objeto realmente passa."""
+def salvar_pontos(caminho: Path, tracks: dict, meta: dict, max_por_grupo: int = 4000) -> None:
+    """Pontos de chão amostrados por categoria (coordenadas 0–1 do quadro
+    original) — o editor de linhas mostra onde cada tipo de objeto realmente passa."""
+    W, H = meta["original"]
+    ox, oy = (meta.get("area") or (0, 0))[:2]
+    f = meta["fator"]
     por_grupo: dict[str, list] = {}
     for t in tracks.values():
         if t.n < MIN_OBS:
@@ -493,7 +609,7 @@ def salvar_pontos(caminho: Path, tracks: dict, largura: int, altura: int, max_po
         passo = max(1, t.n // 12)
         for c in t.caixas[::passo]:
             x, y = ponto_chao(c)
-            por_grupo.setdefault(CATEGORIA_GRUPO[g], []).append([round(x / largura, 4), round(y / altura, 4)])
+            por_grupo.setdefault(CATEGORIA_GRUPO[g], []).append([round((ox + x * f) / W, 4), round((oy + y * f) / H, 4)])
     rng = np.random.default_rng(0)
     for g, pts in por_grupo.items():
         if len(pts) > max_por_grupo:
@@ -505,14 +621,22 @@ def salvar_pontos(caminho: Path, tracks: dict, largura: int, altura: int, max_po
 # Candidatos
 # ----------------------------------------------------------------------
 
-def _movimento_real(tr: Track, fps: float) -> bool:
+def _movimento_real(tr: Track, fps: float, escala: float = 1.0, fino: bool = False) -> bool:
     """Track só de subtração de fundo: precisa durar e se deslocar de verdade
-    (folhas, chuva e faróis piscando ficam no lugar)."""
+    (folhas, chuva e faróis piscando ficam no lugar). Na área de análise
+    (`fino`), também ter tamanho de objeto e andar uma distância mínima."""
     if tr.frames[-1] - tr.frames[0] < MOV_MIN_S * fps:
         return False
     alturas = sorted(c[3] - c[1] for c in tr.caixas)
     p0, p1 = ponto_chao(tr.caixas[0]), ponto_chao(tr.caixas[-1])
-    return np.hypot(p1[0] - p0[0], p1[1] - p0[1]) >= MOV_DESLOC_ALTURAS * alturas[len(alturas) // 2]
+    desloc = np.hypot(p1[0] - p0[0], p1[1] - p0[1])
+    if desloc < MOV_DESLOC_ALTURAS * alturas[len(alturas) // 2]:
+        return False
+    if fino:
+        areas = [(c[2] - c[0]) * (c[3] - c[1]) for c in tr.caixas]
+        if np.percentile(areas, 90) < MOV_FINO_AREA_P90 * escala ** 2 or desloc < MOV_FINO_DESLOC * escala:
+            return False
+    return True
 
 
 def _largo_demais(tr: Track, j: int, a, b) -> bool:
@@ -526,7 +650,7 @@ def _largo_demais(tr: Track, j: int, a, b) -> bool:
 
 
 def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int,
-                     fps: float, escala: float) -> list[dict]:
+                     fps: float, escala: float, fino: bool = False) -> list[dict]:
     segs = [(l["id"], (l["x1"] * largura, l["y1"] * altura), (l["x2"] * largura, l["y2"] * altura))
             for l in linhas]
     so_faixa = {l["id"] for l in linhas
@@ -537,7 +661,7 @@ def gerar_candidatos(tracks: dict, linhas: list[dict], largura: int, altura: int
     for tr in tracks.values():
         if tr.n < MIN_OBS:
             continue
-        if tr.grupo == "mov" and not _movimento_real(tr, fps):
+        if tr.grupo == "mov" and not _movimento_real(tr, fps, escala, fino):
             continue
         base = {"track": tr.chave, "grupo": tr.grupo, "_tr": tr}
         if segs:
@@ -690,7 +814,8 @@ def _caixa_em(tr: Track, idx: int):
 
 
 def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: Path,
-                 fps: float, largura: int, altura: int, escala: float, n_recortes: int = 5) -> None:
+                 fps: float, largura: int, altura: int, escala: float, n_recortes: int = 5,
+                 area=None) -> None:
     import imageio_ffmpeg
 
     dir_clipes = saida / "clipes"
@@ -708,7 +833,7 @@ def passo_midias(video: str, candidatos: list[dict], linhas: list[dict], saida: 
     ativos: list[dict] = []
     proximo = 0
     ultimo_f = max(max(c["frame"] for c in pend) + meia, max(recortes_em))
-    leitor = LeitorVideo(video)
+    leitor = LeitorVideo(video, area=area)
     idx = -1
     ultimo_emit = 0.0
     while idx < ultimo_f:
@@ -779,44 +904,62 @@ def main() -> None:
     ap.add_argument("--inicio", type=float, default=0.0, help="segundo inicial (testes)")
     ap.add_argument("--fim", type=float, default=None, help="segundo final (testes)")
     ap.add_argument("--imgsz", type=int, default=None, help="resolução de inferência (padrão: pela altura do vídeo)")
+    ap.add_argument("--area", help="área de análise x,y,w,h (0–1 do quadro); o resto do quadro é ignorado")
     args = ap.parse_args()
 
     saida = Path(args.saida)
     arq_trilhas = Path(args.trilhas) if args.trilhas else saida.parent / "trilhas.json.gz"
     linhas = json.loads(Path(args.linhas).read_text(encoding="utf-8")) if args.linhas else []
-    fps = info_video(args.video)["fps"]
+    info = info_video(args.video)
+    fps = info["fps"]
+    area = area_em_px(tuple(float(v) for v in args.area.split(",")) if args.area else None,
+                      info["largura"], info["altura"])
 
     tracks = None
     if args.etapa == "candidatos":
         tracks, meta = carregar_trilhas(arq_trilhas)
         if meta.get("versao", 1) < TRILHAS_VERSAO:
             tracks = None  # detecção antiga (sem movimento): refaz tudo
+        elif tuple(meta.get("area") or ()) != tuple(area or ()):
+            tracks = None  # outra área de análise: a detecção é outra
+        elif area and meta.get("mov_fino", 1) < MOV_FINO_VERSAO:
+            tracks = None  # área detectada antes do carro justo: refaz
     if tracks is None:
         inicio_f = int(args.inicio * fps)
         fim_f = int(args.fim * fps) if args.fim is not None else None
-        tracks, escala, leitor = passo_deteccao(args.video, inicio_f, fim_f, args.imgsz)
+        linhas_previa = linhas_no_quadro(linhas, {"area": area, "original": [info["largura"], info["altura"]]})
+        tracks, escala, leitor = passo_deteccao(args.video, inicio_f, fim_f, args.imgsz, area=area,
+                                                previa=saida.parent / "previa.jpg",
+                                                linhas_previa=linhas_previa)
         tracks = emendar_tracks(tracks, fps, escala)
         meta = {"fps": fps, "largura": leitor.largura, "altura": leitor.altura,
-                "fator": leitor.fator, "escala": escala, "versao": TRILHAS_VERSAO}
+                "fator": leitor.fator, "escala": escala, "versao": TRILHAS_VERSAO,
+                "area": list(area) if area else None, "area_arg": args.area if area else None,
+                "mov_fino": MOV_FINO_VERSAO,
+                "original": [info["largura"], info["altura"]]}
         salvar_trilhas(arq_trilhas, tracks, meta)
-        salvar_pontos(arq_trilhas.parent / "pontos.json", tracks, leitor.largura, leitor.altura)
+        (arq_trilhas.parent / "trilhas_meta.json").write_text(json.dumps(meta), encoding="utf-8")
+        salvar_pontos(arq_trilhas.parent / "pontos.json", tracks, meta)
         if args.etapa == "trilhas":
             emitir(tipo="fim", trilhas=len(tracks))
             return
     largura, altura, escala = meta["largura"], meta["altura"], meta["escala"]  # espaço do quadro processado
+    meta.setdefault("original", [info["largura"], info["altura"]])
+    linhas_q = linhas_no_quadro(linhas, meta)
 
     for sub in ("filmstrips", "contextos", "clipes"):
         (saida / sub).mkdir(parents=True, exist_ok=True)
-    candidatos = gerar_candidatos(tracks, linhas, largura, altura, fps, escala)
+    candidatos = gerar_candidatos(tracks, linhas_q, largura, altura, fps, escala, fino=bool(meta.get("area")))
     emitir(tipo="progresso", etapa="clipes", p=0, candidatos=len(candidatos))
-    passo_midias(args.video, candidatos, linhas, saida, fps, largura, altura, escala)
+    passo_midias(args.video, candidatos, linhas_q, saida, fps, largura, altura, escala,
+                 area=tuple(meta["area"]) if meta.get("area") else None)
 
     campos = ("id", "track", "linha_id", "frame", "tempo_s", "direcao", "bbox",
               "classe_yolo", "conf_yolo", "alternativa", "origem", "n_obs")
     saida_json = []
     for c in candidatos:
         d = {k: c.get(k) for k in campos}
-        d["bbox"] = [round(v * meta["fator"], 1) for v in c["bbox"]]  # px do vídeo original
+        d["bbox"] = caixa_no_original(c["bbox"], meta)  # px do vídeo original
         d["filmstrip"] = f"filmstrips/{c['id']}.jpg"
         d["clipe"] = f"clipes/{c['id']}.mp4"
         d["contexto"] = f"contextos/{c['id']}.jpg"

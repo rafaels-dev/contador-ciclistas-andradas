@@ -7,6 +7,12 @@ import type { Candidato, Categoria, Linha } from "./db";
 
 export type Classe = Categoria | "descartado";
 
+/**
+ * modelo_llm de quem não passou pelo modelo de visão: carro do YOLO numa linha
+ * que não conta automóveis (a proposta já é descartar). Entra no aceite em lote.
+ */
+export const SEM_CONSULTA = "detector";
+
 export const CLASSES: readonly Classe[] = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros", "descartado"];
 
 /** As categorias contadas (CLASSES sem "descartado"), para o navegador — db.ts não pode ir ao bundle do cliente. */
