@@ -4,7 +4,10 @@
 # pelo app, com CUDA ou sem (web/src/lib/motor.ts).
 ultralytics==8.4.60
 supervision==0.28.0
-opencv-python-headless==4.13.0.92
+# o ultralytics exige o opencv-python: fixá-lo evita uma 2ª cópia (headless ou
+# outra versão) gravada por cima na mesma pasta cv2 — a instalação em paralelo
+# do uv deixava o cv2 quebrado ou não, conforme a ordem
+opencv-python==4.13.0.92
 numpy==2.2.6
 pillow==12.2.0
 imageio[ffmpeg]==2.37.3
