@@ -1,0 +1,103 @@
+# Instaladores do app desktop para Windows, macOS e Linux.
+#
+# Duas formas de rodar:
+# - Tag v* (ex.: git tag v0.0.1 && git push origin v0.0.1): gera os três
+#   instaladores e os publica num GitHub Release com o mesmo nome — é de lá
+#   que o electron-updater dos apps instalados baixa a atualização.
+# - À mão (Actions → App desktop → Run workflow): informe a versão (ex.:
+#   0.0.1) e, se quiser, só um sistema. Os instaladores ficam nos artefatos
+#   da execução, sem publicar release.
+name: App desktop
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versão do instalador (sem o v), ex.: 0.0.1"
+        required: true
+        default: "0.0.1"
+      sistema:
+        description: "Qual instalador gerar"
+        type: choice
+        default: todos
+        options: [todos, windows, macos, linux]
+
+permissions:
+  contents: write
+
+jobs:
+  escolher:
+    runs-on: ubuntu-latest
+    outputs:
+      sistemas: ${{ steps.lista.outputs.sistemas }}
+      versao: ${{ steps.lista.outputs.versao }}
+    steps:
+      - id: lista
+        shell: bash
+        run: |
+          case "${{ github.event.inputs.sistema || 'todos' }}" in
+            windows) s='["windows-latest"]' ;;
+            macos)   s='["macos-latest"]' ;;
+            linux)   s='["ubuntu-latest"]' ;;
+            *)       s='["windows-latest","macos-latest","ubuntu-latest"]' ;;
+          esac
+          echo "sistemas=$s" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "versao=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "versao=${{ github.event.inputs.versao }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  instaladores:
+    needs: escolher
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(needs.escolher.outputs.sistemas) }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            desktop/package-lock.json
+
+      - name: Dependências do app desktop
+        working-directory: desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Versão do instalador (${{ needs.escolher.outputs.versao }})
+        working-directory: desktop
+        shell: bash
+        run: npm version --no-git-tag-version --allow-same-version "${{ needs.escolher.outputs.versao }}"
+
+      - name: Servidor, motor e uv
+        working-directory: desktop
+        # o fine-tune de bicicletas (runs/ft_blur/weights/best.pt) está no git;
+        # o yolov8n.pt vem do site da Ultralytics
+        run: npm run preparar
+
+      - name: Instalador
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # sem certificado de assinatura por enquanto (o Windows/macOS avisam na 1ª abertura)
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        shell: bash
+        run: npx electron-builder --publish ${{ startsWith(github.ref, 'refs/tags/v') && 'always' || 'never' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: instalador-${{ needs.escolher.outputs.versao }}-${{ matrix.os }}
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.dmg
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+          if-no-files-found: error

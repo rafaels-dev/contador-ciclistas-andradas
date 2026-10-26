@@ -1,0 +1,3 @@
+# Só para desenvolvimento e CI (o app desktop não instala isto).
+-r requirements.txt
+pytest==8.4.2

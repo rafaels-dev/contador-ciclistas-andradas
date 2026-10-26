@@ -1,0 +1,132 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A computer-vision tool that watches street-camera footage and counts four independent categories of traffic — ciclistas (cyclists), pedestres (pedestrians), automóveis (cars/buses/trucks), motocicletas (motorcycles) — as they cross a vertical counting line. Built specifically for camera CAM 4 in Andradas (Intelbras, 1920x1080 @ 15fps, side-on view), but works with any fixed-camera footage.
+
+Two entry points share the same core (`contador/`):
+- `processar_video.py` — batch mode: reads a video file end-to-end, writes an annotated H.264 video + a JSON report.
+- `stream_tempo_real.py` — real-time mode: reads RTSP/webcam/file, emits newline-delimited JSON events to stdout (for piping into Kafka/MQTT/a database), optionally shows a live OpenCV window.
+
+## Commands
+
+```bash
+# setup
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# batch processing (writes Andradas_anotado.mp4 + resultado.json)
+python processar_video.py
+python processar_video.py --video outro.mp4 --saida saida.mp4 --json saida.json
+python processar_video.py --sem-video              # stats only, no video (much faster — use this while iterating)
+python processar_video.py --inicio 30 --fim 90      # process only seconds 30–90, for fast iteration on one clip
+
+# real-time streaming (prints JSON events to stdout)
+python stream_tempo_real.py rtsp://192.168.1.100/cam4 --cam-id CAM4
+python stream_tempo_real.py Andradas.mp4
+python stream_tempo_real.py 0 --sem-janela          # webcam, no display window
+python stream_tempo_real.py rtsp://... --pular 1    # skip every other frame to cut CPU load
+```
+
+Automated tests (CI: `.github/workflows/testes.yml`, on every PR and push to `main`/`app-revisao`; branch protection requires both jobs — "Web (lint, tipos e testes)" and "Worker (pytest)" — so renaming a job means updating the rule):
+
+```bash
+python -m pytest                  # tests/ — needs requirements-dev.txt (pytest + requirements.txt + torch)
+python -m pytest -m "not lento"   # skips test_worker_video.py (runs worker/detectar.py on a synthetic video, ~25 s)
+cd web && npm run lint && npm run typecheck && npm test   # Vitest: src/**/*.test.ts
+```
+
+`tests/` covers the worker's geometry/area conversions, `gerar_candidatos` (crossings, person↔bike pairing, bike×moto, motion filters incl. `fino`, `LARGO_FAIXA`), track splicing, trilhas round-trip, `LinhaContagem`, and an end-to-end worker run where only the motion detector can see the object. Web tests cover `lib/revisao.ts`, `lib/mp4.ts` (hand-built MP4 boxes), model fallback list, JPEG header, paths, status and the desktop access token. On Windows the app's motor venv has no pip: `uv pip install --target <dir> pytest` and put `<dir>` on `PYTHONPATH`.
+
+Counting quality is still validated with the evaluation harness in `avaliacao/` (validation videos live in `avaliacao/videos/`, gitignored, downloaded from Cristiano's Drive via rclone remote `gdrive`):
+
+```bash
+# diagnóstico instrumentado: eventos.jsonl (cada contagem com motivo/lado/dx),
+# tracks.json (trajetórias), snapshots JPG por evento
+python avaliacao/rodar_instrumentado.py --video avaliacao/videos/Andradas_07.mp4 --saida avaliacao/diag_07
+
+# aponta suspeitas: contado_sem_cruzar, direcao_invertida, cruzou_sem_contar, possivel_duplicata
+python avaliacao/analisar_diagnostico.py avaliacao/diag_07
+
+# grades de miniaturas p/ verificação visual (por humano ou agente barato)
+python avaliacao/montar_grade.py avaliacao/diag_07 --cat ciclistas
+
+# contador independente sem ML (subtração de fundo na coluna da linha) p/ cross-check
+python avaliacao/contar_scanline.py avaliacao/videos/Andradas_07.mp4 --inicio 600 --fim 900 --json blobs.json
+
+# varredura completa das 19 horas + tabela consolidada
+python avaliacao/varrer_tudo.py
+```
+
+Quick sanity check on the small local clip: `python avaliacao/rodar_instrumentado.py --video "Andradas - todas categorias.mp4" --saida /tmp/diag` — expected totals with current code: ciclistas 2, pedestres 7, automóveis 13, motocicletas 9.
+
+## Architecture
+
+**Single YOLO inference per frame (class-agnostic NMS), then 4 trackers + arbitration.** `ContadorVeiculos.processar()` (`contador/detector.py`) is the shared core used by both entry points:
+
+1. One `YOLOv8n` (COCO) call detects person/car/bus/truck/motorcycle with `agnostic_nms=True` (prevents car+truck double boxes). A SECOND model — `MODELO_BICICLETAS` in config.py, a yolov8n fine-tuned on this camera with synthetic motion blur (`runs/ft_blur/weights/best.pt`, built by `avaliacao/montar_dataset.py` + `avaliacao/treinar_ft.py`) — supplies ONLY the `bicycle` detections. The fine-tune recovers blurred dusk/night bicycles (h17: 35→56 of 70 manual; h18: 10→32 of 85) without touching the other classes. Set `MODELO_BICICLETAS = None` to fall back to COCO-only. Do NOT train with unlabeled night frames (blurred unlabeled vehicles teach the model that night objects are background — this was tried and it collapsed night car counts).
+2. **Ciclistas are counted from the `bicycle` class** (own tracker + line — project decision: vehicles carrying bikes essentially never pass here), with two recovery paths: a person track with bike association whose crossing pairs with no bicycle event within ±45 frames counts as cyclist ("cic_pessoa"); a bike track that dies without crossing the line but moved ≥350 px counts once ("tela" — Cristiano counts bikes that pass through the SCREEN, not only line-crossers).
+3. **Persons** are tracked in a single tracker; each person track accumulates, frame by frame, whether a bicycle or motorcycle was nearby (anisotropic: |dx|≤120, |dy|≤250 px). When a person crosses the line it counts as **pedestre** only if its track is NOT bike-associated (that's the cyclist, already counted via bicycle) NOR moto-associated (rider/pillion, already counted via motorcycle). Track-level (not per-frame) classification prevents double counting when bicycle detection flickers.
+4. **Motos** go through bike↔moto arbitration at count time: a motorcycle crossing event that coincides with a recent, consistent bicycle track (COCO confuses the two classes on two-wheelers) is discarded as a misclassified bicycle.
+5. Automóveis (car+bus+truck) count directly. Each category has its own `sv.ByteTrack()` and `LinhaContagem`.
+
+**`LinhaContagem` (`contador/linha.py`) is the trickiest piece of logic in the codebase** — read it fully before touching counting behavior. Philosophy (v2, jul/2026): **only actual line crossings count**. It does NOT use `supervision`'s `LineZone` (fails on large/fast objects). Counting paths, mutually exclusive per ID:
+- `centroide` — track persists and its `cx` switches sides of `linha_x`.
+- `centroide_gap` — the SAME tracker id disappears for a few frames and resumes on the other side (ByteTrack re-association) — the crossing happened during the gap.
+- `reid_oposto` — a NEW id appears on the opposite side of a recently-lost id, with physical plausibility checks: vertical coherence (`dist_vertical`), implied speed ≤ `vmax_reid` px/frame × gap, and motion-direction consistency with the lost track's velocity (EMA `dx`). Without these checks this path both double-counts and suppresses real counts (platoons of cars in the same lane).
+- `entrada` (legacy, OFF by default) — counts on frame-edge entry; direction inferred from which edge (right edge → moving left = in). The old always-on version counted objects that never crossed and inverted directions.
+Same-side re-ID (`janela_mesmo_lado`, `dist_spatial`, `dist_vertical`) merges broken tracks without counting; a new id adjacent to an already-counted ACTIVE track inherits "counted" (duplicate YOLO boxes). `_contados` guarantees idempotency; expired lost-ids are pruned.
+
+When changing counting logic, preserve idempotency AND the plausibility checks in `_par_oposto_lado` — both directions of error (double-count and suppressed-count) came from that path historically.
+
+**Known limitation (night)**: heavy motion blur under artificial lighting makes the `bicycle`/`motorcycle` classes undetectable while the rider is still detected as `person` → night cyclists/motorcyclists get counted as pedestres. A speed-based reclassification fallback exists but is disabled (`LIMIAR_VEL_CICLISTA_PX_FRAME = None`) because ByteTrack id-switches poison track velocity.
+
+**DVR seek quirk**: `cap.set(CAP_PROP_POS_FRAMES)` lands ~30 s early on these files and `get()` silently reports the requested position. Any frame extraction for visualization/verification must decode sequentially (`avaliacao/frames_exatos.py`). The processing entry points always read sequentially, so their frame numbers are the ground truth.
+
+**Category-specific config lives in `config.py`**, not hardcoded — `LINHA_X` (counting line position), `CONFIANCA` (detection confidence threshold), `DIST_MAX_CYCLIST_PX` (person↔bicycle association distance), and the COCO class-ID groupings per category. This is the first place to look when adapting the tool to a different camera/location.
+
+**Video writer abstraction (`processar_video.py::_Writer`)**: pipes raw frames to `ffmpeg` (system install or the one bundled via `imageio_ffmpeg`) to encode H.264, falling back to OpenCV's `mp4v` writer only if no ffmpeg is found anywhere. This keeps output file size close to the original instead of the much larger default OpenCV codec.
+
+**`contador/visualizador.py`** (`anotar_frame`) draws bboxes/traces/labels per category in a distinct color, the counting line, a red screen-flash on any new count event, and the stats panel — purely cosmetic, only invoked when annotated video output is requested (skipped entirely by `--sem-video`).
+
+## Web app (`web/`) — revisão humana (out/2026)
+
+Direção nova: em vez de contagem 100% automática, um app Next.js 16 (`web/`, ver `web/README.md` e `web/AGENTS.md` — a versão do Next tem APIs novas, leia `web/node_modules/next/dist/docs/` antes de mexer) recebe um link do Drive, o usuário desenha linhas de contagem em qualquer ângulo, o worker Python detecta/rastreia, o OpenRouter sugere a classe de **todo** candidato, um humano revisa, e só então o vídeo final com contador é renderizado. A `LinhaContagem` vertical (`linha_x`) continua servindo os entry points CLI; o app usa segmentos arbitrários.
+
+Interface (out/2026): layout de editor de vídeo — barra de título, biblioteca lateral com **grupos** de vídeos (`grupos` + `jobs.grupo_id`; "Mover para grupo" e "Montar vídeo final…" a partir da seleção na grade), barra de status com o que está rodando. Tema escuro/claro por tokens CSS em `globals.css` (`data-theme` no `<html>`, salvo em `localStorage` `contador:tema`, aplicado por script inline antes da pintura); cores de categoria `--color-cat-*` (as mesmas de `COR` em `worker/renderizar.py`). Classes compartilhadas em `web/src/lib/ui.ts`. A revisão tem lista de candidatos, monitor do clipe, inspetor e timeline (uma trilha por linha).
+
+App desktop (`desktop/`, ver `desktop/README.md`): Electron sobre o servidor Next *standalone* (`output: "standalone"`), instaladores por electron-builder (NSIS por usuário, dmg, AppImage/deb) e atualização pelos GitHub Releases (`.github/workflows/desktop.yml`, tag `v*`). O servidor recebe `CONTADOR_DADOS`, `CONTADOR_ENV` (config editável em **Configurações**), `CONTADOR_MOTOR` (venv do Python, criado na 1ª execução pelo `uv` embutido — `web/src/lib/motor.ts`) e `CONTADOR_RAIZ` (worker + pesos). Primeiro acesso (`/boas-vindas`, a `/` redireciona enquanto `configuracoes.primeiro_acesso` não existe): placa de vídeo (preferência GPU/CPU em `configuracoes.placa`; CPU esconde a placa do worker com `CUDA_VISIBLE_DEVICES=""`), instalação do motor com progresso e chave do OpenRouter testada antes de salvar — os mesmos painéis em Configurações (`web/src/app/configuracoes/paineis.tsx`), em linguagem para quem não é técnico. No desktop o motor é só o venv do app (nunca um Python qualquer do sistema); `requirements.txt` e o PyTorch (2.12.0, cu126/cpu) têm versões fixas porque a instalação é do zero (supervision 0.31 tirou `sv.ByteTrack`). Painel "Tarefas em andamento" na barra lateral (`tarefasEmAndamento()` em `lib/atividade.ts`). `partialPrefetching` fica desligado: no build de produção ele impedia o `refresh()` das server actions de atualizar a tela. Workers são cancelados pelo processo registrado (`taskkill /T` no Windows), não por `pkill`. Modo produção nesta máquina: `cd web && npm run producao` (compila o standalone numa cópia limpa e sobe em 127.0.0.1:3000 com `web/data` e o `.env` da raiz; `-- --sem-build` só sobe); `npm run dev` continua para desenvolver. Atualização (`iniciarAtualizacoes` em `desktop/main.cjs`): o electron-updater baixa sozinho (checa ao abrir e a cada 4 h) e a faixa `web/src/app/_shell/faixa-atualizacao.tsx` oferece "Reiniciar e atualizar" (avisa se há tarefas rodando); instalar — pelo botão ou ao fechar com versão baixada — usa `quitAndInstall(false, true)`: instalador visível e o app reabre. A instalação silenciosa (padrão do electron-updater ao fechar) apagava o app e levava 1–2 min para pôr o novo sem nada na tela: o usuário achava que tinha sido desinstalado. No WSL o app desktop desliga a aceleração de hardware (senão o WSLg põe "[WARN:COPY MODE]" no título). Windows: caminhos com acento (`%APPDATA%\Contador de Tráfego`) quebram `cv2.imwrite` (o worker usa `gravar_jpg`) e o Python nasce em cp1252 (o runner passa `PYTHONUTF8=1`). `next build` dentro de `web/` com os vídeos de `data/` estoura a memória do Turbopack: o empacotamento compila numa cópia limpa (`desktop/scripts/preparar.mjs`); acessos dinâmicos ao disco levam `/* turbopackIgnore: true */`.
+
+Vídeos do computador (o app roda localmente): a página inicial navega pelas pastas no servidor (`web/src/lib/locais.ts`; caminhos `C:\...` colados viram `/mnt/c/...` no WSL) e o job usa o arquivo **onde está** — `drive_id = "local"`, `arquivo_video` com caminho absoluto, sem cópia nem symlink. Como isso expõe o disco a quem acessa o app, `npm run dev`/`start` escutam só em 127.0.0.1; `CONTADOR_ARQUIVOS_LOCAIS=0` desliga o recurso se o app for publicado na rede.
+
+Worker do app: `worker/detectar.py` (trajetórias completas → candidatos, filmstrip/contexto/clipe) lê vídeo via `worker/leitor.py` (ffmpeg NVDEC + `scale_cuda`, saída YUV; precisa do build BtbN em `~/.local/opt/ffmpeg-btbn` ou `CONTADOR_FFMPEG`, senão cai para CPU). Vídeos > 1920 px são processados em 1080p; `imgsz` acompanha a resolução de origem (4K → 1280).
+
+Área de análise (out/2026, `--area x,y,w,h` em 0–1; `jobs.area`/`cameras.area`): o leitor recorta o quadro ANTES de reduzir (`crop` antes do `scale_cuda`, conferido no 1º quadro contra a CPU — FFmpeg antigo poderia ignorá-lo em quadros CUDA) e o worker detecta só no recorte, em resolução cheia. Motivo: Augusto de Lima (4K, câmera alta) — o ciclista de ~60 px virava ~17 px no 1080p e nem YOLO nem movimento o pegavam (0 de 6). No recorte, o YOLO ainda falha (ciclista borrado, pessoa 0,28 < `CONFIANCA` 0,4); quem pega é o movimento, com a máscara mais fina (até 960 px) e **contando a sombra** do MOG2 (`fino`: limiar 100, fechamento 11×11) — o ciclista borrado sobre o piso vinha quase todo marcado como sombra. Coordenadas: o "quadro processado" passa a ser o recorte; `escala_do` = densidade de pixels relativa a 1080p (recorte 4K nativo → 2); `linhas_no_quadro` converte as linhas, `caixa_no_original`/`salvar_pontos` devolvem caixas e pontos ao quadro inteiro. `trilhas_meta.json` guarda a área (`area_arg`): mudar a área refaz a detecção (o runner compara em `areaDasTrilhas`). No editor de linhas, a área vem ligada por padrão em vídeo > 1920 px e segue as linhas (folga, mínimo ~1/4 do quadro) até o usuário desenhar uma; avisa linha fora da área e área > 1920 px (reduzida). O vídeo final não muda. Na área, a máscara fina deixa passar ruído (manchas de 10–20 px no 4K: compressão, sol entre as folhas) que o tracker encadeia em "trilhas" que saltam de lugar: `_movimento_real` com `fino` exige p90 da área ≥ `MOV_FINO_AREA_P90` e deslocamento ≥ `MOV_FINO_DESLOC` (px de 1080p; 30 descartados → 3 sem perder ciclista). Carro **justo** na área: a caixa do carro da faixa colada ao meio-fio desce sobre a ciclovia — alargada, "explicava" o ciclista ao lado e emendava as manchas; lá ela não é alargada e o miolo sai da máscara (recupera os ciclistas colados no carro das 81 e 117 min). `trilhas_meta.json` guarda `mov_fino` (`MOV_FINO_VERSAO`): trilhas de área mais antigas são refeitas. Bicicletas na área: o modelo ajustado (`MODELO_BICICLETAS`, câmera de Andradas) não pega nada na Augusto de Lima e o COCO pega — na área, as bicicletas do COCO somam-se às dele (NMS); e o COCO alterna bicicleta/moto no mesmo ciclista pequeno, o que impedia os dois rastreadores de formar trilha — na área, duas rodas vão para um só grupo (`bic`) e o modelo de visão decide. Sem isso, a caixa crua da "pessoa" (rápida demais para o ByteTrack por IoU) ainda "explicava" a mancha e o ciclista sumia (88 min). Tirar automóvel da detecção não ajudou (carros viram manchas e vão todos ao modelo de visão). Testar variações em trechos de 30 s recortados com `ffmpeg -ss … -c copy` (minutos, em vez de ~45 min do vídeo inteiro); recortar a detecção com margem em volta da área não ajudou e deixou ~3× mais lento.
+
+Prévia da detecção: o worker sobrescreve `previa.jpg` (quadro atual com caixas e linhas, ≤ 1280 px) uma vez por segundo e a apaga ao terminar; a página do job a mostra no lugar do 1º quadro.
+
+Carro do YOLO (`origem` track, `classe_yolo` automoveis) numa linha que não conta automóveis não vai ao modelo de visão (`iniciarSugestoes`): registra a sugestão com `modelo_llm = SEM_CONSULTA` e entra no aceite em lote (Augusto de Lima: o modelo confirmou 236 de 236). Mancha de movimento continua indo ao modelo — pode ser o ciclista colado no carro.
+
+Revisão (fase 3): `web/src/app/jobs/[id]/revisao.tsx` + `web/src/lib/revisao.ts`. A proposta de cada candidato é a sugestão do modelo, trocada por descarte quando a categoria não é contada na linha cruzada (`Linha.categorias`, editável no editor de linhas e na própria revisão sem refazer nada). A decisão humana fica em `candidatos.rotulo`; os totais e o vídeo final usam só `rotulo`. Atalhos: ↑/↓, Enter aceita, 1–8 categorias, 0 descarta, U desfaz; ←/→ um quadro (Shift: 1 s), Espaço/P toca, +/− zoom, `\` timeline inteira. Espaço não aceita mais a proposta (fácil de apertar querendo tocar o vídeo), e Enter/Espaço com um botão em foco ficam com o botão.
+
+Timeline (`timeline.tsx`) no estilo de editor: régua com cursor arrastável, zoom até o quadro (Ctrl+roda ancorado no mouse, −/+, deslizante, "Ajustar"), arrastar o fundo move a vista, altura ajustável (`localStorage` `contador:alturaTimeline`), opção de uma trilha por linha × categoria; só desenha marcas e rótulos da faixa visível. O cursor (`relogio.ts`) fica fora do estado do React — muda a cada quadro tocando. O monitor ganhou a aba **Vídeo**: o original (`/api/jobs/[id]/video`, com Range; HEVC abre no Chromium/Electron com decodificação por hardware) no quadro do cursor, com linhas e área por cima e controles de quadro/velocidade. **DVR tem buracos no tempo** (Andradas_06: 54.009 quadros em 3.631 s): o worker conta quadros, o `<video>` usa o tempo gravado — `lib/mp4.ts` lê a tabela stts/ctts/elst do `moov` (sem decodificar, ~10 ms) e `/api/jobs/[id]/quadros` a entrega; a revisão posiciona cada candidato por `tabela[frame]` (sem isso, o ciclista do quadro 1315 aparecia 0,7 s antes, e a diferença chega a ~30 s no fim da hora). Filtro **Possível duplicado** (`possiveisDuplicados` em `revisao.ts`): mesma linha, sentido e classe, cruzando a ≤ 1 s com caixas sobrepostas — só aponta, não descarta.
+
+Tudo que se move entra na revisão: além dos 4 ByteTracks do YOLO, `worker/detectar.py` roda subtração de fundo (MOG2 numa cópia de 480 px) e rastreia as manchas que nenhuma caixa do YOLO explica (grupo `mov`, origem `movimento`, `classe_yolo` = `outros`); só viram candidato se durarem ≥ 0,6 s e andarem ≥ 1,5 alturas, e saem se coincidirem com um evento do YOLO na mesma linha. Numa linha que não conta automóveis (ciclovia, calçada), objeto com comprimento no sentido da travessia > `LARGO_FAIXA` (3×) a linha não vira candidato: a base da caixa de carro/ônibus na pista ao lado (e o farol no chão) invade a ciclovia. Categorias só do modelo de visão: patinete, scooter elétrico, monociclo; o que se move e não tem categoria vai para **outros** ("nenhum"/descartar é só para o que não é objeto real).
+
+Vídeo final (fase 4): `worker/renderizar.py` + `web/src/app/renders/`. Um render junta um ou mais jobs com a revisão completa, na ordem escolhida (página inicial, ou o botão da revisão para um só), num único MP4 1080p; o painel soma entre os vídeos (linhas com o mesmo **nome** são a mesma contagem). O usuário escolhe quais categorias entram (`renders.categorias`, JSON; null = todas — `EscolhaCategorias` na revisão, na bandeja da página inicial e em "Gerar de novo"); o runner filtra os eventos e as categorias das linhas ao montar o plano e `renderizar.py` tira do painel o que ficou de fora. O plano (`data/renders/<id>/plano.json`) congela os `rotulo`s do momento do pedido — a página avisa quando a revisão mudou depois e oferece gerar de novo. Saída: `video_final.mp4` (h264_nvenc, ou libx264 sem NVIDIA; teto de 2 Mbit/s), `relatorio.json`, `eventos.csv` (`;`, BOM para o Excel). Leitura e escrita em threads (~135 fps; 2 h ≈ 13 min). Textos com acento via PIL (o Hershey do OpenCV não tem).
+
+O contexto enviado ao modelo precisa da caixa do objeto: o cruzamento costuma cair entre duas observações do track, e `_caixa_em` interpola a caixa (sem ela o modelo classificava o vizinho — ex.: o ciclista ao lado do carro). O prompt manda classificar só o objeto marcado.
+
+Erros visíveis (out/2026): cada falha de sugestão guarda em `candidatos.erro_llm` o JSON com status HTTP, tentativas e o que o OpenRouter/provedor respondeu (`ErroOpenRouter.detalhe`), e vai para `sugestoes_erros.jsonl` na pasta do job e para o log do servidor (`[sugestoes] …`). Com falhas persistentes a página oferece **Revisar assim mesmo** (`revisarSemSugestoes`): o candidato sem sugestão entra na revisão com a classe do detector como proposta (`Proposta.doDetector`, nunca no aceite em lote) e o inspetor mostra "Detalhes do erro". **Salvar diagnóstico** (`/api/diagnostico`, `web/src/lib/diagnostico.ts`, botão em Configurações e nas telas de erro) gera um .zip com o fim de `servidor.log` (`CONTADOR_LOG`, gravado pelo Electron), `config.env` com a chave omitida, versão do app (`CONTADOR_VERSAO`), estado do motor, jobs/renders com os erros, resumo de candidatos por linha × classe, e filmstrip/contexto das sugestões que falharam — é o que o usuário manda pelo WhatsApp quando algo dá errado.
+
+Modelo de visão (OpenRouter): padrão `anthropic/claude-haiku-5.5`, filmstrip + contexto, sem dica do YOLO. Calibração (out/2026): `avaliacao/montar_calibracao_llm.py` casa os rótulos do Cristiano (`rotulos_andradas.json`, no Drive) com candidatos do worker; `web/scripts/calibrar.ts` compara modelos. Gabarito auditado em `avaliacao/calibracao_llm_auditada.json` (142 casos, quase todos crepúsculo/noite): Haiku 5.5 99–100%, Gemini 3.1 Flash Lite 99% a 4× o custo, YOLO sozinho 87% (13/32 ciclistas).
+
+Imagens para o modelo: Claude recusa lado > 8000 px ("Provider returned error" do Vertex). Manchas de movimento muito largas (a guia inteira da calçada no amanhecer, ~1900×40 px) geravam filmstrips de 8–14 mil px — eram as falhas persistentes do Cristiano (6 de 491 no Andradas_06, todas `mov`). `salvar_filmstrip` encaixa cada recorte em 480×160; para jobs antigos, `sugerirCategoria` lê o tamanho do JPEG (`dimensoesJpeg`) e manda só o contexto se o filmstrip passar de `LADO_MAX_IMAGEM` — "Tentar de novo" resolve sem refazer a detecção.
+
+Fallback de modelos (out/2026): `sugerirCategoria` manda `models: [principal, ...reservas]` e o OpenRouter passa para o próximo quando um falha em execução (provedor fora, 429, "Provider returned error", modelo sem suporte a imagem); ID de modelo inválido é recusado antes do roteamento e não cai na reserva. `RESERVAS_PADRAO` = DeepSeek V4.1 Flash 1017 → Gemini 3.1 Flash Lite; `OPENROUTER_MODELOS_RESERVA` troca (vazio/"nenhum" desliga); `calibrar.ts` passa `reservas: []` para medir um modelo por vez. Recalibração com 10 modelos (sem dica do YOLO; noite 142 / dia 31 do vídeo local revisado; acerto · US$/mil): Haiku 5.5 100/100 · 0,18; DeepSeek V4.1 Flash 100/97 · 0,15; Gemini 3.1 Flash Lite 99/100 · 0,83; Gemini 3.5 Flash Lite 99/100 · 1,03; GLM 5.3 Flash 96/100 · 0,10 (ciclista→outros); Qwen3-VL 30B 96/94 · 0,26; GPT-6 Luna 95/94 · 0,21; MiMo V2.6 Flash 92/87 (pedestre→patinete); Qwen3.8 Flash e Gemma 4 31B ≤ 55% (não seguem o esquema JSON). Os rankings públicos (LMArena Vision, uso no OpenRouter) não previram isso: GLM e Gemma estão bem no LMArena e falham aqui.
+
+## Output data model
+
+Both entry points produce events keyed by category (`ciclistas`/`pedestres`/`automoveis`/`motocicletas`), each carrying a running total plus `in`/`out` directional counts (`in` = right→left, `out` = left→right, per `LinhaContagem`). `processar_video.py` accumulates these into one `resultado.json` at the end; `stream_tempo_real.py` emits them as they happen (plus `inicio`/`heartbeat`/`encerramento` lifecycle events) so downstream consumers don't need to wait for the stream to end.

@@ -1,0 +1,1435 @@
+[
+ {
+  "id": "c0013",
+  "hora": "06",
+  "rotulo": "ciclistas",
+  "fonte": "A",
+  "yolo": "ciclistas",
+  "dist": 29.2,
+  "filmstrip": "filmstrips/c0013.jpg",
+  "contexto": "contextos/c0013.jpg"
+ },
+ {
+  "id": "c0020",
+  "hora": "07",
+  "rotulo": "automoveis",
+  "fonte": "A",
+  "yolo": "automoveis",
+  "dist": 167.2,
+  "filmstrip": "filmstrips/c0020.jpg",
+  "contexto": "contextos/c0020.jpg"
+ },
+ {
+  "id": "c0029",
+  "hora": "08",
+  "rotulo": "motocicletas",
+  "fonte": "A",
+  "yolo": "motocicletas",
+  "dist": 104.0,
+  "filmstrip": "filmstrips/c0029.jpg",
+  "contexto": "contextos/c0029.jpg"
+ },
+ {
+  "id": "c0036",
+  "hora": "09",
+  "rotulo": "motocicletas",
+  "fonte": "A",
+  "yolo": "motocicletas",
+  "dist": 94.3,
+  "filmstrip": "filmstrips/c0036.jpg",
+  "contexto": "contextos/c0036.jpg"
+ },
+ {
+  "id": "c0040",
+  "hora": "10",
+  "rotulo": "automoveis",
+  "fonte": "A",
+  "yolo": "automoveis",
+  "dist": 185.7,
+  "filmstrip": "filmstrips/c0040.jpg",
+  "contexto": "contextos/c0040.jpg"
+ },
+ {
+  "id": "c0056",
+  "hora": "12",
+  "rotulo": "ciclistas",
+  "fonte": "A",
+  "yolo": "ciclistas",
+  "dist": 188.1,
+  "filmstrip": "filmstrips/c0056.jpg",
+  "contexto": "contextos/c0056.jpg"
+ },
+ {
+  "id": "c0091",
+  "hora": "16",
+  "rotulo": "pedestres",
+  "fonte": "A",
+  "yolo": "pedestres",
+  "dist": 44.2,
+  "filmstrip": "filmstrips/c0091.jpg",
+  "contexto": "contextos/c0091.jpg"
+ },
+ {
+  "id": "c0096",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.0,
+  "filmstrip": "filmstrips/c0096.jpg",
+  "contexto": "contextos/c0096.jpg"
+ },
+ {
+  "id": "c0097",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.4,
+  "filmstrip": "filmstrips/c0097.jpg",
+  "contexto": "contextos/c0097.jpg"
+ },
+ {
+  "id": "c0098",
+  "hora": "17",
+  "rotulo": "automoveis",
+  "fonte": "C",
+  "yolo": "automoveis",
+  "dist": 134.9,
+  "filmstrip": "filmstrips/c0098.jpg",
+  "contexto": "contextos/c0098.jpg"
+ },
+ {
+  "id": "c0099",
+  "hora": "17",
+  "rotulo": "ciclistas",
+  "fonte": "B",
+  "yolo": "ciclistas",
+  "dist": 40.5,
+  "filmstrip": "filmstrips/c0099.jpg",
+  "contexto": "contextos/c0099.jpg"
+ },
+ {
+  "id": "c0100",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 99.2,
+  "filmstrip": "filmstrips/c0100.jpg",
+  "contexto": "contextos/c0100.jpg"
+ },
+ {
+  "id": "c0101",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.1,
+  "filmstrip": "filmstrips/c0101.jpg",
+  "contexto": "contextos/c0101.jpg"
+ },
+ {
+  "id": "c0102",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.1,
+  "filmstrip": "filmstrips/c0102.jpg",
+  "contexto": "contextos/c0102.jpg"
+ },
+ {
+  "id": "c0103",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.1,
+  "filmstrip": "filmstrips/c0103.jpg",
+  "contexto": "contextos/c0103.jpg"
+ },
+ {
+  "id": "c0104",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 195.9,
+  "filmstrip": "filmstrips/c0104.jpg",
+  "contexto": "contextos/c0104.jpg"
+ },
+ {
+  "id": "c0105",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 153.8,
+  "filmstrip": "filmstrips/c0105.jpg",
+  "contexto": "contextos/c0105.jpg"
+ },
+ {
+  "id": "c0106",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 106.8,
+  "filmstrip": "filmstrips/c0106.jpg",
+  "contexto": "contextos/c0106.jpg"
+ },
+ {
+  "id": "c0107",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.1,
+  "filmstrip": "filmstrips/c0107.jpg",
+  "contexto": "contextos/c0107.jpg"
+ },
+ {
+  "id": "c0108",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 96.7,
+  "filmstrip": "filmstrips/c0108.jpg",
+  "contexto": "contextos/c0108.jpg"
+ },
+ {
+  "id": "c0109",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 76.4,
+  "filmstrip": "filmstrips/c0109.jpg",
+  "contexto": "contextos/c0109.jpg"
+ },
+ {
+  "id": "c0111",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.7,
+  "filmstrip": "filmstrips/c0111.jpg",
+  "contexto": "contextos/c0111.jpg"
+ },
+ {
+  "id": "c0112",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 89.9,
+  "filmstrip": "filmstrips/c0112.jpg",
+  "contexto": "contextos/c0112.jpg"
+ },
+ {
+  "id": "c0113",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.8,
+  "filmstrip": "filmstrips/c0113.jpg",
+  "contexto": "contextos/c0113.jpg"
+ },
+ {
+  "id": "c0114",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 103.9,
+  "filmstrip": "filmstrips/c0114.jpg",
+  "contexto": "contextos/c0114.jpg"
+ },
+ {
+  "id": "c0115",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0115.jpg",
+  "contexto": "contextos/c0115.jpg"
+ },
+ {
+  "id": "c0116",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 80.1,
+  "filmstrip": "filmstrips/c0116.jpg",
+  "contexto": "contextos/c0116.jpg"
+ },
+ {
+  "id": "c0117",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 81.6,
+  "filmstrip": "filmstrips/c0117.jpg",
+  "contexto": "contextos/c0117.jpg"
+ },
+ {
+  "id": "c0118",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 3.6,
+  "filmstrip": "filmstrips/c0118.jpg",
+  "contexto": "contextos/c0118.jpg"
+ },
+ {
+  "id": "c0119",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 106.4,
+  "filmstrip": "filmstrips/c0119.jpg",
+  "contexto": "contextos/c0119.jpg"
+ },
+ {
+  "id": "c0120",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.0,
+  "filmstrip": "filmstrips/c0120.jpg",
+  "contexto": "contextos/c0120.jpg"
+ },
+ {
+  "id": "c0121",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 186.5,
+  "filmstrip": "filmstrips/c0121.jpg",
+  "contexto": "contextos/c0121.jpg"
+ },
+ {
+  "id": "c0122",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 93.8,
+  "filmstrip": "filmstrips/c0122.jpg",
+  "contexto": "contextos/c0122.jpg"
+ },
+ {
+  "id": "c0123",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 86.7,
+  "filmstrip": "filmstrips/c0123.jpg",
+  "contexto": "contextos/c0123.jpg"
+ },
+ {
+  "id": "c0124",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 121.6,
+  "filmstrip": "filmstrips/c0124.jpg",
+  "contexto": "contextos/c0124.jpg"
+ },
+ {
+  "id": "c0125",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 137.8,
+  "filmstrip": "filmstrips/c0125.jpg",
+  "contexto": "contextos/c0125.jpg",
+  "rotulo_original": "automoveis"
+ },
+ {
+  "id": "c0126",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 105.3,
+  "filmstrip": "filmstrips/c0126.jpg",
+  "contexto": "contextos/c0126.jpg"
+ },
+ {
+  "id": "c0127",
+  "hora": "17",
+  "rotulo": "automoveis",
+  "fonte": "C",
+  "yolo": "automoveis",
+  "dist": 185.1,
+  "filmstrip": "filmstrips/c0127.jpg",
+  "contexto": "contextos/c0127.jpg"
+ },
+ {
+  "id": "c0128",
+  "hora": "17",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 0.7,
+  "filmstrip": "filmstrips/c0128.jpg",
+  "contexto": "contextos/c0128.jpg"
+ },
+ {
+  "id": "c0129",
+  "hora": "17",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 73.1,
+  "filmstrip": "filmstrips/c0129.jpg",
+  "contexto": "contextos/c0129.jpg"
+ },
+ {
+  "id": "c0130",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 154.2,
+  "filmstrip": "filmstrips/c0130.jpg",
+  "contexto": "contextos/c0130.jpg"
+ },
+ {
+  "id": "c0131",
+  "hora": "17",
+  "rotulo": "automoveis",
+  "fonte": "C",
+  "yolo": "automoveis",
+  "dist": 186.2,
+  "filmstrip": "filmstrips/c0131.jpg",
+  "contexto": "contextos/c0131.jpg"
+ },
+ {
+  "id": "c0132",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 128.2,
+  "filmstrip": "filmstrips/c0132.jpg",
+  "contexto": "contextos/c0132.jpg"
+ },
+ {
+  "id": "c0135",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 96.6,
+  "filmstrip": "filmstrips/c0135.jpg",
+  "contexto": "contextos/c0135.jpg"
+ },
+ {
+  "id": "c0137",
+  "hora": "17",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 106.4,
+  "filmstrip": "filmstrips/c0137.jpg",
+  "contexto": "contextos/c0137.jpg"
+ },
+ {
+  "id": "c0141",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 48.1,
+  "filmstrip": "filmstrips/c0141.jpg",
+  "contexto": "contextos/c0141.jpg",
+  "rotulo_original": "pedestres"
+ },
+ {
+  "id": "c0142",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 30.8,
+  "filmstrip": "filmstrips/c0142.jpg",
+  "contexto": "contextos/c0142.jpg",
+  "rotulo_original": "pedestres"
+ },
+ {
+  "id": "c0143",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 52.3,
+  "filmstrip": "filmstrips/c0143.jpg",
+  "contexto": "contextos/c0143.jpg",
+  "rotulo_original": "pedestres"
+ },
+ {
+  "id": "c0144",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 3.7,
+  "filmstrip": "filmstrips/c0144.jpg",
+  "contexto": "contextos/c0144.jpg",
+  "rotulo_original": "automoveis"
+ },
+ {
+  "id": "c0145",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 65.0,
+  "filmstrip": "filmstrips/c0145.jpg",
+  "contexto": "contextos/c0145.jpg",
+  "rotulo_original": "motocicletas"
+ },
+ {
+  "id": "c0147",
+  "hora": "18",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 99.9,
+  "filmstrip": "filmstrips/c0147.jpg",
+  "contexto": "contextos/c0147.jpg",
+  "rotulo_original": "automoveis"
+ },
+ {
+  "id": "c0149",
+  "hora": "18",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 93.7,
+  "filmstrip": "filmstrips/c0149.jpg",
+  "contexto": "contextos/c0149.jpg"
+ },
+ {
+  "id": "c0150",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 50.1,
+  "filmstrip": "filmstrips/c0150.jpg",
+  "contexto": "contextos/c0150.jpg"
+ },
+ {
+  "id": "c0155",
+  "hora": "18",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 72.5,
+  "filmstrip": "filmstrips/c0155.jpg",
+  "contexto": "contextos/c0155.jpg"
+ },
+ {
+  "id": "c0158",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 119.4,
+  "filmstrip": "filmstrips/c0158.jpg",
+  "contexto": "contextos/c0158.jpg"
+ },
+ {
+  "id": "c0160",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 190.3,
+  "filmstrip": "filmstrips/c0160.jpg",
+  "contexto": "contextos/c0160.jpg"
+ },
+ {
+  "id": "c0161",
+  "hora": "18",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 99.1,
+  "filmstrip": "filmstrips/c0161.jpg",
+  "contexto": "contextos/c0161.jpg"
+ },
+ {
+  "id": "c0166",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 94.6,
+  "filmstrip": "filmstrips/c0166.jpg",
+  "contexto": "contextos/c0166.jpg"
+ },
+ {
+  "id": "c0168",
+  "hora": "18",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 102.6,
+  "filmstrip": "filmstrips/c0168.jpg",
+  "contexto": "contextos/c0168.jpg"
+ },
+ {
+  "id": "c0169",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 93.6,
+  "filmstrip": "filmstrips/c0169.jpg",
+  "contexto": "contextos/c0169.jpg"
+ },
+ {
+  "id": "c0173",
+  "hora": "18",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 51.1,
+  "filmstrip": "filmstrips/c0173.jpg",
+  "contexto": "contextos/c0173.jpg"
+ },
+ {
+  "id": "c0176",
+  "hora": "18",
+  "rotulo": "motocicletas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 100.9,
+  "filmstrip": "filmstrips/c0176.jpg",
+  "contexto": "contextos/c0176.jpg",
+  "rotulo_original": "ciclistas"
+ },
+ {
+  "id": "c0177",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 157.7,
+  "filmstrip": "filmstrips/c0177.jpg",
+  "contexto": "contextos/c0177.jpg"
+ },
+ {
+  "id": "c0180",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 156.4,
+  "filmstrip": "filmstrips/c0180.jpg",
+  "contexto": "contextos/c0180.jpg"
+ },
+ {
+  "id": "c0184",
+  "hora": "18",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 107.6,
+  "filmstrip": "filmstrips/c0184.jpg",
+  "contexto": "contextos/c0184.jpg"
+ },
+ {
+  "id": "c0186",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0186.jpg",
+  "contexto": "contextos/c0186.jpg"
+ },
+ {
+  "id": "c0187",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 116.8,
+  "filmstrip": "filmstrips/c0187.jpg",
+  "contexto": "contextos/c0187.jpg"
+ },
+ {
+  "id": "c0188",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.6,
+  "filmstrip": "filmstrips/c0188.jpg",
+  "contexto": "contextos/c0188.jpg"
+ },
+ {
+  "id": "c0189",
+  "hora": "19",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 177.4,
+  "filmstrip": "filmstrips/c0189.jpg",
+  "contexto": "contextos/c0189.jpg"
+ },
+ {
+  "id": "c0192",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 6.3,
+  "filmstrip": "filmstrips/c0192.jpg",
+  "contexto": "contextos/c0192.jpg"
+ },
+ {
+  "id": "c0193",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 154.9,
+  "filmstrip": "filmstrips/c0193.jpg",
+  "contexto": "contextos/c0193.jpg"
+ },
+ {
+  "id": "c0194",
+  "hora": "19",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 146.1,
+  "filmstrip": "filmstrips/c0194.jpg",
+  "contexto": "contextos/c0194.jpg"
+ },
+ {
+  "id": "c0195",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 117.6,
+  "filmstrip": "filmstrips/c0195.jpg",
+  "contexto": "contextos/c0195.jpg"
+ },
+ {
+  "id": "c0196",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 42.6,
+  "filmstrip": "filmstrips/c0196.jpg",
+  "contexto": "contextos/c0196.jpg"
+ },
+ {
+  "id": "c0197",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0197.jpg",
+  "contexto": "contextos/c0197.jpg"
+ },
+ {
+  "id": "c0199",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0199.jpg",
+  "contexto": "contextos/c0199.jpg"
+ },
+ {
+  "id": "c0200",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0200.jpg",
+  "contexto": "contextos/c0200.jpg"
+ },
+ {
+  "id": "c0202",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 57.4,
+  "filmstrip": "filmstrips/c0202.jpg",
+  "contexto": "contextos/c0202.jpg"
+ },
+ {
+  "id": "c0203",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 117.8,
+  "filmstrip": "filmstrips/c0203.jpg",
+  "contexto": "contextos/c0203.jpg"
+ },
+ {
+  "id": "c0206",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0206.jpg",
+  "contexto": "contextos/c0206.jpg"
+ },
+ {
+  "id": "c0207",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0207.jpg",
+  "contexto": "contextos/c0207.jpg"
+ },
+ {
+  "id": "c0210",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 1.1,
+  "filmstrip": "filmstrips/c0210.jpg",
+  "contexto": "contextos/c0210.jpg"
+ },
+ {
+  "id": "c0211",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.9,
+  "filmstrip": "filmstrips/c0211.jpg",
+  "contexto": "contextos/c0211.jpg"
+ },
+ {
+  "id": "c0213",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 109.9,
+  "filmstrip": "filmstrips/c0213.jpg",
+  "contexto": "contextos/c0213.jpg"
+ },
+ {
+  "id": "c0214",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 55.8,
+  "filmstrip": "filmstrips/c0214.jpg",
+  "contexto": "contextos/c0214.jpg"
+ },
+ {
+  "id": "c0217",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 125.8,
+  "filmstrip": "filmstrips/c0217.jpg",
+  "contexto": "contextos/c0217.jpg"
+ },
+ {
+  "id": "c0224",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 32.7,
+  "filmstrip": "filmstrips/c0224.jpg",
+  "contexto": "contextos/c0224.jpg"
+ },
+ {
+  "id": "c0228",
+  "hora": "19",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 140.5,
+  "filmstrip": "filmstrips/c0228.jpg",
+  "contexto": "contextos/c0228.jpg"
+ },
+ {
+  "id": "c0229",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 104.0,
+  "filmstrip": "filmstrips/c0229.jpg",
+  "contexto": "contextos/c0229.jpg"
+ },
+ {
+  "id": "c0230",
+  "hora": "19",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 148.8,
+  "filmstrip": "filmstrips/c0230.jpg",
+  "contexto": "contextos/c0230.jpg",
+  "rotulo_original": "ciclistas"
+ },
+ {
+  "id": "c0231",
+  "hora": "20",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 105.5,
+  "filmstrip": "filmstrips/c0231.jpg",
+  "contexto": "contextos/c0231.jpg"
+ },
+ {
+  "id": "c0235",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 84.4,
+  "filmstrip": "filmstrips/c0235.jpg",
+  "contexto": "contextos/c0235.jpg"
+ },
+ {
+  "id": "c0246",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0246.jpg",
+  "contexto": "contextos/c0246.jpg"
+ },
+ {
+  "id": "c0247",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0247.jpg",
+  "contexto": "contextos/c0247.jpg"
+ },
+ {
+  "id": "c0248",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 2.0,
+  "filmstrip": "filmstrips/c0248.jpg",
+  "contexto": "contextos/c0248.jpg"
+ },
+ {
+  "id": "c0251",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 111.3,
+  "filmstrip": "filmstrips/c0251.jpg",
+  "contexto": "contextos/c0251.jpg"
+ },
+ {
+  "id": "c0252",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 1.0,
+  "filmstrip": "filmstrips/c0252.jpg",
+  "contexto": "contextos/c0252.jpg"
+ },
+ {
+  "id": "c0257",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 96.1,
+  "filmstrip": "filmstrips/c0257.jpg",
+  "contexto": "contextos/c0257.jpg"
+ },
+ {
+  "id": "c0259",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 80.9,
+  "filmstrip": "filmstrips/c0259.jpg",
+  "contexto": "contextos/c0259.jpg"
+ },
+ {
+  "id": "c0260",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0260.jpg",
+  "contexto": "contextos/c0260.jpg"
+ },
+ {
+  "id": "c0262",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0262.jpg",
+  "contexto": "contextos/c0262.jpg"
+ },
+ {
+  "id": "c0263",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0263.jpg",
+  "contexto": "contextos/c0263.jpg"
+ },
+ {
+  "id": "c0264",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.4,
+  "filmstrip": "filmstrips/c0264.jpg",
+  "contexto": "contextos/c0264.jpg"
+ },
+ {
+  "id": "c0265",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0265.jpg",
+  "contexto": "contextos/c0265.jpg"
+ },
+ {
+  "id": "c0266",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0266.jpg",
+  "contexto": "contextos/c0266.jpg"
+ },
+ {
+  "id": "c0267",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.4,
+  "filmstrip": "filmstrips/c0267.jpg",
+  "contexto": "contextos/c0267.jpg"
+ },
+ {
+  "id": "c0268",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0268.jpg",
+  "contexto": "contextos/c0268.jpg"
+ },
+ {
+  "id": "c0269",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.6,
+  "filmstrip": "filmstrips/c0269.jpg",
+  "contexto": "contextos/c0269.jpg"
+ },
+ {
+  "id": "c0270",
+  "hora": "20",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 181.4,
+  "filmstrip": "filmstrips/c0270.jpg",
+  "contexto": "contextos/c0270.jpg"
+ },
+ {
+  "id": "c0271",
+  "hora": "20",
+  "rotulo": "ciclistas",
+  "fonte": "B",
+  "yolo": "ciclistas",
+  "dist": 40.8,
+  "filmstrip": "filmstrips/c0271.jpg",
+  "contexto": "contextos/c0271.jpg"
+ },
+ {
+  "id": "c0272",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 84.5,
+  "filmstrip": "filmstrips/c0272.jpg",
+  "contexto": "contextos/c0272.jpg"
+ },
+ {
+  "id": "c0273",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 1.3,
+  "filmstrip": "filmstrips/c0273.jpg",
+  "contexto": "contextos/c0273.jpg",
+  "rotulo_original": "ciclistas"
+ },
+ {
+  "id": "c0274",
+  "hora": "20",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0274.jpg",
+  "contexto": "contextos/c0274.jpg"
+ },
+ {
+  "id": "c0289",
+  "hora": "21",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0289.jpg",
+  "contexto": "contextos/c0289.jpg"
+ },
+ {
+  "id": "c0295",
+  "hora": "21",
+  "rotulo": "ciclistas",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 56.5,
+  "filmstrip": "filmstrips/c0295.jpg",
+  "contexto": "contextos/c0295.jpg"
+ },
+ {
+  "id": "c0296",
+  "hora": "21",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0296.jpg",
+  "contexto": "contextos/c0296.jpg",
+  "rotulo_original": "automoveis"
+ },
+ {
+  "id": "c0301",
+  "hora": "21",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 86.3,
+  "filmstrip": "filmstrips/c0301.jpg",
+  "contexto": "contextos/c0301.jpg"
+ },
+ {
+  "id": "c0305",
+  "hora": "21",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.1,
+  "filmstrip": "filmstrips/c0305.jpg",
+  "contexto": "contextos/c0305.jpg"
+ },
+ {
+  "id": "c0306",
+  "hora": "21",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.1,
+  "filmstrip": "filmstrips/c0306.jpg",
+  "contexto": "contextos/c0306.jpg"
+ },
+ {
+  "id": "c0307",
+  "hora": "21",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 158.5,
+  "filmstrip": "filmstrips/c0307.jpg",
+  "contexto": "contextos/c0307.jpg"
+ },
+ {
+  "id": "c0308",
+  "hora": "21",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 66.2,
+  "filmstrip": "filmstrips/c0308.jpg",
+  "contexto": "contextos/c0308.jpg"
+ },
+ {
+  "id": "c0310",
+  "hora": "22",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 46.9,
+  "filmstrip": "filmstrips/c0310.jpg",
+  "contexto": "contextos/c0310.jpg"
+ },
+ {
+  "id": "c0316",
+  "hora": "22",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 98.9,
+  "filmstrip": "filmstrips/c0316.jpg",
+  "contexto": "contextos/c0316.jpg"
+ },
+ {
+  "id": "c0327",
+  "hora": "22",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0327.jpg",
+  "contexto": "contextos/c0327.jpg",
+  "rotulo_original": "automoveis"
+ },
+ {
+  "id": "c0330",
+  "hora": "22",
+  "rotulo": "ciclistas",
+  "fonte": "A",
+  "yolo": "ciclistas",
+  "dist": 37.9,
+  "filmstrip": "filmstrips/c0330.jpg",
+  "contexto": "contextos/c0330.jpg"
+ },
+ {
+  "id": "c0335",
+  "hora": "22",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.4,
+  "filmstrip": "filmstrips/c0335.jpg",
+  "contexto": "contextos/c0335.jpg"
+ },
+ {
+  "id": "c0336",
+  "hora": "22",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0336.jpg",
+  "contexto": "contextos/c0336.jpg"
+ },
+ {
+  "id": "c0337",
+  "hora": "22",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.7,
+  "filmstrip": "filmstrips/c0337.jpg",
+  "contexto": "contextos/c0337.jpg"
+ },
+ {
+  "id": "c0340",
+  "hora": "22",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "ciclistas",
+  "dist": 109.8,
+  "filmstrip": "filmstrips/c0340.jpg",
+  "contexto": "contextos/c0340.jpg"
+ },
+ {
+  "id": "c0345",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 9.7,
+  "filmstrip": "filmstrips/c0345.jpg",
+  "contexto": "contextos/c0345.jpg"
+ },
+ {
+  "id": "c0349",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.7,
+  "filmstrip": "filmstrips/c0349.jpg",
+  "contexto": "contextos/c0349.jpg"
+ },
+ {
+  "id": "c0351",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 4.4,
+  "filmstrip": "filmstrips/c0351.jpg",
+  "contexto": "contextos/c0351.jpg"
+ },
+ {
+  "id": "c0353",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 116.3,
+  "filmstrip": "filmstrips/c0353.jpg",
+  "contexto": "contextos/c0353.jpg",
+  "rotulo_original": "motocicletas"
+ },
+ {
+  "id": "c0359",
+  "hora": "23",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 105.9,
+  "filmstrip": "filmstrips/c0359.jpg",
+  "contexto": "contextos/c0359.jpg"
+ },
+ {
+  "id": "c0361",
+  "hora": "23",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 125.0,
+  "filmstrip": "filmstrips/c0361.jpg",
+  "contexto": "contextos/c0361.jpg"
+ },
+ {
+  "id": "c0362",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 93.5,
+  "filmstrip": "filmstrips/c0362.jpg",
+  "contexto": "contextos/c0362.jpg"
+ },
+ {
+  "id": "c0363",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.3,
+  "filmstrip": "filmstrips/c0363.jpg",
+  "contexto": "contextos/c0363.jpg"
+ },
+ {
+  "id": "c0367",
+  "hora": "23",
+  "rotulo": "ciclistas",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 123.4,
+  "filmstrip": "filmstrips/c0367.jpg",
+  "contexto": "contextos/c0367.jpg"
+ },
+ {
+  "id": "c0368",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 1.4,
+  "filmstrip": "filmstrips/c0368.jpg",
+  "contexto": "contextos/c0368.jpg"
+ },
+ {
+  "id": "c0372",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "B",
+  "yolo": "pedestres",
+  "dist": 0.2,
+  "filmstrip": "filmstrips/c0372.jpg",
+  "contexto": "contextos/c0372.jpg"
+ },
+ {
+  "id": "c0373",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 60.8,
+  "filmstrip": "filmstrips/c0373.jpg",
+  "contexto": "contextos/c0373.jpg"
+ },
+ {
+  "id": "c0375",
+  "hora": "23",
+  "rotulo": "pedestres",
+  "fonte": "C",
+  "yolo": "pedestres",
+  "dist": 106.8,
+  "filmstrip": "filmstrips/c0375.jpg",
+  "contexto": "contextos/c0375.jpg"
+ }
+]

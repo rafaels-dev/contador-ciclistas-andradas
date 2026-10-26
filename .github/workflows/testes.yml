@@ -1,0 +1,74 @@
+# Testes automatizados — rodam em todo pull request e em todo push nas
+# branches principais. A proteção das branches (Settings → Branches) exige
+# que os dois jobs abaixo passem antes do merge; os nomes deles são os que
+# aparecem lá como "status checks", então mudar um nome exige atualizar a regra.
+#
+# Para rodar localmente:
+#   cd web && npm run lint && npm run typecheck && npm test
+#   python -m pytest              (na raiz, com requirements-dev.txt instalado)
+#   python -m pytest -m "not lento"   (pula o worker de ponta a ponta)
+name: Testes
+
+on:
+  pull_request:
+  push:
+    branches: [main, app-revisao]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testes-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web (lint, tipos e testes)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  worker:
+    name: Worker (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: requirements*.txt
+
+      # mesmas versões que o app desktop instala (web/src/lib/motor.ts), PyTorch sem CUDA
+      - name: Ambiente do motor (Python 3.11)
+        run: |
+          uv venv --python 3.11 .venv
+          uv pip install --python .venv torch==2.12.0 torchvision==0.27.0 --index-url https://download.pytorch.org/whl/cpu
+          uv pip install --python .venv -r requirements-dev.txt
+
+      # o yolov8n.pt (COCO) vem do site da Ultralytics na 1ª execução; o
+      # fine-tune de bicicletas (runs/ft_blur/weights/best.pt) está no git
+      - uses: actions/cache@v4
+        with:
+          path: yolov8n.pt
+          key: yolov8n-pt
+
+      - name: pytest
+        env:
+          PYTHONUTF8: "1"
+        run: .venv/bin/python -m pytest -v

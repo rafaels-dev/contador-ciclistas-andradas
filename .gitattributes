@@ -1,0 +1,2 @@
+# LF no repositório mesmo quando o commit sai do Windows (o npm lá grava CRLF)
+* text=auto eol=lf

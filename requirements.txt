@@ -1,5 +1,14 @@
-ultralytics>=8.2.0
-supervision>=0.22.0
-opencv-python-headless>=4.9.0
-numpy>=1.26.0
-imageio[ffmpeg]>=2.34.0
+# Versões fixas: o app desktop instala o motor do zero na máquina do usuário,
+# e versões novas quebram o worker (ex.: supervision 0.31 tirou sv.ByteTrack).
+# São as validadas no desenvolvimento; o PyTorch (2.12.0) é instalado à parte
+# pelo app, com CUDA ou sem (web/src/lib/motor.ts).
+ultralytics==8.4.60
+supervision==0.28.0
+# o ultralytics exige o opencv-python: fixá-lo evita uma 2ª cópia (headless ou
+# outra versão) gravada por cima na mesma pasta cv2 — a instalação em paralelo
+# do uv deixava o cv2 quebrado ou não, conforme a ordem
+opencv-python==4.13.0.92
+numpy==2.2.6
+pillow==12.2.0
+imageio[ffmpeg]==2.37.3
+imageio-ffmpeg==0.6.0

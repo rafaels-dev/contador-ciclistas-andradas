@@ -1,0 +1,481 @@
+import fs from "node:fs";
+import { DatabaseSync } from "node:sqlite";
+import { ARQUIVO_DB, DIR_DADOS } from "./paths";
+
+/**
+ * Fluxo de um job (ordem fixa — o render só acontece depois da revisão humana):
+ *   baixando → aguardando_linhas (usuário desenha as linhas no 1º frame)
+ *   → detectando → sugerindo (OpenRouter p/ TODO candidato)
+ *   → aguardando_revisao
+ * Qualquer etapa pode ir para `erro` (mensagem em jobs.erro). O vídeo final é
+ * um `render` à parte: junta um ou mais jobs com a revisão completa (contador
+ * somando entre eles) e não muda o status dos jobs — a revisão continua
+ * editável e dá para gerar de novo. (renderizando/concluido: legado.)
+ */
+export const STATUS_JOB = [
+  "baixando",
+  "aguardando_linhas",
+  "detectando",
+  "sugerindo",
+  "aguardando_revisao",
+  "renderizando",
+  "concluido",
+  "erro",
+] as const;
+export type StatusJob = (typeof STATUS_JOB)[number];
+
+// patinetes (em pé), scooters elétricos (sentado, sem pedalar) e monociclos: só o
+// modelo de visão e a revisão os distinguem — o YOLO os entrega como
+// pessoa/bicicleta/moto. "outros": tudo que se move e não tem categoria própria
+// (inclusive o que só a subtração de fundo do worker viu)
+export const CATEGORIAS = ["ciclistas", "patinetes", "scooters", "monociclos", "pedestres", "automoveis", "motocicletas", "outros"] as const;
+export type Categoria = (typeof CATEGORIAS)[number];
+
+/**
+ * Linha de contagem desenhada pelo usuário sobre o 1º frame: um segmento em
+ * qualquer ângulo (ciclovias têm geometrias diferentes por câmera). Coordenadas
+ * normalizadas 0–1 para independer da resolução. Sem nenhuma linha, cada
+ * trajetória com deslocamento relevante vira um candidato.
+ */
+export type Linha = {
+  id: string;
+  nome: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  /** categorias contadas nesta linha (vazio/ausente = todas); as demais vão
+   *  para a revisão já propostas como descarte — ver lib/revisao.ts */
+  categorias?: Categoria[];
+};
+
+/**
+ * Área de análise (0–1 do quadro): o worker detecta só nela, na resolução
+ * original do vídeo — numa câmera 4K alta, o ciclista distante continua com
+ * os pixels que o 1080p reduzido tirava. Não muda o vídeo final.
+ */
+export type Area = { x: number; y: number; w: number; h: number };
+
+export type Job = {
+  id: string;
+  link_drive: string;
+  drive_id: string;
+  nome_arquivo: string | null;
+  camera_id: string | null;
+  linhas: string; // JSON de Linha[] — cópia congelada no momento da detecção
+  area: string | null; // JSON de Area (null = quadro inteiro)
+  arquivo_video: string | null; // relativo ao dir do job, ou absoluto (vídeo local usado onde está)
+  grupo_id: string | null; // grupo da biblioteca (null = sem grupo)
+  fps: number | null;
+  largura: number | null;
+  altura: number | null;
+  duracao_s: number | null;
+  status: StatusJob;
+  progresso: number;
+  mensagem: string | null;
+  erro: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+/** Grupo da biblioteca (um local, um dia de coleta…): só organiza e facilita o vídeo final. */
+export type Grupo = { id: string; nome: string; criado_em: string };
+
+const SCHEMA_GRUPOS = `
+CREATE TABLE IF NOT EXISTS grupos (
+  id         TEXT PRIMARY KEY,
+  nome       TEXT NOT NULL,
+  criado_em  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+-- preferências do app (placa de vídeo, primeiro acesso…); a chave do
+-- OpenRouter não fica aqui, e sim no arquivo de configuração (lib/env.ts)
+CREATE TABLE IF NOT EXISTS configuracoes (
+  chave  TEXT PRIMARY KEY,
+  valor  TEXT NOT NULL
+);
+`;
+
+const SCHEMA_RENDERS = `
+CREATE TABLE IF NOT EXISTS renders (
+  id             TEXT PRIMARY KEY,
+  nome           TEXT NOT NULL,
+  jobs           TEXT NOT NULL,              -- JSON: ids dos jobs, na ordem do vídeo
+  status         TEXT NOT NULL DEFAULT 'na_fila', -- na_fila | renderizando | pronto | erro
+  progresso      REAL NOT NULL DEFAULT 0,
+  mensagem       TEXT,
+  erro           TEXT,
+  criado_em      TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`;
+
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS cameras (
+  id          TEXT PRIMARY KEY,
+  nome        TEXT NOT NULL,
+  linhas      TEXT NOT NULL DEFAULT '[]',
+  criado_em   TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+  id             TEXT PRIMARY KEY,
+  link_drive     TEXT NOT NULL,
+  drive_id       TEXT NOT NULL,
+  nome_arquivo   TEXT,
+  camera_id      TEXT REFERENCES cameras(id),
+  linhas         TEXT NOT NULL DEFAULT '[]',
+  arquivo_video  TEXT,
+  fps            REAL,
+  largura        INTEGER,
+  altura         INTEGER,
+  duracao_s      REAL,
+  status         TEXT NOT NULL DEFAULT 'baixando',
+  progresso      REAL NOT NULL DEFAULT 0,
+  mensagem       TEXT,
+  erro           TEXT,
+  criado_em      TEXT NOT NULL DEFAULT (datetime('now')),
+  atualizado_em  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS candidatos (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id             TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+  track              TEXT NOT NULL,    -- '<grupo>:<tid>' (pes|bic|aut|mot)
+  linha_id           TEXT,             -- linha cruzada (NULL = modo sem linha)
+  frame              INTEGER NOT NULL, -- frame do evento (cruzamento ou meio da trajetória)
+  tempo_s            REAL NOT NULL,
+  direcao            TEXT,             -- 'A→B' | 'B→A' em relação à linha
+  bbox               TEXT,             -- JSON [x1,y1,x2,y2] em px no frame do evento
+  classe_yolo        TEXT,             -- categoria sugerida pelo detector
+  conf_yolo          REAL,
+  alternativa        TEXT,             -- outra categoria plausível (bike×moto)
+  origem             TEXT,             -- track | pessoa_com_bicicleta | pessoa_com_moto
+  n_obs              INTEGER,
+  filmstrip          TEXT,             -- caminho relativo ao dir do job
+  contexto           TEXT,             -- quadro do evento recortado (p/ o modelo de visão)
+  clipe              TEXT,
+  sugestao_llm       TEXT,             -- categoria sugerida pelo OpenRouter (ou 'descartado')
+  custo_llm          REAL,             -- US$ da chamada (informado pelo OpenRouter)
+  conf_llm           REAL,
+  justificativa_llm  TEXT,
+  modelo_llm         TEXT,
+  status_llm         TEXT NOT NULL DEFAULT 'pendente', -- pendente | ok | falhou
+  erro_llm           TEXT,             -- JSON com o erro da última tentativa (status HTTP, resposta do provedor…)
+  rotulo             TEXT,             -- decisão humana: categoria ou 'descartado'
+  revisado_em        TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_candidatos_job ON candidatos(job_id);
+${SCHEMA_RENDERS}
+${SCHEMA_GRUPOS}`;
+
+/** Colunas adicionadas depois da criação do banco (CREATE IF NOT EXISTS não altera tabela existente). */
+function migrar(d: DatabaseSync): void {
+  const novas: Record<string, Record<string, string>> = {
+    candidatos: { contexto: "TEXT", custo_llm: "REAL", erro_llm: "TEXT" },
+    jobs: { grupo_id: "TEXT REFERENCES grupos(id) ON DELETE SET NULL", area: "TEXT" },
+    cameras: { area: "TEXT" },
+    renders: { categorias: "TEXT" }, // JSON de Categoria[]; NULL = todas
+  };
+  d.exec(SCHEMA_RENDERS);
+  d.exec(SCHEMA_GRUPOS);
+  for (const [tabela, colunas] of Object.entries(novas)) {
+    const existentes = new Set((d.prepare(`PRAGMA table_info(${tabela})`).all() as { name: string }[]).map((c) => c.name));
+    for (const [col, tipo] of Object.entries(colunas)) {
+      if (!existentes.has(col)) d.exec(`ALTER TABLE ${tabela} ADD COLUMN ${col} ${tipo}`);
+    }
+  }
+}
+
+// globalThis: sobrevive ao hot reload do `next dev` (senão cada recarga
+// reabriria o banco e marcaria como interrompidos os jobs em andamento)
+const g = globalThis as { __contadorDb?: DatabaseSync; __contadorDbVersao?: number };
+// incremente ao mudar migrar(): no hot reload o banco continua aberto, e a
+// migração precisa rodar sem reiniciar o servidor (e os workers em curso)
+const VERSAO_SCHEMA = 8;
+
+export function db(): DatabaseSync {
+  if (!g.__contadorDb) {
+    fs.mkdirSync(DIR_DADOS, { recursive: true });
+    const d = new DatabaseSync(ARQUIVO_DB);
+    d.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
+    d.exec(SCHEMA);
+    // processo novo: nenhum worker sobreviveu ao reinício do servidor
+    d.prepare(
+      `UPDATE jobs SET status = 'erro', erro = 'Interrompido: o servidor foi reiniciado.',
+       atualizado_em = datetime('now') WHERE status IN ('baixando', 'detectando')`,
+    ).run();
+    d.exec(SCHEMA_RENDERS);
+    d.prepare(
+      `UPDATE renders SET status = 'erro', erro = 'Interrompido: o servidor foi reiniciado.',
+       atualizado_em = datetime('now') WHERE status IN ('na_fila', 'renderizando')`,
+    ).run();
+    g.__contadorDb = d;
+  }
+  if (g.__contadorDbVersao !== VERSAO_SCHEMA) {
+    migrar(g.__contadorDb);
+    g.__contadorDbVersao = VERSAO_SCHEMA;
+  }
+  return g.__contadorDb;
+}
+
+// node:sqlite devolve objetos com protótipo nulo, que o React não serializa
+// para Client Components — converte em objetos comuns.
+function simples(linha: object): object {
+  return { ...linha };
+}
+
+export type Candidato = {
+  id: number;
+  job_id: string;
+  track: string;
+  linha_id: string | null;
+  frame: number;
+  tempo_s: number;
+  direcao: string | null;
+  bbox: string | null;
+  classe_yolo: Categoria | null;
+  conf_yolo: number | null;
+  alternativa: Categoria | null;
+  origem: string | null;
+  n_obs: number | null;
+  filmstrip: string | null;
+  contexto: string | null;
+  clipe: string | null;
+  sugestao_llm: Categoria | "descartado" | null;
+  custo_llm: number | null;
+  conf_llm: number | null;
+  justificativa_llm: string | null;
+  modelo_llm: string | null;
+  status_llm: "pendente" | "ok" | "falhou";
+  erro_llm: string | null;
+  rotulo: Categoria | "descartado" | null;
+  revisado_em: string | null;
+};
+
+export type Camera = { id: string; nome: string; linhas: string; area: string | null; criado_em: string };
+
+type CamposJob = Partial<Omit<Job, "id" | "criado_em" | "atualizado_em">>;
+
+export function atualizarJob(id: string, campos: CamposJob): void {
+  const chaves = Object.keys(campos) as (keyof CamposJob)[];
+  if (!chaves.length) return;
+  const sets = chaves.map((k) => `${k} = ?`).join(", ");
+  db()
+    .prepare(`UPDATE jobs SET ${sets}, atualizado_em = datetime('now') WHERE id = ?`)
+    .run(...chaves.map((k) => campos[k] ?? null), id);
+}
+
+export function listarCandidatos(jobId: string): Candidato[] {
+  return db()
+    .prepare("SELECT * FROM candidatos WHERE job_id = ? ORDER BY frame, id")
+    .all(jobId)
+    .map(simples) as Candidato[];
+}
+
+export function substituirCandidatos(
+  jobId: string,
+  itens: Omit<Candidato, "id" | "job_id" | "sugestao_llm" | "custo_llm" | "conf_llm" | "justificativa_llm" | "modelo_llm" | "status_llm" | "erro_llm" | "rotulo" | "revisado_em">[],
+): void {
+  const d = db();
+  d.exec("BEGIN");
+  try {
+    d.prepare("DELETE FROM candidatos WHERE job_id = ?").run(jobId);
+    const ins = d.prepare(
+      `INSERT INTO candidatos (job_id, track, linha_id, frame, tempo_s, direcao, bbox, classe_yolo,
+         conf_yolo, alternativa, origem, n_obs, filmstrip, contexto, clipe)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    for (const c of itens) {
+      ins.run(jobId, c.track, c.linha_id, c.frame, c.tempo_s, c.direcao, c.bbox, c.classe_yolo,
+        c.conf_yolo, c.alternativa, c.origem, c.n_obs, c.filmstrip, c.contexto, c.clipe);
+    }
+    d.exec("COMMIT");
+  } catch (e) {
+    d.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+export function listarCameras(): Camera[] {
+  return db().prepare("SELECT * FROM cameras ORDER BY nome").all().map(simples) as Camera[];
+}
+
+export function salvarCamera(id: string, nome: string, linhas: Linha[], area?: Area | null): void {
+  // area undefined = mantém a da câmera (ex.: só as categorias das linhas mudaram)
+  db()
+    .prepare(
+      `INSERT INTO cameras (id, nome, linhas, area) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET nome = excluded.nome, linhas = excluded.linhas,
+         area = CASE WHEN ? THEN excluded.area ELSE cameras.area END`,
+    )
+    .run(id, nome, JSON.stringify(linhas), area ? JSON.stringify(area) : null, area === undefined ? 0 : 1);
+}
+
+export function listarJobs(): Job[] {
+  return db().prepare("SELECT * FROM jobs ORDER BY criado_em DESC").all().map(simples) as Job[];
+}
+
+export function obterJob(id: string): Job | undefined {
+  const linha = db().prepare("SELECT * FROM jobs WHERE id = ?").get(id);
+  return linha ? (simples(linha) as Job) : undefined;
+}
+
+export function criarJob(dados: { id: string; link_drive: string; drive_id: string; grupo_id?: string | null }): void {
+  db()
+    .prepare("INSERT INTO jobs (id, link_drive, drive_id, grupo_id) VALUES (?, ?, ?, ?)")
+    .run(dados.id, dados.link_drive, dados.drive_id, dados.grupo_id ?? null);
+}
+
+export function listarGrupos(): (Grupo & { n: number })[] {
+  return db()
+    .prepare(
+      `SELECT g.*, (SELECT COUNT(*) FROM jobs j WHERE j.grupo_id = g.id) AS n
+       FROM grupos g ORDER BY g.nome COLLATE NOCASE`,
+    )
+    .all()
+    .map(simples) as (Grupo & { n: number })[];
+}
+
+export function obterGrupo(id: string): Grupo | undefined {
+  const linha = db().prepare("SELECT * FROM grupos WHERE id = ?").get(id);
+  return linha ? (simples(linha) as Grupo) : undefined;
+}
+
+export function salvarGrupo(id: string, nome: string): void {
+  db()
+    .prepare("INSERT INTO grupos (id, nome) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET nome = excluded.nome")
+    .run(id, nome);
+}
+
+/** Apaga só o grupo: os vídeos continuam na biblioteca, sem grupo. */
+export function excluirGrupo(id: string): void {
+  const d = db();
+  d.prepare("UPDATE jobs SET grupo_id = NULL WHERE grupo_id = ?").run(id);
+  d.prepare("DELETE FROM grupos WHERE id = ?").run(id);
+}
+
+export function moverJobs(ids: string[], grupoId: string | null): void {
+  const upd = db().prepare("UPDATE jobs SET grupo_id = ? WHERE id = ?");
+  for (const id of ids) upd.run(grupoId, id);
+}
+
+export function registrarSugestao(
+  id: number,
+  dados: {
+    sugestao_llm: string | null;
+    conf_llm: number | null;
+    justificativa_llm: string | null;
+    modelo_llm: string | null;
+    custo_llm: number | null;
+    status_llm: "ok" | "falhou" | "pendente";
+    /** JSON do erro (só quando falhou); omitido = limpa */
+    erro_llm?: string | null;
+  },
+): void {
+  db()
+    .prepare(
+      `UPDATE candidatos SET sugestao_llm = ?, conf_llm = ?, justificativa_llm = ?, modelo_llm = ?, custo_llm = ?, status_llm = ?, erro_llm = ?
+       WHERE id = ?`,
+    )
+    .run(dados.sugestao_llm, dados.conf_llm, dados.justificativa_llm, dados.modelo_llm, dados.custo_llm, dados.status_llm, dados.erro_llm ?? null, id);
+}
+
+/** Candidatos cuja sugestão falhou, em todos os jobs (relatório de diagnóstico). */
+export function listarCandidatosComErro(limite = 200): Candidato[] {
+  return db()
+    .prepare(`SELECT * FROM candidatos WHERE status_llm = 'falhou' ORDER BY job_id, id LIMIT ?`)
+    .all(limite)
+    .map(simples) as Candidato[];
+}
+
+/** Quantos candidatos por linha, classe do detector e status da sugestão (diagnóstico de "não contou nada"). */
+export function resumoCandidatos(jobId: string): { linha_id: string | null; classe_yolo: string | null; origem: string | null; status_llm: string; sugestao_llm: string | null; rotulo: string | null; n: number }[] {
+  return db()
+    .prepare(
+      `SELECT linha_id, classe_yolo, origem, status_llm, sugestao_llm, rotulo, COUNT(*) AS n FROM candidatos
+       WHERE job_id = ? GROUP BY linha_id, classe_yolo, origem, status_llm, sugestao_llm, rotulo ORDER BY linha_id, n DESC`,
+    )
+    .all(jobId)
+    .map(simples) as ReturnType<typeof resumoCandidatos>;
+}
+
+/** Grava decisões humanas (rotulo null = volta a pendente). Só toca candidatos do job. */
+export function revisarCandidatos(jobId: string, decisoes: { id: number; rotulo: Categoria | "descartado" | null }[]): void {
+  const d = db();
+  const upd = d.prepare(
+    `UPDATE candidatos SET rotulo = ?, revisado_em = CASE WHEN ? IS NULL THEN NULL ELSE datetime('now') END
+     WHERE id = ? AND job_id = ?`,
+  );
+  d.exec("BEGIN");
+  try {
+    for (const x of decisoes) upd.run(x.rotulo, x.rotulo, x.id, jobId);
+    d.exec("COMMIT");
+  } catch (e) {
+    d.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+export function resumoRevisao(jobId: string): { total: number; revisados: number } {
+  const r = db()
+    .prepare("SELECT COUNT(*) AS total, COUNT(rotulo) AS revisados FROM candidatos WHERE job_id = ?")
+    .get(jobId) as { total: number; revisados: number };
+  return { total: r.total, revisados: r.revisados };
+}
+
+export function resumoSugestoes(jobId: string): { total: number; ok: number; falhou: number; custo: number } {
+  const r = db()
+    .prepare(
+      `SELECT COUNT(*) AS total, SUM(status_llm = 'ok') AS ok, SUM(status_llm = 'falhou') AS falhou,
+              COALESCE(SUM(custo_llm), 0) AS custo FROM candidatos WHERE job_id = ?`,
+    )
+    .get(jobId) as { total: number; ok: number | null; falhou: number | null; custo: number };
+  return { total: r.total, ok: r.ok ?? 0, falhou: r.falhou ?? 0, custo: r.custo };
+}
+
+export type StatusRender = "na_fila" | "renderizando" | "pronto" | "erro";
+
+export type Render = {
+  id: string;
+  nome: string;
+  jobs: string; // JSON de string[]
+  /** JSON de Categoria[] que entram no vídeo e na contagem; null = todas */
+  categorias: string | null;
+  status: StatusRender;
+  progresso: number;
+  mensagem: string | null;
+  erro: string | null;
+  criado_em: string;
+  atualizado_em: string;
+};
+
+export function criarRender(id: string, nome: string, jobs: string[], categorias: Categoria[] | null = null): void {
+  db().prepare("INSERT INTO renders (id, nome, jobs, categorias) VALUES (?, ?, ?, ?)").run(id, nome, JSON.stringify(jobs), categorias ? JSON.stringify(categorias) : null);
+}
+
+export function obterRender(id: string): Render | undefined {
+  const linha = db().prepare("SELECT * FROM renders WHERE id = ?").get(id);
+  return linha ? (simples(linha) as Render) : undefined;
+}
+
+export function listarRenders(): Render[] {
+  return db().prepare("SELECT * FROM renders ORDER BY criado_em DESC").all().map(simples) as Render[];
+}
+
+export function atualizarRender(id: string, campos: Partial<Pick<Render, "status" | "progresso" | "mensagem" | "erro" | "categorias">>): void {
+  const chaves = Object.keys(campos) as (keyof typeof campos)[];
+  if (!chaves.length) return;
+  db()
+    .prepare(`UPDATE renders SET ${chaves.map((k) => `${k} = ?`).join(", ")}, atualizado_em = datetime('now') WHERE id = ?`)
+    .run(...chaves.map((k) => campos[k] ?? null), id);
+}
+
+export function lerConfiguracao(chave: string): string | null {
+  const linha = db().prepare("SELECT valor FROM configuracoes WHERE chave = ?").get(chave) as { valor: string } | undefined;
+  return linha?.valor ?? null;
+}
+
+export function gravarConfiguracao(chave: string, valor: string | null): void {
+  if (valor === null) db().prepare("DELETE FROM configuracoes WHERE chave = ?").run(chave);
+  else db().prepare("INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON CONFLICT(chave) DO UPDATE SET valor = excluded.valor").run(chave, valor);
+}
