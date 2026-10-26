@@ -30,7 +30,17 @@ python stream_tempo_real.py 0 --sem-janela          # webcam, no display window
 python stream_tempo_real.py rtsp://... --pular 1    # skip every other frame to cut CPU load
 ```
 
-There is no test suite, linter, or type-checker configured. Validate changes with the evaluation harness in `avaliacao/` (validation videos live in `avaliacao/videos/`, gitignored, downloaded from Cristiano's Drive via rclone remote `gdrive`):
+Automated tests (CI: `.github/workflows/testes.yml`, on every PR and push to `main`/`app-revisao`; branch protection requires both jobs — "Web (lint, tipos e testes)" and "Worker (pytest)" — so renaming a job means updating the rule):
+
+```bash
+python -m pytest                  # tests/ — needs requirements-dev.txt (pytest + requirements.txt + torch)
+python -m pytest -m "not lento"   # skips test_worker_video.py (runs worker/detectar.py on a synthetic video, ~25 s)
+cd web && npm run lint && npm run typecheck && npm test   # Vitest: src/**/*.test.ts
+```
+
+`tests/` covers the worker's geometry/area conversions, `gerar_candidatos` (crossings, person↔bike pairing, bike×moto, motion filters incl. `fino`, `LARGO_FAIXA`), track splicing, trilhas round-trip, `LinhaContagem`, and an end-to-end worker run where only the motion detector can see the object. Web tests cover `lib/revisao.ts`, `lib/mp4.ts` (hand-built MP4 boxes), model fallback list, JPEG header, paths, status and the desktop access token. On Windows the app's motor venv has no pip: `uv pip install --target <dir> pytest` and put `<dir>` on `PYTHONPATH`.
+
+Counting quality is still validated with the evaluation harness in `avaliacao/` (validation videos live in `avaliacao/videos/`, gitignored, downloaded from Cristiano's Drive via rclone remote `gdrive`):
 
 ```bash
 # diagnóstico instrumentado: eventos.jsonl (cada contagem com motivo/lado/dx),
