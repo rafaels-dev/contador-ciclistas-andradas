@@ -6,7 +6,7 @@
   "description": "Contagem de ciclistas, pedestres e veículos com revisão humana",
   "homepage": "https://github.com/rafaels-dev/contador-ciclistas-andradas",
   "author": "Rafael Schettino <rcschettino@gmail.com>",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "private": true,
   "main": "main.cjs",
   "scripts": {

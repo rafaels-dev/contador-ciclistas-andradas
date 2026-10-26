@@ -1,270 +1,117 @@
-# Contador de Ciclistas, Pedestres, Automóveis e Motocicletas
+# Contador de Tráfego
 
-Ferramenta de inteligência artificial que analisa vídeos de câmeras de rua e conta automaticamente quatro categorias de usuários:
+Aplicativo de computador que conta **ciclistas, pedestres, automóveis, motocicletas, patinetes, scooters elétricos e monociclos** em vídeos de câmeras fixas de rua — com revisão humana de cada contagem antes do resultado final.
 
-- 🚲 **Ciclistas** — pessoas andando de bicicleta
-- 🚶 **Pedestres** — pessoas a pé
-- 🚗 **Automóveis** — carros, ônibus e caminhões
-- 🏍️ **Motocicletas**
+Feito para pesquisas de mobilidade (começou com a câmera da ciclovia de Andradas, MG), funciona com qualquer vídeo de câmera parada.
 
-A contagem é feita quando cada objeto cruza uma linha vertical no centro do vídeo. O programa gera um vídeo anotado em H.264 (tamanho próximo ao original) e um arquivo JSON com os totais e os instantes de cada evento.
+## Como funciona
 
----
+1. **Escolha o vídeo** — um arquivo do computador ou um link do Google Drive.
+2. **Desenhe as linhas de contagem** em qualquer ângulo (ciclovia, calçada, faixa da rua) e escolha o que cada linha conta. Em vídeos 4K de câmera alta, marque também a área de análise.
+3. **Detecção** — o app encontra e acompanha tudo o que se move (inteligência artificial YOLO + detecção de movimento), na placa de vídeo NVIDIA ou no processador.
+4. **Sugestões** — um modelo de visão (via OpenRouter, com a sua chave) sugere a categoria de cada objeto que cruzou uma linha.
+5. **Revisão** — você confere cada objeto num editor com o clipe, o vídeo original e uma linha do tempo, aceitando ou corrigindo a sugestão (atalhos de teclado, aceite em lote dos casos confiáveis).
+6. **Vídeo final** — um MP4 com as linhas, as contagens e o painel de totais, mais uma planilha (`eventos.csv`) e um relatório (`relatorio.json`). Vários vídeos (por exemplo, as horas de um dia) podem virar um único vídeo final com os totais somados.
 
-## Requisitos de hardware
+## Baixar e instalar
 
-| Item | Mínimo | Recomendado |
+Baixe o instalador da última versão em **[Releases](https://github.com/rafaels-dev/contador-ciclistas-andradas/releases/latest)**:
+
+| Sistema | Arquivo |
+|---|---|
+| Windows 10/11 (64 bits) | `ContadorDeTrafego-Setup-<versão>.exe` |
+| macOS (chip Apple) | `ContadorDeTrafego-<versão>-arm64.dmg` |
+| macOS (Intel) | `ContadorDeTrafego-<versão>-x64.dmg` |
+| Linux | `.AppImage` ou `.deb` |
+
+O instalador não pede administrador e o app se atualiza sozinho: quando há versão nova, aparece a faixa **Reiniciar e atualizar**.
+
+Na primeira vez, um assistente prepara três coisas:
+
+- **Placa de vídeo** — usa a NVIDIA se houver (bem mais rápido); dá para escolher só o processador.
+- **Motor de detecção** — o app baixa e instala o Python e as bibliotecas de inteligência artificial (cerca de 1 GB sem placa NVIDIA, 2,5 GB com ela; ocupa até ~6 GB no disco).
+- **Chave do OpenRouter** — o serviço pago por uso que faz as sugestões. Cada sugestão custa uma fração de centavo (duas horas de vídeo de uma avenida movimentada saíram por cerca de US$ 0,10). Crie a chave em [openrouter.ai](https://openrouter.ai/keys) e cole no app; ele testa antes de salvar.
+
+**Requisitos:** placa de vídeo NVIDIA opcional (recomendada), espaço em disco para o motor (~6 GB) e para os vídeos finais, e internet para instalar o motor e para as sugestões.
+
+**Se algo der errado:** em **Configurações → Ajuda e diagnóstico**, clique em **Salvar relatório de diagnóstico** e envie o arquivo `.zip` a quem dá suporte. Ele leva o registro do programa e o que aconteceu em cada vídeo — sem os vídeos e sem a sua chave.
+
+## Privacidade
+
+Os vídeos são processados **no seu computador** e não são enviados a lugar nenhum. O app só se comunica com outros sistemas nestes casos:
+
+| Quando | Para onde | O que vai |
 |---|---|---|
-| RAM | 4 GB | 8 GB ou mais |
-| CPU | Qualquer dual-core | Quad-core ou melhor |
-| GPU | Não obrigatório | NVIDIA com CUDA (processa mais rápido) |
-| Espaço em disco | ~1,3× o tamanho do vídeo original | — |
+| Sugestões de categoria (com a chave que você configurou) | [OpenRouter](https://openrouter.ai/privacy) e o provedor do modelo escolhido por ele (padrão: Anthropic; reservas: DeepSeek e Google) | Recortes pequenos de cada objeto candidato (sequência de recortes e o quadro do cruzamento, em JPEG). Nada mais do vídeo. |
+| Você cola um link do Google Drive | [Google Drive](https://policies.google.com/privacy) | O pedido de download do arquivo do link. |
+| Instalação do motor (primeira execução ou "Instalar agora") | GitHub (Python), [PyPI](https://pypi.org) e download.pytorch.org | Pedidos de download das bibliotecas. |
+| Atualizações (ao abrir o app e a cada 4 h) | [GitHub Releases](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) deste repositório | Consulta da versão mais recente e, se houver, o download dela. |
 
-> O vídeo de saída é gravado em H.264 via ffmpeg embutido no pacote `imageio` — sem instalação manual. Nos testes com a câmera de Andradas, um vídeo original de 47 MB gerou um arquivo anotado de 63 MB. As anotações visuais (caixas, texto, painel) aumentam levemente a complexidade dos frames, daí a diferença. Use `--sem-video` se quiser apenas os números, sem gerar vídeo.
+Não há telemetria, conta de usuário nem coleta de dados de uso. O relatório de diagnóstico só é gerado quando você pede, fica salvo no seu computador e omite a chave do OpenRouter.
 
----
+## Code signing policy
 
-## 1. Instale o Python
+Os instaladores são gerados pelo GitHub Actions ([`.github/workflows/desktop.yml`](.github/workflows/desktop.yml)) direto do código deste repositório, a partir de cada tag `v*`. A assinatura gratuita de código para projetos open source foi solicitada à [SignPath Foundation](https://signpath.org); enquanto ela não sai, o Windows e o macOS avisam na primeira abertura que o app é de um desenvolvedor não identificado.
 
-O programa precisa do **Python 3.10 ou superior**.
+Equipe:
 
-### Windows
+- Autores (commits sem revisão adicional): [Rafael Schettino](https://github.com/rafaels-dev)
+- Revisores: [Rafael Schettino](https://github.com/rafaels-dev)
+- Aprovadores (aprovam cada assinatura): [Rafael Schettino](https://github.com/rafaels-dev)
 
-1. Acesse [python.org/downloads](https://www.python.org/downloads/) e baixe o instalador mais recente.
-2. Execute o instalador. **Marque a opção "Add Python to PATH"** antes de clicar em *Install Now*.
-3. Após a instalação, abra o **Prompt de Comando** (tecle `Win + R`, digite `cmd`, pressione Enter) e confirme:
-   ```
-   python --version
-   ```
-   Deve aparecer algo como `Python 3.12.x`.
+Toda mudança na branch `main` passa pelos testes automatizados ([`.github/workflows/testes.yml`](.github/workflows/testes.yml)) antes do merge.
 
-### macOS
+Privacidade: veja a seção [Privacidade](#privacidade) — este programa não transfere informações a outros sistemas em rede, exceto nos casos listados lá, pedidos pelo usuário ou por quem o instala ou opera.
 
-1. Acesse [python.org/downloads](https://www.python.org/downloads/) e baixe o instalador para macOS.
-2. Execute o `.pkg` e siga os passos.
-3. Abra o **Terminal** (Finder → Aplicativos → Utilitários → Terminal) e confirme:
-   ```
-   python3 --version
-   ```
+## Para desenvolvedores
 
-### Linux (Ubuntu / Debian)
+Estrutura:
 
-O Python já costuma vir instalado. Confirme no terminal:
-```bash
-python3 --version
-```
-Se não estiver instalado:
-```bash
-sudo apt update && sudo apt install python3 python3-pip python3-venv -y
-```
+- `web/` — o app (Next.js): telas, banco SQLite, orquestração das etapas e chamadas ao OpenRouter.
+- `worker/` — Python: detecção e rastreamento (`detectar.py`), vídeo final (`renderizar.py`), leitura de vídeo com FFmpeg/NVDEC (`leitor.py`).
+- `desktop/` — Electron e instaladores (electron-builder); ver [`desktop/README.md`](desktop/README.md).
+- `contador/`, `processar_video.py`, `stream_tempo_real.py` — o contador original de linha de comando (contagem automática numa linha vertical, sem revisão), mantido para processamento em lote e tempo real.
+- `avaliacao/` — ferramentas de avaliação da contagem e calibração dos modelos.
+- `tests/` e `web/src/**/*.test.ts` — testes automatizados.
 
----
-
-## 2. Baixe o projeto
-
-Se você recebeu os arquivos por zip ou pen drive, extraia tudo em uma pasta de fácil acesso, por exemplo:
-
-- Windows: `C:\Users\SeuNome\contador-ciclistas`
-- macOS/Linux: `/home/seunome/contador-ciclistas`
-
-Se tiver o **Git** instalado, pode clonar diretamente:
-```bash
-git clone <url-do-repositorio>
-cd contador-ciclistas-andradas
-```
-
----
-
-## 3. Crie um ambiente virtual e instale as dependências
-
-Um ambiente virtual isola as bibliotecas deste projeto sem interferir no resto do seu computador. O comando `pip install` já instala tudo que é necessário, incluindo o ffmpeg embutido para geração do vídeo em H.264 — **não é preciso instalar o ffmpeg separadamente**.
-
-### Windows
-
-Abra o **Prompt de Comando** na pasta do projeto (você pode digitar `cmd` na barra de endereço do Explorador de Arquivos) e execute:
-
-```bat
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Quando o ambiente estiver ativo, você verá `(venv)` no início da linha do prompt.
-
-### macOS e Linux
-
-Abra o **Terminal** na pasta do projeto e execute:
+Rodar o app em desenvolvimento (Python 3.11 com as dependências e Node.js 22+):
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+python -m venv venv && source venv/bin/activate      # Windows: venv\Scripts\activate
+pip install torch==2.12.0 torchvision==0.27.0 --index-url https://download.pytorch.org/whl/cpu   # ou cu126 para NVIDIA
+pip install -r requirements-dev.txt
+cd web && npm ci && npm run dev                       # http://127.0.0.1:3000
 ```
 
-Quando ativo, você verá `(venv)` no início da linha.
-
-> **Na primeira execução**, o programa baixará automaticamente o modelo de IA (~6 MB). É necessário ter conexão com a internet somente nessa primeira vez.
-
----
-
-## 4. Como usar
-
-> **Importante:** sempre ative o ambiente virtual antes de rodar o programa (passo 3). Se fechar e reabrir o terminal, ative novamente com `venv\Scripts\activate` (Windows) ou `source venv/bin/activate` (macOS/Linux).
-
-### Uso básico — processar o vídeo padrão
-
-Coloque o vídeo chamado `Andradas.mp4` na mesma pasta do programa e execute:
+Testes (os mesmos do CI, exigidos para o merge na `main`):
 
 ```bash
-# Windows
-python processar_video.py
-
-# macOS / Linux
-python3 processar_video.py
+python -m pytest                      # worker e contador (na raiz)
+cd web && npm run lint && npm run typecheck && npm test
 ```
 
-Ao terminar, serão criados dois arquivos na mesma pasta:
-- `Andradas_anotado.mp4` — vídeo em H.264 com as detecções desenhadas e os contadores na tela
-- `resultado.json` — dados detalhados em formato de texto estruturado
-
-### Especificar outro vídeo
+Contador de linha de comando:
 
 ```bash
-python processar_video.py --video minha_camera.mp4
+python processar_video.py --video camera.mp4                 # vídeo anotado + resultado.json
+python processar_video.py --video camera.mp4 --sem-video     # só os números
+python stream_tempo_real.py rtsp://192.168.1.100/cam4         # eventos JSON em tempo real
 ```
 
-### Escolher o nome do vídeo de saída
+## Licença
 
-```bash
-python processar_video.py --video entrada.mp4 --saida saida_anotada.mp4
-```
+Copyright © 2026 Rafael Schettino.
 
-### Processar apenas um trecho (em segundos)
+Este programa é software livre, distribuído sob a **GNU Affero General Public License, versão 3** ([`LICENSE`](LICENSE)). Você pode usá-lo, estudá-lo, modificá-lo e redistribuí-lo; quem distribuir versões modificadas — ou oferecê-las a outras pessoas pela rede — deve disponibilizar o código-fonte sob a mesma licença.
 
-```bash
-# Processar do segundo 30 ao segundo 90
-python processar_video.py --inicio 30 --fim 90
-```
+Principais componentes de terceiros, todos open source:
 
-### Só obter as estatísticas, sem gerar vídeo
-
-Mais rápido — útil quando você só quer os números:
-
-```bash
-python processar_video.py --sem-video
-```
-
-### Referência completa das opções
-
-| Opção | Descrição | Padrão |
-|---|---|---|
-| `--video ARQUIVO` | Caminho para o vídeo a analisar | `Andradas.mp4` |
-| `--saida ARQUIVO` | Nome do vídeo anotado gerado | `<nome-do-video>_anotado.mp4` |
-| `--json ARQUIVO` | Nome do arquivo JSON com resultados | `resultado.json` |
-| `--sem-video` | Não gera vídeo anotado (mais rápido) | — |
-| `--inicio SEGUNDOS` | Começa a processar a partir desse segundo | `0` |
-| `--fim SEGUNDOS` | Para de processar nesse segundo | fim do vídeo |
-
----
-
-## 5. Exemplo de saída no terminal
-
-```
-Vídeo     : Andradas.mp4
-Resolução : 1920x1080 @ 15.0fps  |  Duração: 371.7s
-Intervalo : frames 0–5576 (371.7s)
-
-Codec de saída: H.264 (libx264)
-
-  🏍️ motocicletas   frame 63   (00:04.20) | total: 1
-  🚶 pedestres      frame 88   (00:05.87) | total: 1
-  🚲 ciclistas      frame 2083 (02:18.87) | total: 1
-  🚲 ciclistas      frame 2377 (02:38.47) | total: 2
-  🚶 pedestres      frame 2402 (02:40.13) | total: 2
-  ...
-
-────────────────────────────────────────────────────
-  Ciclistas    : 2
-  Pedestres    : 7
-  Automóveis   : 11
-  Motocicletas : 11
-────────────────────────────────────────────────────
-  Processamento: 175.3s (2.12× tempo real)
-  Vídeo anotado: Andradas_anotado.mp4
-  Tamanho      : 62.7 MB
-  JSON         : resultado.json
-```
-
-Cada linha mostra o momento exato (em `MM:SS.ss`) em que um novo objeto foi contado.
-
----
-
-## 6. Entendendo o vídeo anotado
-
-No vídeo gerado você verá:
-
-- **Linha branca vertical** no centro — é a linha de contagem; objetos são registrados ao cruzá-la
-- **Caixas coloridas** ao redor de cada objeto detectado:
-  - 🟢 Verde — ciclistas
-  - 🟡 Amarelo — pedestres
-  - 🟠 Laranja — automóveis
-  - 🔵 Ciano — motocicletas
-- **Painel de contagem** no canto superior esquerdo com os totais acumulados
-
----
-
-## 7. Ajustando as configurações
-
-Se precisar adaptar o programa para outra câmera ou local, edite o arquivo `config.py` com um editor de texto simples (Bloco de Notas, TextEdit, gedit):
-
-| Configuração | O que faz | Padrão |
-|---|---|---|
-| `LINHA_X` | Posição horizontal da linha de contagem (pixels) | `960` (centro de 1920px) |
-| `CONFIANCA` | Sensibilidade da detecção (0.0 a 1.0). Valor menor detecta mais objetos, mas pode gerar falsos positivos | `0.40` |
-| `DIST_MAX_CYCLIST_PX` | Distância máxima (pixels) entre pessoa e bicicleta para considerar ciclista | `250` |
-
----
-
-## 8. Resolução de problemas
-
-### "python não é reconhecido como um comando"
-- **Windows:** o Python não foi adicionado ao PATH durante a instalação. Reinstale e marque a opção **"Add Python to PATH"**.
-- **macOS/Linux:** tente usar `python3` em vez de `python`.
-
-### "ModuleNotFoundError: No module named 'ultralytics'"
-O ambiente virtual não está ativo ou as dependências não foram instaladas. Execute:
-```bash
-# Windows
-venv\Scripts\activate
-pip install -r requirements.txt
-
-# macOS / Linux
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### "Erro: não foi possível abrir 'Andradas.mp4'"
-O vídeo não foi encontrado na pasta. Verifique:
-1. Se o arquivo existe na mesma pasta que `processar_video.py`
-2. O nome exato do arquivo (incluindo a extensão `.mp4`)
-3. Use `--video` para indicar o caminho completo: `python processar_video.py --video C:\Videos\meu_video.mp4`
-
-### O processamento está muito lento
-- Use `--sem-video` para não gerar o vídeo anotado (economiza tempo)
-- Processe apenas um trecho com `--inicio` e `--fim`
-- Um computador com GPU NVIDIA acelera significativamente o processo
-
-### O vídeo anotado não abre
-O vídeo de saída usa o codec H.264, compatível com a grande maioria dos players modernos (Windows Media Player, Fotos do Windows, QuickTime, VLC). Se o seu player não abrir, instale o **VLC Media Player** ([videolan.org](https://www.videolan.org/)) — ele suporta qualquer formato.
-
-### A linha "Codec de saída" mostra "mp4v (fallback)"
-Isso ocorre em situações raras em que o ffmpeg embutido não pôde ser carregado. O vídeo ainda será gerado, porém em qualidade equivalente e com tamanho maior (~3× o original). Para resolver, tente reinstalar as dependências:
-```bash
-pip install --force-reinstall imageio[ffmpeg]
-```
-
----
-
-## Suporte
-
-Em caso de dúvidas ou problemas, entre em contato com a equipe responsável pelo projeto.
+| Componente | Licença |
+|---|---|
+| [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) e os pesos `yolov8n.pt` (inclusive o ajuste fino em `runs/ft_blur`) | AGPL-3.0 |
+| [PyTorch](https://pytorch.org) | BSD-3-Clause |
+| [OpenCV](https://opencv.org) | Apache-2.0 |
+| [supervision](https://github.com/roboflow/supervision) | MIT |
+| [FFmpeg](https://ffmpeg.org) (via imageio-ffmpeg) | LGPL/GPL |
+| [Electron](https://www.electronjs.org), [Next.js](https://nextjs.org), [React](https://react.dev) | MIT |
+| [uv](https://github.com/astral-sh/uv) | MIT / Apache-2.0 |
