@@ -1,44 +1,44 @@
-import type { Classe } from "./revisao";
+import type { Label } from "./review";
 
 /**
- * Peças visuais repetidas entre telas (classes Tailwind escritas por extenso
- * para o Tailwind encontrá-las no código).
+ * Visual pieces repeated across screens (Tailwind classes written out in
+ * full so Tailwind finds them in the code).
  */
 
-export const BOTAO = {
-  primario:
+export const BUTTON = {
+  primary:
     "inline-flex items-center justify-center gap-1.5 rounded-md bg-accent px-3 py-1.5 text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40",
-  secundario:
+  secondary:
     "inline-flex items-center justify-center gap-1.5 rounded-md border border-line bg-raised px-3 py-1.5 text-sm font-medium hover:bg-hover disabled:cursor-not-allowed disabled:opacity-40",
-  fantasma:
+  ghost:
     "inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-sm text-muted hover:bg-hover hover:text-fg disabled:cursor-not-allowed disabled:opacity-40",
-  perigo:
+  danger:
     "inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1 text-sm text-danger hover:bg-danger/10 disabled:opacity-40",
 } as const;
 
-export const CAMPO =
+export const FIELD =
   "rounded-md border border-line bg-raised px-2.5 py-1.5 text-sm text-fg placeholder:text-faint focus:border-accent focus:outline-none";
 
-/** Cabeçalho de painel, no estilo dos editores (título curto à esquerda, ações à direita). */
-export const TITULO_PAINEL = "font-display text-[0.8rem] font-semibold tracking-wide text-muted";
+/** Panel header, in the style of editors (short title on the left, actions on the right). */
+export const PANEL_TITLE = "font-display text-[0.8rem] font-semibold tracking-wide text-muted";
 
-export const COR_CLASSE: Record<Classe, { fundo: string; texto: string; borda: string }> = {
-  ciclistas: { fundo: "bg-cat-ciclistas", texto: "text-cat-ciclistas", borda: "border-cat-ciclistas" },
-  pedestres: { fundo: "bg-cat-pedestres", texto: "text-cat-pedestres", borda: "border-cat-pedestres" },
-  automoveis: { fundo: "bg-cat-automoveis", texto: "text-cat-automoveis", borda: "border-cat-automoveis" },
-  motocicletas: { fundo: "bg-cat-motocicletas", texto: "text-cat-motocicletas", borda: "border-cat-motocicletas" },
-  patinetes: { fundo: "bg-cat-patinetes", texto: "text-cat-patinetes", borda: "border-cat-patinetes" },
-  scooters: { fundo: "bg-cat-scooters", texto: "text-cat-scooters", borda: "border-cat-scooters" },
-  monociclos: { fundo: "bg-cat-monociclos", texto: "text-cat-monociclos", borda: "border-cat-monociclos" },
-  outros: { fundo: "bg-cat-outros", texto: "text-cat-outros", borda: "border-cat-outros" },
-  descartado: { fundo: "bg-cat-descartado", texto: "text-cat-descartado", borda: "border-cat-descartado" },
+export const LABEL_COLOR: Record<Label, { bg: string; text: string; border: string }> = {
+  cyclists: { bg: "bg-cat-cyclists", text: "text-cat-cyclists", border: "border-cat-cyclists" },
+  pedestrians: { bg: "bg-cat-pedestrians", text: "text-cat-pedestrians", border: "border-cat-pedestrians" },
+  cars: { bg: "bg-cat-cars", text: "text-cat-cars", border: "border-cat-cars" },
+  motorcycles: { bg: "bg-cat-motorcycles", text: "text-cat-motorcycles", border: "border-cat-motorcycles" },
+  kick_scooters: { bg: "bg-cat-kick-scooters", text: "text-cat-kick-scooters", border: "border-cat-kick-scooters" },
+  mopeds: { bg: "bg-cat-mopeds", text: "text-cat-mopeds", border: "border-cat-mopeds" },
+  unicycles: { bg: "bg-cat-unicycles", text: "text-cat-unicycles", border: "border-cat-unicycles" },
+  other: { bg: "bg-cat-other", text: "text-cat-other", border: "border-cat-other" },
+  discarded: { bg: "bg-cat-discarded", text: "text-cat-discarded", border: "border-cat-discarded" },
 };
 
-/** 471.3 → "7:51"; com horas quando passa de 1 h ("1:02:05"). */
-export function timecode(s: number, horas = false): string {
+/** 471.3 → "7:51"; with hours past 1 h ("1:02:05"). */
+export function timecode(s: number, hours = false): string {
   const t = Math.max(0, Math.floor(s));
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
   const ss = String(t % 60).padStart(2, "0");
-  return h || horas ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+  return h || hours ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }

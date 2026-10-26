@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+# Vision prompt evals in every app language: each labeled candidate is
+# classified once per language, with the real app code (provider.mjs →
+# suggestCategory). A language whose prompt or category words drift shows up
+# as a column with a lower pass rate. See README.md for data and cost.
+description: Traffic Counter — vision prompt per language
+
+# the prompt lives in src/lib/prompts.ts; promptfoo only needs a placeholder
+prompts:
+  - "{{id}}"
+
+providers:
+  - { id: file://provider.mjs, label: en, config: { locale: en } }
+  - { id: file://provider.mjs, label: pt-BR, config: { locale: pt-BR } }
+  - { id: file://provider.mjs, label: es, config: { locale: es } }
+  - { id: file://provider.mjs, label: fr, config: { locale: fr } }
+  - { id: file://provider.mjs, label: de, config: { locale: de } }
+  - { id: file://provider.mjs, label: nl, config: { locale: nl } }
+  - { id: file://provider.mjs, label: it, config: { locale: it } }
+  - { id: file://provider.mjs, label: da, config: { locale: da } }
+
+tests: file://tests.mjs
+
+evaluateOptions:
+  maxConcurrency: 6

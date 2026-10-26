@@ -3,88 +3,93 @@ import path from "node:path";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Suspense } from "react";
-import { jobTrabalhando } from "@/lib/atividade";
-import { lerConfiguracao, listarCandidatos, listarGrupos, listarJobs, obterGrupo, resumoRevisao } from "@/lib/db";
-import { dirJob } from "@/lib/paths";
-import { rotuloStatus } from "@/lib/status";
-import { BOTAO } from "@/lib/ui";
-import { CabecalhoGrupo } from "./cabecalho-grupo";
-import { GradeVideos, type VideoNaGrade } from "./grade-videos";
+import { jobWorking } from "@/lib/activity";
+import { getGroup, listCandidates, listGroups, listJobs, readSetting, reviewSummary } from "@/lib/db";
+import { jobDir } from "@/lib/paths";
+import { statusKey } from "@/lib/status";
+import { BUTTON } from "@/lib/ui";
+import { GroupHeader } from "./group-header";
+import { VideoGrid, type GridVideo } from "./video-grid";
 import { AutoRefresh } from "./jobs/[id]/auto-refresh";
+import { PageLoading } from "@/app/_shell/page-loading";
 
 export default function Home(props: PageProps<"/">) {
   return (
-    <Suspense fallback={<p className="p-6 text-muted">Carregando…</p>}>
-      <Painel searchParams={props.searchParams} />
+    <Suspense fallback={<PageLoading />}>
+      <Dashboard searchParams={props.searchParams} />
     </Suspense>
   );
 }
 
-async function Painel({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
+async function Dashboard({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   await connection();
-  // primeiro acesso: o assistente prepara placa de vídeo, motor e chave da IA
-  if (!lerConfiguracao("primeiro_acesso")) redirect("/boas-vindas");
+  // first run: the wizard sets up the graphics card, the engine and the AI key
+  if (!readSetting("first_run")) redirect("/welcome");
+  const t = await getTranslations();
+  const locale = await getLocale();
   const sp = await searchParams;
-  const filtro = typeof sp.grupo === "string" ? sp.grupo : null;
-  const grupo = filtro && filtro !== "sem" ? obterGrupo(filtro) : undefined;
-  const grupos = listarGrupos();
+  const filter = typeof sp.group === "string" ? sp.group : null;
+  const group = filter && filter !== "none" ? getGroup(filter) : undefined;
+  const groups = listGroups();
 
-  const jobs = listarJobs()
-    .filter((j) => (filtro === "sem" ? !j.grupo_id : grupo ? j.grupo_id === grupo.id : true))
-    .sort((a, b) => (a.nome_arquivo ?? a.drive_id).localeCompare(b.nome_arquivo ?? b.drive_id, "pt-BR", { numeric: true }));
+  const jobs = listJobs()
+    .filter((j) => (filter === "none" ? !j.group_id : group ? j.group_id === group.id : true))
+    .sort((a, b) => (a.file_name ?? a.drive_id).localeCompare(b.file_name ?? b.drive_id, locale, { numeric: true }));
 
-  const videos: VideoNaGrade[] = jobs.map((j) => {
-    const r = resumoRevisao(j.id);
-    const naRevisao = j.status === "aguardando_revisao";
+  const videos: GridVideo[] = jobs.map((j) => {
+    const r = reviewSummary(j.id);
+    const inReview = j.status === "awaiting_review";
     return {
       id: j.id,
-      nome: j.nome_arquivo ?? j.drive_id,
+      name: j.file_name ?? j.drive_id,
       local: j.drive_id === "local",
-      grupo: grupos.find((g) => g.id === j.grupo_id)?.nome ?? null,
+      group: groups.find((g) => g.id === j.group_id)?.name ?? null,
       status: j.status,
-      rotulo: rotuloStatus(j),
-      trabalhando: jobTrabalhando(j),
-      progresso: j.progresso,
-      mensagem: j.mensagem,
-      erro: j.status === "erro" ? j.erro : null,
-      duracao_s: j.duracao_s,
-      miniatura: fs.existsSync(path.join(dirJob(j.id), "frame0.jpg")) ? `/api/jobs/${j.id}/arquivos/frame0.jpg` : null,
-      revisados: r.revisados,
+      statusKey: statusKey(j),
+      working: jobWorking(j),
+      progress: j.progress,
+      message: j.message,
+      error: j.status === "error" ? j.error : null,
+      duration_s: j.duration_s,
+      thumbnail: fs.existsSync(path.join(jobDir(j.id), "frame0.jpg")) ? `/api/jobs/${j.id}/files/frame0.jpg` : null,
+      reviewed: r.reviewed,
       total: r.total,
-      contagens: naRevisao ? listarCandidatos(j.id).filter((c) => c.rotulo && c.rotulo !== "descartado").length : 0,
-      // por que ainda não entra num vídeo final (null = pode)
-      impedimento: !naRevisao ? (j.status === "sugerindo" ? "aguardando sugestões" : "revisão não começou") : r.revisados < r.total ? `faltam ${r.total - r.revisados} na revisão` : null,
+      counts: inReview ? listCandidates(j.id).filter((c) => c.label && c.label !== "discarded").length : 0,
+      // why it cannot go into a final video yet (null = it can)
+      blocker: !inReview
+        ? { key: j.status === "suggesting" ? "waitingSuggestions" : "reviewNotStarted" }
+        : r.reviewed < r.total
+          ? { key: "remaining", values: { n: r.total - r.reviewed } }
+          : null,
     };
   });
 
-  const titulo = grupo?.nome ?? (filtro === "sem" ? "Sem grupo" : "Todos os vídeos");
+  const title = group?.name ?? (filter === "none" ? t("library.ungrouped") : t("library.allVideos"));
 
   return (
     <div className="flex flex-col gap-4 p-5">
-      {videos.some((v) => v.trabalhando) && <AutoRefresh ms={2000} />}
-      <CabecalhoGrupo grupo={grupo ?? null} titulo={titulo} videos={videos.length} />
+      {videos.some((v) => v.working) && <AutoRefresh ms={2000} />}
+      <GroupHeader group={group ?? null} title={title} videos={videos.length} />
 
       {videos.length === 0 ? (
-        <Vazio grupo={!!filtro} />
+        <Empty inGroup={!!filter} />
       ) : (
-        <GradeVideos key={filtro ?? ""} videos={videos} grupos={grupos.map((g) => ({ id: g.id, nome: g.nome }))} grupoAtual={grupo?.id ?? null} />
+        <VideoGrid key={filter ?? ""} videos={videos} groups={groups.map((g) => ({ id: g.id, name: g.name }))} currentGroup={group?.id ?? null} />
       )}
     </div>
   );
 }
 
-function Vazio({ grupo }: { grupo: boolean }) {
+async function Empty({ inGroup }: { inGroup: boolean }) {
+  const t = await getTranslations("home");
   return (
     <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line px-6 py-16 text-center">
-      <p className="text-lg font-medium">{grupo ? "Nenhum vídeo neste grupo" : "A biblioteca está vazia"}</p>
-      <p className="max-w-md text-sm text-muted">
-        {grupo
-          ? "Selecione vídeos em “Todos os vídeos” e use “Mover para grupo”, ou importe novos direto para cá."
-          : "Importe um vídeo do Google Drive ou do computador. O app detecta o que se move, o modelo de visão sugere a classe de cada objeto e você confirma antes do vídeo final."}
-      </p>
-      <Link href="/importar" className={BOTAO.primario}>
-        Importar vídeos
+      <p className="text-lg font-medium">{inGroup ? t("emptyGroup") : t("emptyLibrary")}</p>
+      <p className="max-w-md text-sm text-muted">{inGroup ? t("emptyGroupHint") : t("emptyLibraryHint")}</p>
+      <Link href="/import" className={BUTTON.primary}>
+        {t("importVideos")}
       </Link>
     </div>
   );

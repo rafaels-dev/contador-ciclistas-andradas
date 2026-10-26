@@ -1,45 +1,44 @@
 """
-Configurações para o contador de veículos e pedestres — Andradas.
-Câmera CAM 4 Intelbras, 1920x1080 @ 15fps, visão lateral.
+Settings for the command-line counter (counter/) — Andradas camera.
+CAM 4 Intelbras, 1920x1080 @ 15 fps, side view.
 """
 
-# Modelo YOLOv8 (baixado automaticamente na primeira execução)
-MODELO = "yolov8n.pt"
+# YOLOv8 model (downloaded automatically on the first run)
+MODEL = "yolov8n.pt"
 
-# Modelo dedicado para BICICLETAS (fine-tuned nesta câmera com blur
-# sintético — recupera bicicletas borradas no crepúsculo). None = usa só o
-# modelo principal. As demais classes sempre vêm do MODELO principal.
-MODELO_BICICLETAS = "runs/ft_blur/weights/best.pt"
+# Dedicated BICYCLE model (fine-tuned on this camera with synthetic blur —
+# recovers blurred bicycles at dusk). None = main model only. Every other
+# class always comes from MODEL.
+BICYCLE_MODEL = "runs/ft_blur/weights/best.pt"
 
-# Posição X da linha de contagem (vertical, centro do frame 1920px)
-LINHA_X = 960
-LINHA_Y_INICIO = 0      # topo do frame
-LINHA_Y_FIM = 1080      # base do frame
+# X position of the counting line (vertical, center of a 1920 px frame)
+LINE_X = 960
+LINE_Y_START = 0      # top of the frame
+LINE_Y_END = 1080     # bottom of the frame
 
-# Região de interesse vertical: cobre todo o frame
+# Vertical region of interest: the whole frame
 ROI_Y_MIN = 0
 ROI_Y_MAX = 1080
 
-# Detecção
-CONFIANCA = 0.40
+# Detection
+CONFIDENCE = 0.40
 IOU = 0.50
 
-# Distância máxima person ↔ bicycle/motorcycle para associação POR FRAME
-# (a classificação final é por track: ver contador/detector.py)
-DIST_MAX_CYCLIST_PX = 150
+# Max person ↔ bicycle/motorcycle distance for the PER-FRAME association
+# (the final classification is per track: see counter/detector.py)
+MAX_CYCLIST_DIST_PX = 150
 
-# EXPERIMENTAL (desligado): velocidade mínima (px/frame) para reclassificar
-# como ciclista uma pessoa que cruza sem bicycle detectada (motion blur
-# noturno esconde a bicicleta). Desativado porque trocas de ID do ByteTrack
-# contaminam a velocidade do track e as faixas de pedestre/ciclista se
-# sobrepõem nesta câmera. None = desligado.
-LIMIAR_VEL_CICLISTA_PX_FRAME = None
+# EXPERIMENTAL (off): minimum speed (px/frame) to reclassify as a cyclist a
+# person who crosses with no bicycle detected (night motion blur hides the
+# bicycle). Off because ByteTrack id switches pollute the track speed and the
+# pedestrian/cyclist lanes overlap on this camera. None = off.
+CYCLIST_SPEED_THRESHOLD_PX_FRAME = None
 
-# Classes COCO por categoria
+# COCO classes per category
 # 0=person, 1=bicycle, 2=car, 3=motorcycle, 5=bus, 7=truck
-CLASSES_CICLISTAS    = [0, 1]      # person próxima de bicycle
-CLASSES_PEDESTRES    = [0]         # person sem bicycle próxima
-# car, bus, truck — inclui ids 4/5 (bus/truck no modelo fine-tuned de 6
-# classes) e 5/7 (COCO); ids não previstos pelo modelo em uso são inócuos
-CLASSES_AUTOMOVEIS   = [2, 4, 5, 7]
-CLASSES_MOTOCICLETAS = [3]         # motorcycle
+CYCLIST_CLASSES    = [0, 1]      # person next to a bicycle
+PEDESTRIAN_CLASSES = [0]         # person with no bicycle nearby
+# car, bus, truck — includes ids 4/5 (bus/truck in the 6-class fine-tuned
+# model) and 5/7 (COCO); ids the model in use does not predict are harmless
+CAR_CLASSES        = [2, 4, 5, 7]
+MOTORCYCLE_CLASSES = [3]         # motorcycle

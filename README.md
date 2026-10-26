@@ -1,117 +1,128 @@
-# Contador de Tráfego
+# Traffic Counter
 
-Aplicativo de computador que conta **ciclistas, pedestres, automóveis, motocicletas, patinetes, scooters elétricos e monociclos** em vídeos de câmeras fixas de rua — com revisão humana de cada contagem antes do resultado final.
+**English** · [Português (Brasil)](README.pt-BR.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Dansk](README.da.md)
 
-Feito para pesquisas de mobilidade (começou com a câmera da ciclovia de Andradas, MG), funciona com qualquer vídeo de câmera parada.
+A desktop app that counts **cyclists, pedestrians, cars, motorcycles, kick scooters, electric mopeds and unicycles** in videos from fixed street cameras. A person reviews every count before the final result.
 
-## Como funciona
+It was built for urban mobility research (it started with the bike lane camera in Andradas, Brazil) and works with any video from a camera that doesn't move. The app speaks English, Portuguese, Spanish, French, German, Dutch, Italian and Danish. It follows the computer's language, and you can pick another one in **Settings**.
 
-1. **Escolha o vídeo** — um arquivo do computador ou um link do Google Drive.
-2. **Desenhe as linhas de contagem** em qualquer ângulo (ciclovia, calçada, faixa da rua) e escolha o que cada linha conta. Em vídeos 4K de câmera alta, marque também a área de análise.
-3. **Detecção** — o app encontra e acompanha tudo o que se move (inteligência artificial YOLO + detecção de movimento), na placa de vídeo NVIDIA ou no processador.
-4. **Sugestões** — um modelo de visão (via OpenRouter, com a sua chave) sugere a categoria de cada objeto que cruzou uma linha.
-5. **Revisão** — você confere cada objeto num editor com o clipe, o vídeo original e uma linha do tempo, aceitando ou corrigindo a sugestão (atalhos de teclado, aceite em lote dos casos confiáveis).
-6. **Vídeo final** — um MP4 com as linhas, as contagens e o painel de totais, mais uma planilha (`eventos.csv`) e um relatório (`relatorio.json`). Vários vídeos (por exemplo, as horas de um dia) podem virar um único vídeo final com os totais somados.
+## How it works
 
-## Baixar e instalar
+1. **Pick the video.** Use a file on your computer or a Google Drive link.
+2. **Draw the counting lines.** They can go at any angle (bike lane, sidewalk, a traffic lane), and you choose what each line counts. On 4K videos from a high camera, also mark the analysis area.
+3. **Detection.** The app finds and follows everything that moves, using YOLO object detection plus motion detection. It runs on an NVIDIA graphics card or on the processor.
+4. **Suggestions.** A vision model, called through OpenRouter with your own key, suggests the category of each object that crossed a line. The prompt and the category names follow the app language.
+5. **Review.** You check each object in an editor with the clip, the original video and a timeline, and accept or correct the suggestion. Keyboard shortcuts and bulk accept of the reliable cases keep it fast.
+6. **Final video.** You get an MP4 with the lines, the counts and a totals panel, plus a spreadsheet (`events.csv`) and a report (`report.json`). Several videos (the hours of a day, for example) can become a single final video with the totals added up.
 
-Baixe o instalador da última versão em **[Releases](https://github.com/rafaels-dev/contador-ciclistas-andradas/releases/latest)**:
+## Download and install
 
-| Sistema | Arquivo |
+Download the installer for the latest version from **[Releases](https://github.com/rafaels-dev/contador-ciclistas-andradas/releases/latest)**:
+
+| System | File |
 |---|---|
-| Windows 10/11 (64 bits) | `ContadorDeTrafego-Setup-<versão>.exe` |
-| macOS (chip Apple) | `ContadorDeTrafego-<versão>-arm64.dmg` |
-| macOS (Intel) | `ContadorDeTrafego-<versão>-x64.dmg` |
-| Linux | `.AppImage` ou `.deb` |
+| Windows 10/11 (64-bit) | `TrafficCounter-Setup-<version>.exe` |
+| macOS (Apple chip) | `TrafficCounter-<version>-arm64.dmg` |
+| macOS (Intel) | `TrafficCounter-<version>-x64.dmg` |
+| Linux | `.AppImage` or `.deb` |
 
-O instalador não pede administrador e o app se atualiza sozinho: quando há versão nova, aparece a faixa **Reiniciar e atualizar**.
+The installer doesn't ask for administrator rights, and the app updates itself. When a new version is ready, a **Restart and update** banner appears.
 
-Na primeira vez, um assistente prepara três coisas:
+The first time, a wizard sets up four things:
 
-- **Placa de vídeo** — usa a NVIDIA se houver (bem mais rápido); dá para escolher só o processador.
-- **Motor de detecção** — o app baixa e instala o Python e as bibliotecas de inteligência artificial (cerca de 1 GB sem placa NVIDIA, 2,5 GB com ela; ocupa até ~6 GB no disco).
-- **Chave do OpenRouter** — o serviço pago por uso que faz as sugestões. Cada sugestão custa uma fração de centavo (duas horas de vídeo de uma avenida movimentada saíram por cerca de US$ 0,10). Crie a chave em [openrouter.ai](https://openrouter.ai/keys) e cole no app; ele testa antes de salvar.
+- **Language.** The computer's language, or another one.
+- **Graphics card.** The app uses an NVIDIA card if there is one (much faster). You can choose the processor only.
+- **Detection engine.** The app downloads and installs Python and the AI libraries: about 1 GB without an NVIDIA card, 2.5 GB with one, and up to ~6 GB on disk.
+- **OpenRouter key.** OpenRouter is the pay-per-use service that makes the suggestions. Each suggestion costs a fraction of a cent: two hours of video of a busy avenue came to about US$ 0.10. Create a key at [openrouter.ai](https://openrouter.ai/keys) and paste it into the app, which tests it before saving.
 
-**Requisitos:** placa de vídeo NVIDIA opcional (recomendada), espaço em disco para o motor (~6 GB) e para os vídeos finais, e internet para instalar o motor e para as sugestões.
+**Requirements:**
+- An NVIDIA graphics card (optional, recommended).
+- Disk space for the engine (~6 GB) and for the final videos.
+- Internet, to install the engine and for the suggestions.
 
-**Se algo der errado:** em **Configurações → Ajuda e diagnóstico**, clique em **Salvar relatório de diagnóstico** e envie o arquivo `.zip` a quem dá suporte. Ele leva o registro do programa e o que aconteceu em cada vídeo — sem os vídeos e sem a sua chave.
+**If something goes wrong:** go to **Settings → Help and diagnostics**, click **Save diagnostics report**, and send the `.zip` file to whoever supports you. It contains the program log and what happened to each video. It does not contain the videos or your key.
 
-## Privacidade
+Updating from 0.0.7 or earlier (when the app was called "Contador de Tráfego"): the app moves your data to the new name the first time it starts. Nothing is detected again and no review is lost.
 
-Os vídeos são processados **no seu computador** e não são enviados a lugar nenhum. O app só se comunica com outros sistemas nestes casos:
+## Privacy
 
-| Quando | Para onde | O que vai |
+Videos are processed **on your computer** and are not sent anywhere. The app only talks to other systems in these cases:
+
+| When | Where to | What goes |
 |---|---|---|
-| Sugestões de categoria (com a chave que você configurou) | [OpenRouter](https://openrouter.ai/privacy) e o provedor do modelo escolhido por ele (padrão: Anthropic; reservas: DeepSeek e Google) | Recortes pequenos de cada objeto candidato (sequência de recortes e o quadro do cruzamento, em JPEG). Nada mais do vídeo. |
-| Você cola um link do Google Drive | [Google Drive](https://policies.google.com/privacy) | O pedido de download do arquivo do link. |
-| Instalação do motor (primeira execução ou "Instalar agora") | GitHub (Python), [PyPI](https://pypi.org) e download.pytorch.org | Pedidos de download das bibliotecas. |
-| Atualizações (ao abrir o app e a cada 4 h) | [GitHub Releases](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) deste repositório | Consulta da versão mais recente e, se houver, o download dela. |
+| Category suggestions (with the key you set up) | [OpenRouter](https://openrouter.ai/privacy) and the model provider it routes to (default: Anthropic; fallbacks: DeepSeek and Google) | Small crops of each candidate object (a sequence of crops and the crossing frame, as JPEG). Nothing else from the video. |
+| You paste a Google Drive link | [Google Drive](https://policies.google.com/privacy) | The download request for the linked file. |
+| Engine installation (first run or "Install now") | GitHub (Python), [PyPI](https://pypi.org) and download.pytorch.org | Download requests for the libraries. |
+| Updates (when the app opens and every 4 h) | This repository's [GitHub Releases](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) | A check for the latest version and, if there is one, its download. |
 
-Não há telemetria, conta de usuário nem coleta de dados de uso. O relatório de diagnóstico só é gerado quando você pede, fica salvo no seu computador e omite a chave do OpenRouter.
+There is no telemetry, no user account and no usage data collection. The diagnostics report is only created when you ask for it. It is saved on your computer and leaves out the OpenRouter key.
 
 ## Code signing policy
 
-Os instaladores são gerados pelo GitHub Actions ([`.github/workflows/desktop.yml`](.github/workflows/desktop.yml)) direto do código deste repositório, a partir de cada tag `v*`. A assinatura gratuita de código para projetos open source foi solicitada à [SignPath Foundation](https://signpath.org); enquanto ela não sai, o Windows e o macOS avisam na primeira abertura que o app é de um desenvolvedor não identificado.
+The installers are built by GitHub Actions ([`.github/workflows/desktop.yml`](.github/workflows/desktop.yml)) straight from this repository's code, from each `v*` tag. Free code signing for open source projects has been requested from the [SignPath Foundation](https://signpath.org). Until it arrives, Windows and macOS warn on the first start that the app comes from an unidentified developer.
 
-Equipe:
+Team:
 
-- Autores (commits sem revisão adicional): [Rafael Schettino](https://github.com/rafaels-dev)
-- Revisores: [Rafael Schettino](https://github.com/rafaels-dev)
-- Aprovadores (aprovam cada assinatura): [Rafael Schettino](https://github.com/rafaels-dev)
+- Committers (commits without additional review): [Rafael Schettino](https://github.com/rafaels-dev)
+- Reviewers: [Rafael Schettino](https://github.com/rafaels-dev)
+- Approvers (approve each signing): [Rafael Schettino](https://github.com/rafaels-dev)
 
-Toda mudança na branch `main` passa pelos testes automatizados ([`.github/workflows/testes.yml`](.github/workflows/testes.yml)) antes do merge.
+Every change to the `main` branch must pass the automated tests ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) before it can be merged.
 
-Privacidade: veja a seção [Privacidade](#privacidade) — este programa não transfere informações a outros sistemas em rede, exceto nos casos listados lá, pedidos pelo usuário ou por quem o instala ou opera.
+Privacy: see the [Privacy](#privacy) section. This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, except in the cases listed there.
 
-## Para desenvolvedores
+## For developers
 
-Estrutura:
+Layout:
 
-- `web/` — o app (Next.js): telas, banco SQLite, orquestração das etapas e chamadas ao OpenRouter.
-- `worker/` — Python: detecção e rastreamento (`detectar.py`), vídeo final (`renderizar.py`), leitura de vídeo com FFmpeg/NVDEC (`leitor.py`).
-- `desktop/` — Electron e instaladores (electron-builder); ver [`desktop/README.md`](desktop/README.md).
-- `contador/`, `processar_video.py`, `stream_tempo_real.py` — o contador original de linha de comando (contagem automática numa linha vertical, sem revisão), mantido para processamento em lote e tempo real.
-- `avaliacao/` — ferramentas de avaliação da contagem e calibração dos modelos.
-- `tests/` e `web/src/**/*.test.ts` — testes automatizados.
+- `web/`: the app (Next.js). Screens, SQLite database, step orchestration and the OpenRouter calls. Translations are in `web/messages/<language>.json` (next-intl) and the vision prompts in `web/src/lib/prompts.ts`.
+- `worker/`: Python. Detection and tracking (`detect.py`), final video (`render.py`), video reading with FFmpeg/NVDEC (`reader.py`).
+- `desktop/`: Electron and installers (electron-builder). See [`desktop/README.md`](desktop/README.md).
+- `counter/`, `process_video.py`, `stream_realtime.py`: the original command-line counter (automatic counting on a vertical line, without review), kept for batch and real-time processing.
+- `evaluation/`: tools to evaluate the counting and calibrate the models.
+- `tests/`, `web/src/**/*.test.ts` and `web/evals/`: automated tests and prompt evals.
 
-Rodar o app em desenvolvimento (Python 3.11 com as dependências e Node.js 22+):
+To run the app in development, you need Python 3.11 with the dependencies and Node.js 22+:
 
 ```bash
 python -m venv venv && source venv/bin/activate      # Windows: venv\Scripts\activate
-pip install torch==2.12.0 torchvision==0.27.0 --index-url https://download.pytorch.org/whl/cpu   # ou cu126 para NVIDIA
+pip install torch==2.12.0 torchvision==0.27.0 --index-url https://download.pytorch.org/whl/cpu   # or cu126 for NVIDIA
 pip install -r requirements-dev.txt
 cd web && npm ci && npm run dev                       # http://127.0.0.1:3000
 ```
 
-Testes (os mesmos do CI, exigidos para o merge na `main`):
+Tests (the same as CI, required to merge into `main`):
 
 ```bash
-python -m pytest                      # worker e contador (na raiz)
+python -m pytest                      # worker and counter (at the root)
 cd web && npm run lint && npm run typecheck && npm test
+cd web && npm run eval:prompts        # vision prompt in every language (paid; see web/evals/README.md)
 ```
 
-Contador de linha de comando:
+Adding a language: add a `web/messages/<code>.json` with every key of `en.json`, an entry in `web/src/i18n/locales.ts`, and the prompt in `web/src/lib/prompts.ts`. Then run the prompt evals.
+
+Command-line counter:
 
 ```bash
-python processar_video.py --video camera.mp4                 # vídeo anotado + resultado.json
-python processar_video.py --video camera.mp4 --sem-video     # só os números
-python stream_tempo_real.py rtsp://192.168.1.100/cam4         # eventos JSON em tempo real
+python process_video.py --video camera.mp4                 # annotated video + result.json
+python process_video.py --video camera.mp4 --no-video      # numbers only
+python stream_realtime.py rtsp://192.168.1.100/cam4         # JSON events in real time
 ```
 
-## Licença
+## License
 
 Copyright © 2026 Rafael Schettino.
 
-Este programa é software livre, distribuído sob a **GNU Affero General Public License, versão 3** ([`LICENSE`](LICENSE)). Você pode usá-lo, estudá-lo, modificá-lo e redistribuí-lo; quem distribuir versões modificadas — ou oferecê-las a outras pessoas pela rede — deve disponibilizar o código-fonte sob a mesma licença.
+This program is free software, distributed under the **GNU Affero General Public License, version 3** ([`LICENSE`](LICENSE)). You can use, study, modify and redistribute it. If you distribute modified versions, or offer them to other people over a network, you must make the source code available under the same license.
 
-Principais componentes de terceiros, todos open source:
+Main third-party components, all open source:
 
-| Componente | Licença |
+| Component | License |
 |---|---|
-| [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) e os pesos `yolov8n.pt` (inclusive o ajuste fino em `runs/ft_blur`) | AGPL-3.0 |
+| [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) and the `yolov8n.pt` weights (including the fine-tune in `runs/ft_blur`) | AGPL-3.0 |
 | [PyTorch](https://pytorch.org) | BSD-3-Clause |
 | [OpenCV](https://opencv.org) | Apache-2.0 |
 | [supervision](https://github.com/roboflow/supervision) | MIT |
 | [FFmpeg](https://ffmpeg.org) (via imageio-ffmpeg) | LGPL/GPL |
-| [Electron](https://www.electronjs.org), [Next.js](https://nextjs.org), [React](https://react.dev) | MIT |
+| [Electron](https://www.electronjs.org), [Next.js](https://nextjs.org), [next-intl](https://next-intl.dev), [React](https://react.dev) | MIT |
 | [uv](https://github.com/astral-sh/uv) | MIT / Apache-2.0 |

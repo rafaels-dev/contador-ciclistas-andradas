@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 /*
- * Tema de editor de vídeo: painéis em grafite (ou papel, no claro) e um único
- * destaque — o amarelo de sinalização viária, a mesma cor das linhas de
- * contagem — para foco, playhead e ação principal. As categorias têm cor
- * própria, como rótulos de clipe num editor.
+ * Video editor theme: graphite panels (or paper, in light mode) and a single
+ * accent — road-sign yellow, the same color as the counting lines — for
+ * focus, playhead and the main action. Categories have their own color, like
+ * clip labels in an editor.
  *
- * O tema vem de data-theme no <html> (script inline em layout.tsx, antes da
- * pintura); sem escolha salva, segue o sistema.
+ * The theme comes from data-theme on <html> (inline script in layout.tsx,
+ * before the first paint); with no saved choice, it follows the system.
  */
 :root,
 :root[data-theme="dark"] {
@@ -93,16 +93,16 @@
   --color-warn: var(--warn);
   --color-viewer: var(--viewer);
 
-  /* cores de clipe por categoria (iguais nos dois temas, como num editor) */
-  --color-cat-ciclistas: #2fbf62;
-  --color-cat-pedestres: #3d82f0;
-  --color-cat-automoveis: #f47b20;
-  --color-cat-motocicletas: #d24bea;
-  --color-cat-patinetes: #17b3a3;
-  --color-cat-scooters: #8b64f0;
-  --color-cat-monociclos: #ea4f73;
-  --color-cat-outros: #a09a93;
-  --color-cat-descartado: #5d6068;
+  /* clip colors per category (the same in both themes, as in an editor) */
+  --color-cat-cyclists: #2fbf62;
+  --color-cat-pedestrians: #3d82f0;
+  --color-cat-cars: #f47b20;
+  --color-cat-motorcycles: #d24bea;
+  --color-cat-kick-scooters: #17b3a3;
+  --color-cat-mopeds: #8b64f0;
+  --color-cat-unicycles: #ea4f73;
+  --color-cat-other: #a09a93;
+  --color-cat-discarded: #5d6068;
 
   --font-sans: var(--font-barlow);
   --font-display: var(--font-barlow-condensed);
@@ -114,25 +114,25 @@ body {
   color: var(--fg);
 }
 
-/* janela do app desktop (Electron, barra de título própria) */
-.regiao-arrasto {
+/* desktop app window (Electron, custom title bar) */
+.drag-region {
   -webkit-app-region: drag;
   app-region: drag;
 }
-.regiao-arrasto :where(a, button, input, select, label) {
+.drag-region :where(a, button, input, select, label) {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
 
-[data-desktop="mac"] .barra-titulo {
-  padding-left: 5.5rem; /* semáforo do macOS */
+[data-desktop="mac"] .title-bar {
+  padding-left: 5.5rem; /* macOS traffic lights */
 }
-[data-desktop="win"] .barra-titulo,
-[data-desktop="linux"] .barra-titulo {
-  padding-right: 9rem; /* minimizar / maximizar / fechar */
+[data-desktop="win"] .title-bar,
+[data-desktop="linux"] .title-bar {
+  padding-right: 9rem; /* minimize / maximize / close */
 }
 
-/* rolagem discreta, como nos painéis de um editor */
+/* discreet scrolling, as in an editor panel */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
@@ -153,21 +153,21 @@ kbd {
   color: var(--muted);
 }
 
-/* progresso sem porcentagem conhecida (download do motor) */
-.barra-indeterminada {
+/* progress without a known percentage (engine download) */
+.indeterminate-bar {
   position: relative;
   overflow: hidden;
 }
-.barra-indeterminada::after {
+.indeterminate-bar::after {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
   width: 35%;
   background: var(--accent);
   border-radius: inherit;
-  animation: indeterminada 1.4s ease-in-out infinite;
+  animation: indeterminate 1.4s ease-in-out infinite;
 }
-@keyframes indeterminada {
+@keyframes indeterminate {
   from { transform: translateX(-100%); }
   to { transform: translateX(300%); }
 }
