@@ -9,6 +9,6 @@ supervision==0.28.0
 # do uv deixava o cv2 quebrado ou não, conforme a ordem
 opencv-python==4.13.0.92
 numpy==2.2.6
-pillow==12.2.0
+pillow==13.0.0
 imageio[ffmpeg]==2.37.3
 imageio-ffmpeg==0.6.0
