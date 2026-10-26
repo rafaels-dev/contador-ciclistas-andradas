@@ -1,5 +1,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { lerConfiguracao } from "./db";
 import { RAIZ_REPO } from "./paths";
@@ -63,7 +64,8 @@ except Exception:
 print(json.dumps(r))
 `;
 
-export function statusMotor(): Promise<StatusMotor> {
+export async function statusMotor(): Promise<StatusMotor> {
+  await ajustarMotor();
   const python = pythonDoMotor();
   return new Promise((resolve) => {
     let saida = "";
@@ -146,6 +148,84 @@ function rodarUv(args: string[], estado: Instalacao): Promise<void> {
   });
 }
 
+function rodarUvSaida(args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let saida = "";
+    let erro = "";
+    const proc = spawn(/* turbopackIgnore: true */ uv(), args, { cwd: RAIZ_REPO, windowsHide: true, env: { ...process.env, UV_NO_PROGRESS: "1" } });
+    proc.stdout.on("data", (d) => (saida += d));
+    proc.stderr.on("data", (d) => (erro = (erro + d).slice(-2000)));
+    proc.on("error", reject);
+    proc.on("close", (c) => (c === 0 ? resolve(saida) : reject(new Error(erro.trim().split("\n").pop() || `uv saiu com código ${c}`))));
+  });
+}
+
+/** Versão de um pacote fixada no requirements.txt. */
+function versaoFixada(pacote: string): string | null {
+  try {
+    const req = fs.readFileSync(path.join(RAIZ_REPO, "requirements.txt"), "utf8");
+    return new RegExp(`^${pacote}==(\\S+)`, "m").exec(req)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Até a 0.0.6, o motor tinha dois OpenCV na mesma pasta cv2: o
+ * opencv-python-headless do requirements.txt e o opencv-python que o
+ * ultralytics puxa (outra versão). O uv instala em paralelo e o cv2 ficava
+ * quebrado ou não, conforme a ordem. Deixa só o opencv-python fixado. O
+ * pacote é baixado ANTES de mexer no motor (vai para o cache do uv): sem
+ * internet, nada muda e tenta de novo na próxima vez.
+ */
+export async function corrigirOpenCV(python: string, estado: Instalacao | null): Promise<boolean> {
+  const versao = versaoFixada("opencv-python");
+  if (!versao) return false;
+  const pacotes = JSON.parse(await rodarUvSaida(["pip", "list", "--python", python, "--format", "json"])) as { name: string; version: string }[];
+  const cv = pacotes.filter((p) => p.name.startsWith("opencv-"));
+  if (cv.length === 1 && cv[0].name === "opencv-python" && cv[0].version === versao) return false;
+
+  if (estado) Object.assign(estado, { etapa: "Corrigindo a biblioteca de imagens (OpenCV)" });
+  const alvo = `opencv-python==${versao}`;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "contador-opencv-"));
+  try {
+    await rodarUvSaida(["pip", "install", "--python", python, "--no-deps", "--target", tmp, alvo]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+  await rodarUvSaida(["pip", "uninstall", "--python", python, ...cv.map((p) => p.name)]);
+  await rodarUvSaida(["pip", "install", "--python", python, "--no-deps", "--offline", alvo]);
+  return true;
+}
+
+const gm = globalThis as { __contadorAjusteMotor?: Promise<void> };
+
+/**
+ * Correções em motores instalados por versões antigas do app. Uma vez por
+ * execução, antes do 1º worker (o runner espera); aparece em "Tarefas em
+ * andamento" enquanto roda. Se falhar, segue com o motor como está.
+ */
+export function ajustarMotor(): Promise<void> {
+  const pasta = pastaMotor();
+  if (!pasta || !fs.existsSync(pythonDaPasta(pasta))) return Promise.resolve();
+  gm.__contadorAjusteMotor ??= (async () => {
+    if (estadoInstalacao().rodando) return; // a instalação já corrige no fim
+    const estado: Instalacao = { rodando: true, ok: null, passo: 0, etapa: "Conferindo o motor", linhas: [] };
+    g.__contadorInstalacao = estado;
+    try {
+      if (await corrigirOpenCV(pythonDaPasta(pasta), estado)) console.log("[motor] OpenCV corrigido (havia mais de uma cópia)");
+      Object.assign(estado, { ok: true, etapa: "Pronto" });
+    } catch (e) {
+      console.error(`[motor] não foi possível corrigir o OpenCV: ${(e as Error).message}`);
+      gm.__contadorAjusteMotor = undefined; // tenta de novo no próximo worker
+      Object.assign(estado, { ok: null, etapa: "" });
+    } finally {
+      estado.rodando = false;
+    }
+  })();
+  return gm.__contadorAjusteMotor;
+}
+
 /**
  * Cria (ou completa) o ambiente do motor: Python 3.11, PyTorch (com CUDA se
  * houver placa NVIDIA e o usuário quiser usá-la; senão para processador; no
@@ -167,6 +247,7 @@ export function instalarMotor(): void {
     await rodarUv(["pip", "install", "--python", python, "torch==2.12.0", "torchvision==0.27.0", ...indice], estado);
     Object.assign(estado, { passo: 3, etapa: "Instalando o detector de objetos" });
     await rodarUv(["pip", "install", "--python", python, "-r", path.join(RAIZ_REPO, "requirements.txt")], estado);
+    await corrigirOpenCV(python, estado);
   })()
     .then(() => Object.assign(estado, { ok: true, etapa: "Pronto" }))
     .catch((e) => Object.assign(estado, { ok: false, etapa: `Não deu certo: ${(e as Error).message}` }))

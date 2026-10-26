@@ -17,7 +17,7 @@ import {
   type Categoria,
   type Linha, type Area } from "./db";
 import { baixarDoDrive } from "./drive";
-import { ambienteDoWorker, pythonDoMotor } from "./motor";
+import { ajustarMotor, ambienteDoWorker, pythonDoMotor } from "./motor";
 import { ErroOpenRouter, modelosDaSugestao, sugerirCategoria } from "./openrouter";
 import { contaNaLinha, SEM_CONSULTA } from "./revisao";
 import { RAIZ_REPO, dirJob, dirRender } from "./paths";
@@ -79,7 +79,8 @@ function naFilaDaGpu<T>(tarefa: () => Promise<T>): Promise<T> {
   return proxima;
 }
 
-function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker) => void, dono?: string): Promise<void> {
+async function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker) => void, dono?: string): Promise<void> {
+  await ajustarMotor();
   return new Promise((resolve, reject) => {
     const proc = spawn(pythonDoMotor(), [path.join("worker", script), ...args], {
       cwd: RAIZ_REPO,

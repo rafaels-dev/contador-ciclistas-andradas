@@ -29,7 +29,7 @@ export function tarefasEmAndamento(): Tarefa[] {
   const tarefas: Tarefa[] = [];
   const inst = estadoInstalacao();
   if (inst.rodando) {
-    tarefas.push({ chave: "motor", href: "/configuracoes", nome: "Motor de detecção", etapa: `Instalando (passo ${inst.passo} de 3)`, progresso: null, mensagem: inst.etapa, naFila: false });
+    tarefas.push({ chave: "motor", href: "/configuracoes", nome: "Motor de detecção", etapa: inst.passo ? `Instalando (passo ${inst.passo} de 3)` : "Atualizando", progresso: null, mensagem: inst.etapa, naFila: false });
   }
   for (const r of listarRenders().filter(renderTrabalhando)) {
     const naFila = r.status === "na_fila";

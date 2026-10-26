@@ -128,11 +128,14 @@ export function PainelMotor({ estado, aoFicarPronto }: { estado: EstadoConfigura
     return (
       <div className="flex flex-col gap-3" data-testid="instalando">
         <p className="font-medium">
-          Passo {inst.passo} de 3 — {inst.etapa}…
+          {inst.passo ? `Passo ${inst.passo} de 3 — ` : ""}
+          {inst.etapa}…
         </p>
         <span className="barra-indeterminada h-2 rounded-full bg-line" aria-hidden />
         <p className="text-sm text-muted">
-          Pode levar de 5 a 20 minutos, dependendo da internet. Deixe o app aberto; você pode continuar os outros passos enquanto isso.
+          {inst.passo
+            ? "Pode levar de 5 a 20 minutos, dependendo da internet. Deixe o app aberto; você pode continuar os outros passos enquanto isso."
+            : "Uma correção rápida no motor instalado por uma versão anterior do app. Leva um ou dois minutos."}
         </p>
         <Detalhes linhas={inst.linhas} />
       </div>
