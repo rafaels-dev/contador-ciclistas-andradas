@@ -26,7 +26,7 @@ import legacy
 ROOT = Path(__file__).resolve().parent
 # English folder names, falling back to the historical Portuguese ones
 MINING = legacy.mining_dir(ROOT)
-SWEEP = legacy.first_existing(ROOT / "sweep_dual", ROOT / "varredura_dual")
+SWEEP = legacy.local("sweep_dual", "varredura_dual")
 FPS = 14.874455802535433
 HOURS = [f"{h:02d}" for h in range(5, 24)]
 NIGHT = {"17", "18", "19", "20", "21", "22", "23"}

@@ -1,4 +1,6 @@
 import path from "node:path";
+// old variable names (CONTADOR_DADOS…) before anything below reads them
+import "./legacy-env";
 
 // turbopackIgnore: without it the build's file tracing tries to include the
 // whole repository and the videos in data/ (tens of GB) in the server

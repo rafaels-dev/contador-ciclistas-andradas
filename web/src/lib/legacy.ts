@@ -77,6 +77,16 @@ function categoryList(json: string | null): string | null {
   }
 }
 
+/**
+ * The repository's `avaliacao/` folder became `evaluation/`: local videos
+ * used in place from there (developers' jobs) moved with it.
+ */
+export function movedVideo(file: unknown): unknown {
+  if (typeof file !== "string" || !path.isAbsolute(file) || fs.existsSync(/* turbopackIgnore: true */ file)) return file;
+  const moved = file.replace(/([\\/])avaliacao(?=[\\/])/, "$1evaluation");
+  return moved !== file && fs.existsSync(/* turbopackIgnore: true */ moved) ? moved : file;
+}
+
 function tableExists(d: DatabaseSync, name: string): boolean {
   return !!d.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
 }
@@ -236,7 +246,7 @@ export function migrateLegacy(d: DatabaseSync, dataDir: string): void {
         camera_id: j.camera_id,
         lines: lines(j.linhas as string),
         area: j.area,
-        video_file: j.arquivo_video,
+        video_file: j.drive_id === "local" ? movedVideo(j.arquivo_video) : j.arquivo_video,
         group_id: j.grupo_id,
         fps: j.fps,
         width: j.largura,

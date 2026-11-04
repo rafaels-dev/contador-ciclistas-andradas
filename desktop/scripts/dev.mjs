@@ -5,6 +5,6 @@ import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 
 const electron = createRequire(import.meta.url)("electron");
-const url = process.env.TRAFFIC_COUNTER_DESKTOP_URL ?? process.env.DEV_URL ?? "http://127.0.0.1:3000";
+const url = process.env.TRAFFIC_COUNTER_DESKTOP_URL ?? process.env.CONTADOR_DESKTOP_URL ?? process.env.DEV_URL ?? "http://127.0.0.1:3000";
 const proc = spawn(electron, ["."], { stdio: "inherit", env: { ...process.env, TRAFFIC_COUNTER_DESKTOP_URL: url } });
 proc.on("exit", (c) => process.exit(c ?? 0));

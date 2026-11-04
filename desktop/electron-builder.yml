@@ -11,6 +11,7 @@ directories:
   buildResources: build
 files:
   - main.cjs
+  - data-folder.cjs
   - preload.cjs
   - package.json
   - build/icon.png

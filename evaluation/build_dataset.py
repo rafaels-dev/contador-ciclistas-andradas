@@ -29,7 +29,7 @@ random.seed(42)
 
 ROOT = Path(__file__).resolve().parent
 # per-hour events of the v9 sweep (sweep_all.py output; old name varredura_v9)
-SWEEP = legacy.first_existing(ROOT / "sweep_v9", ROOT / "varredura_v9")
+SWEEP = legacy.local("sweep_v9", "varredura_v9")
 TRAIN_HOURS = ["06", "08", "09", "10", "11", "13", "14", "15", "16"]
 REMAP = {0: 0, 1: 1, 2: 2, 3: 3, 5: 4, 7: 5}
 NAMES = ["person", "bicycle", "car", "motorcycle", "bus", "truck"]
@@ -85,14 +85,14 @@ def pick_night_frames(hour: str) -> list[int]:
 
 
 def main():
-    out = ROOT / "dataset"
+    out = legacy.local("dataset")
     for sub in ("images/train", "images/val", "labels/train", "labels/val"):
         (out / sub).mkdir(parents=True, exist_ok=True)
 
     model = YOLO("yolov8x.pt")
     n_img = 0
     for hour in TRAIN_HOURS:
-        video = ROOT / f"videos/Andradas_{hour}.mp4"
+        video = legacy.local("videos") / f"Andradas_{hour}.mp4"
         targets = pick_frames(hour)
         print(f"[{hour}] {len(targets)} frames", flush=True)
         for idx, fr in exact_frames(str(video), targets):
@@ -131,7 +131,7 @@ def main():
     # night blur is already on the fast objects, which stay UNLABELED and so
     # teach nothing wrong)
     for hour in NIGHT_HOURS:
-        video = ROOT / f"videos/Andradas_{hour}.mp4"
+        video = legacy.local("videos") / f"Andradas_{hour}.mp4"
         targets = pick_night_frames(hour)
         print(f"[night {hour}] {len(targets)} frames", flush=True)
         for idx, fr in exact_frames(str(video), targets):

@@ -4,7 +4,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import zlib from "node:zlib";
 import { afterAll, describe, expect, it } from "vitest";
-import { migrateLegacy } from "./legacy";
+import { migrateLegacy, movedVideo } from "./legacy";
 
 // The database and the job/render folders exactly as version 0.0.7 left them.
 const OLD_SCHEMA = `
@@ -145,4 +145,22 @@ describe("migrateLegacy (0.0.7 → English names)", () => {
     expect(() => migrateLegacy(d, dir)).not.toThrow();
     expect(one("SELECT COUNT(*) AS n FROM candidates")).toEqual({ n: 2 });
   });
+});
+
+describe("movedVideo", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "moved-video-"));
+  fs.mkdirSync(path.join(root, "evaluation", "videos"), { recursive: true });
+  fs.writeFileSync(path.join(root, "evaluation", "videos", "a.mp4"), "");
+
+  it("follows a local video from avaliacao/ to evaluation/", () => {
+    expect(movedVideo(path.join(root, "avaliacao", "videos", "a.mp4"))).toBe(path.join(root, "evaluation", "videos", "a.mp4"));
+  });
+
+  it("keeps the path when the file is still there or did not move", () => {
+    expect(movedVideo(path.join(root, "evaluation", "videos", "a.mp4"))).toBe(path.join(root, "evaluation", "videos", "a.mp4"));
+    expect(movedVideo(path.join(root, "avaliacao", "videos", "b.mp4"))).toBe(path.join(root, "avaliacao", "videos", "b.mp4"));
+    expect(movedVideo("video.mp4")).toBe("video.mp4");
+  });
+
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 });

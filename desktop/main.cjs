@@ -15,6 +15,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const { dataPath: dataPathIn, readWindowState: readWindowFile, useDataFolder } = require("./data-folder.cjs");
 
 const WIN = process.platform === "win32";
 const MAC = process.platform === "darwin";
@@ -27,7 +28,7 @@ const TITLE_BAR = {
 const BACKGROUND = { dark: "#1a1b1e", light: "#e6e6e2" };
 
 // in development: points to a server already running instead of starting the embedded one
-const DEV_URL = process.env.TRAFFIC_COUNTER_DESKTOP_URL;
+const DEV_URL = process.env.TRAFFIC_COUNTER_DESKTOP_URL ?? process.env.CONTADOR_DESKTOP_URL;
 
 const WSL = process.platform === "linux" && (() => {
   try {
@@ -40,46 +41,13 @@ const WSL = process.platform === "linux" && (() => {
 // does not share those buffers with Windows): draw with the processor
 if (WSL) app.disableHardwareAcceleration();
 
-/**
- * Up to 0.0.7 the product was "Contador de Tráfego": the data folder (named
- * after the product), and the names inside it, were Portuguese. Moves it to
- * "Traffic Counter" on the first start; if the move fails (a file in use),
- * keeps using the old folder — nothing is lost. The engine venv keeps its
- * folder: moving a Python environment can break it, and reinstalling is 3 GB.
- *
- * In development, data apart from the installed app's (same product name =
- * same folder): otherwise the installed app's single-instance lock kills the
- * development window with ERR_FAILED.
- */
-function useDataFolder() {
-  const suffix = app.isPackaged ? "" : " (dev)";
-  const appData = app.getPath("appData");
-  const target = path.join(appData, `Traffic Counter${suffix}`);
-  const old = path.join(appData, `Contador de Tráfego${suffix}`);
-  let dir = target;
-  if (!fs.existsSync(target) && fs.existsSync(old)) {
-    try {
-      fs.renameSync(old, target);
-    } catch (e) {
-      console.error(`[data] could not move ${old}: ${e?.message ?? e}`);
-      dir = old;
-    }
-  }
-  app.setPath("userData", dir);
-  for (const [from, to] of [["dados", "data"], ["servidor.log", "server.log"], ["janela.json", "window.json"]]) {
-    const a = path.join(dir, from);
-    const b = path.join(dir, to);
-    try {
-      if (fs.existsSync(a) && !fs.existsSync(b)) fs.renameSync(a, b);
-    } catch (e) {
-      console.error(`[data] could not rename ${from}: ${e?.message ?? e}`);
-    }
-  }
-  return dir;
-}
-const DATA = useDataFolder();
-// where the old data stayed, when the rename above failed
-const dataPath = (name, legacy) => (fs.existsSync(path.join(DATA, legacy)) && !fs.existsSync(path.join(DATA, name)) ? path.join(DATA, legacy) : path.join(DATA, name));
+// In development, data apart from the installed app's (same product name =
+// same folder): otherwise the installed app's single-instance lock kills the
+// development window with ERR_FAILED.
+const DATA = useDataFolder(app.getPath("appData"), app.isPackaged ? "" : " (dev)");
+app.setPath("userData", DATA);
+// where the old data stayed, when a rename in useDataFolder failed
+const dataPath = (name, legacy) => dataPathIn(DATA, name, legacy);
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
@@ -195,13 +163,7 @@ function followWindowsThemeOnWsl() {
 
 // window size and position between sessions
 const windowFile = () => path.join(DATA, "window.json");
-function readWindowState() {
-  try {
-    return JSON.parse(fs.readFileSync(windowFile(), "utf8"));
-  } catch {
-    return { width: 1440, height: 900 };
-  }
-}
+const readWindowState = () => readWindowFile(dataPath("window.json", "janela.json"));
 
 function createWindow() {
   const theme = nativeTheme.shouldUseDarkColors ? "dark" : "light";
@@ -227,8 +189,7 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  // window.json from before 0.0.8 says "maximizado"
-  if (state.maximized ?? state.maximizado) mainWindow.maximize();
+  if (state.maximized) mainWindow.maximize();
   mainWindow.once("ready-to-show", () => mainWindow.show());
 
   const save = () => {

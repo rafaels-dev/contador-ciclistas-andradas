@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { LEGACY_STORAGE, moveStorageKeys } from "@/lib/legacy-storage";
 import { DocumentLang } from "./_shell/document-lang";
 import { Library } from "./_shell/library";
 import { StatusBar } from "./_shell/status-bar";
@@ -25,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
 // before the first paint: the saved theme (otherwise follows the system) and,
 // in the desktop app, the platform — the title bar leaves room for the window
 // buttons. Moves the localStorage keys from before 0.0.8 (contador:*).
-const INITIAL_SCRIPT = `(function(){try{var s=localStorage,o={"contador:tema":"tc:theme","contador:alturaTimeline":"tc:timelineHeight","contador:ultima":"tc:lastFolder"};for(var k in o){var v=s.getItem(k);if(v!==null){if(s.getItem(o[k])===null)s.setItem(o[k],v);s.removeItem(k)}}var d=document.documentElement,t=s.getItem("tc:theme");if(t==="dark"||t==="light")d.setAttribute("data-theme",t);var p=window.trafficCounterDesktop&&window.trafficCounterDesktop.platform;if(p)d.setAttribute("data-desktop",p)}catch(e){}})()`;
+const INITIAL_SCRIPT = `(function(){try{var s=localStorage;(${moveStorageKeys.toString()})(s,${JSON.stringify(LEGACY_STORAGE)});var d=document.documentElement,t=s.getItem("tc:theme");if(t==="dark"||t==="light")d.setAttribute("data-theme",t);var p=window.trafficCounterDesktop&&window.trafficCounterDesktop.platform;if(p)d.setAttribute("data-desktop",p)}catch(e){}})()`;
 
 /** Everything that depends on the language (setting or computer): read per request. */
 async function Shell({ children }: { children: React.ReactNode }) {

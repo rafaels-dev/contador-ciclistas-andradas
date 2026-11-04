@@ -3,15 +3,18 @@
 Fine-tunes yolov8n on this camera's dataset (with synthetic blur).
 Output: runs/ft_blur/weights/best.pt
 """
+import sys
 from pathlib import Path
 
 from ultralytics import YOLO
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT))
+import legacy  # noqa: E402
 
 m = YOLO("yolov8n.pt")
 m.train(
-    data=str(ROOT / "dataset/data.yaml"),
+    data=str(legacy.local("dataset") / "data.yaml"),
     epochs=30,
     imgsz=640,
     batch=16,

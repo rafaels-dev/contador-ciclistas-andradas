@@ -42,7 +42,7 @@ def main():
         by_hour.setdefault(c["hour"], []).append(c)
 
     for hour, items in sorted(by_hour.items()):
-        video = ROOT / f"videos/Andradas_{hour}.mp4"
+        video = legacy.local("videos") / f"Andradas_{hour}.mp4"
         items.sort(key=lambda c: c["frame"])
         windows = [(max(0, c["frame"] - HALF_WINDOW),
                     c["frame"] + HALF_WINDOW, c) for c in items]

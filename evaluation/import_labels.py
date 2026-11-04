@@ -45,8 +45,8 @@ def main():
 
     ft = YOLO(ROOT.parent / "runs/ft_blur/weights/best.pt")
     x = YOLO("yolov8x.pt")
-    out_img = ROOT / "dataset/images/train"
-    out_lbl = ROOT / "dataset/labels/train"
+    out_img = legacy.local("dataset") / "images/train"
+    out_lbl = legacy.local("dataset") / "labels/train"
     no_box = []
     n_ok = 0
 
@@ -55,7 +55,7 @@ def main():
         by_hour.setdefault(c["hour"], []).append(c)
 
     for hour, items in sorted(by_hour.items()):
-        video = str(ROOT / f"videos/Andradas_{hour}.mp4")
+        video = str(legacy.local("videos") / f"Andradas_{hour}.mp4")
         target_by_frame = {c["frame"]: c for c in items}
         for f, fr in exact_frames(video, list(target_by_frame)):
             c = target_by_frame[f]

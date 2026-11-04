@@ -8,7 +8,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEST = Path(__file__).parent / "videos"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import legacy  # noqa: E402
+
+# the videos of a clone from before 0.0.8 stay in avaliacao/videos
+DEST = legacy.local("videos")
 DEST.mkdir(exist_ok=True)
 
 # (name, file_id) — priority order

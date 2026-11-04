@@ -11,6 +11,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+# This folder was avaliacao/ before 0.0.8. Git moves the scripts, but the
+# untracked videos and outputs of another clone stay behind in avaliacao/.
+OLD_DIR = HERE.parent / "avaliacao"
+
 # Portuguese → English category names (old outputs and the old LLM labels)
 CATEGORY = {
     "ciclistas": "cyclists", "pedestres": "pedestrians", "automoveis": "cars",
@@ -34,6 +39,14 @@ def first_existing(*paths: Path) -> Path:
         if p.exists():
             return p
     return paths[0]
+
+
+def local(name: str, old_name: str | None = None) -> Path:
+    """evaluation/<name>; if it is not there, the same thing left in the old
+    avaliacao/ folder or under its old name (old_name). The new path when
+    nothing exists (for writing)."""
+    names = [name] + ([old_name] if old_name else [])
+    return first_existing(*[d / n for d in (HERE, OLD_DIR) for n in names])
 
 
 def _rename(rec: dict, keys: dict) -> dict:
@@ -95,9 +108,10 @@ def load_candidates(path: Path) -> list[dict]:
     return [candidate(c) for c in json.loads(Path(path).read_text(encoding="utf-8"))]
 
 
-def mining_dir(root: Path) -> Path:
-    """The mining folder (mining/, or the old mineracao/)."""
-    return first_existing(root / "mining", root / "mineracao")
+def mining_dir(root: Path = HERE) -> Path:
+    """The mining folder (mining/, or the old mineracao/ — also in avaliacao/)."""
+    return first_existing(root / "mining", root / "mineracao",
+                          OLD_DIR / "mining", OLD_DIR / "mineracao")
 
 
 def load_mined_candidates(mining: Path) -> list[dict]:

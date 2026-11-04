@@ -5,6 +5,7 @@
 #
 # To run locally:
 #   cd web && npm run lint && npm run typecheck && npm test
+#   cd desktop && node --test
 #   python -m pytest              (at the root, with requirements-dev.txt installed)
 #   python -m pytest -m "not slow"   (skips the end-to-end worker tests)
 name: Tests
@@ -42,6 +43,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+
+      # desktop data folder (no Electron needed: plain Node, no install)
+      - name: Desktop (node --test)
+        working-directory: desktop
+        run: node --test
 
   worker:
     name: Worker (pytest)

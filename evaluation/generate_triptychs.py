@@ -61,7 +61,7 @@ def main():
 
     trips = {}
     for hour, items in sorted(by_hour.items()):
-        video = str(ROOT / f"videos/Andradas_{hour}.mp4")
+        video = str(legacy.local("videos") / f"Andradas_{hour}.mp4")
         requests = {}
         for c in items:
             for f in (c["frame"] - DELTA, c["frame"], c["frame"] + DELTA):

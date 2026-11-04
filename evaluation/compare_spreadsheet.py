@@ -46,9 +46,9 @@ def load_table(sweep: Path) -> dict:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--sweep", default="evaluation/sweep_v9")
+    p.add_argument("--sweep", default=None, help="default: evaluation/sweep_v9 (or the old varredura_v9)")
     args = p.parse_args()
-    tab = load_table(Path(args.sweep))
+    tab = load_table(Path(args.sweep) if args.sweep else legacy.local("sweep_v9", "varredura_v9"))
 
     print(f"{'h':>3} | {'cyc_GT':>6} {'cyc_AI':>7} {'cyc_ours':>9} {'err_AI':>7} {'err_ours':>9} | "
           f"{'ped GT/ours':>13} {'mot GT/ours':>13} {'car GT/ours':>13}")

@@ -57,7 +57,7 @@ if (WEB_ONLY) {
 // the root (BICYCLE_WEIGHTS_URL is still an alternative to the file)
 const WEIGHTS = {
   "yolov8n.pt": "https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt",
-  [path.join("runs", "ft_blur", "weights", "best.pt")]: process.env.BICYCLE_WEIGHTS_URL,
+  [path.join("runs", "ft_blur", "weights", "best.pt")]: process.env.BICYCLE_WEIGHTS_URL ?? process.env.PESOS_BICICLETAS_URL, // the old name keeps working
 };
 const engine = path.join(RESOURCES, "engine");
 copy(path.join(ROOT, "worker"), path.join(engine, "worker"), (src) => !src.includes("__pycache__"));
