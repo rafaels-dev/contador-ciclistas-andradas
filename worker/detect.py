@@ -70,7 +70,7 @@ GROUPS = ("ped", "bike", "car", "moto", "motion")
 GROUP_CATEGORY = {"ped": "pedestrians", "bike": "cyclists", "car": "cars", "moto": "motorcycles",
                   "motion": "other"}
 
-TRACKS_VERSION = 2       # 2: includes the "motion" group; older tracks force a new detection
+TRACKS_VERSION = 3       # 2: includes the "motion" group; 3: TRACK_GROW. Older tracks force a new detection
                          # (meta["area"]: the analyzed crop; tracks of another area too)
 MIN_OBS = 3              # minimum observations (after splicing) to become a candidate
 MAX_CROPS = 10           # crops kept per track (filmstrip)
@@ -86,6 +86,15 @@ MOTION_EXPLAINED = 0.3   # fraction of the blob inside YOLO boxes → already a 
 MOTION_WARMUP_S = 3.0    # the background model needs a few seconds to settle
 MOTION_MIN_S = 0.6       # motion track: minimum duration
 MOTION_SHIFT_HEIGHTS = 1.5  # ... and minimum displacement, in heights of its own box
+# ... unless it is fast: a blob that covers this much (px at 1080p) in fewer
+# frames is a vehicle YOLO missed, not a leaf. Andradas h17: a blurred cyclist
+# filling half the frame (1084 px in 10 frames, 9 between the first and the
+# last) and the motorcycle behind it (1267 px in 7) were both dropped
+MOTION_FAST_SHIFT = 500
+MOTION_FAST_MIN_OBS = 5
+MOTION_REPEATED_OVERLAP = 0.5  # motion box this much inside a YOLO event's box (of the smaller) ...
+MOTION_REPEATED_S = 0.2        # ... crossing at the same moment = the same object. A moto/cyclist beside
+                               # the car also falls inside its box, but crosses 10–14 frames apart
 # Inside the analysis area the mask is fine (down to 1 px of 4K) and noise
 # gets through: 10–20 px blobs (compression, sun through the leaves) that the
 # tracker chains into a "trajectory" that barely moves. Measured in px of a
@@ -93,6 +102,15 @@ MOTION_SHIFT_HEIGHTS = 1.5  # ... and minimum displacement, in heights of its ow
 # ones had p90 area < 1100 or moved < 110; cyclists, pedestrians and scooters,
 # p90 ≥ 1900 and ≥ 160.
 MOTION_FINE_VERSION = 3     # bump when detection inside the area changes (old tracks are redone)
+# ByteTrack confirms a NEW track only when IoU × confidence between two frames
+# is > 0.3 (hard-coded in supervision). A fast object with a narrow box never
+# gets there: the Andradas cyclist at ~130 px/frame with a ~280 px person box
+# gives IoU ~0.36 × 0.65 ≈ 0.23 — every frame opens an id that dies, and no
+# trajectory forms (h17: 7 of 8 cyclists in Cristiano's labels). The boxes are
+# enlarged by this factor only for the tracker (IoU ~0.6) and shrunk back.
+# Not for cars: neighbors in a platoon would swap ids.
+TRACK_GROW = 2.0
+TRACK_GROW_GROUPS = ("ped", "bike", "moto", "motion")
 MOTION_FINE_AREA_P90 = 1000  # px²: the object must reach this size at some point
 MOTION_FINE_SHIFT = 120     # px: minimum displacement from start to end
 LANE_WIDTH = 3.0         # line that does not count cars (bike lane, sidewalk): an object whose
@@ -183,6 +201,26 @@ def _crop(frame, box, group: str) -> bytes:
         img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     ok, buf = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 85])
     return buf.tobytes() if ok else b""
+
+
+def _grown(xyxy: np.ndarray, k: float) -> np.ndarray:
+    """Boxes scaled by k around their centers."""
+    c = (xyxy[:, :2] + xyxy[:, 2:]) / 2
+    half = (xyxy[:, 2:] - xyxy[:, :2]) * (k / 2)
+    return np.hstack([c - half, c + half])
+
+
+def track_update(tracker, dets: sv.Detections, grow: float = 1.0) -> sv.Detections:
+    """ByteTrack over boxes enlarged by `grow` (see TRACK_GROW); the result
+    comes back with the original boxes."""
+    if grow == 1.0 or not len(dets):
+        return tracker.update_with_detections(dets)
+    big = dets[np.arange(len(dets))]  # a copy: the caller's boxes stay as they are
+    big.xyxy = _grown(dets.xyxy.astype(np.float64), grow)
+    out = tracker.update_with_detections(big)
+    if len(out):
+        out.xyxy = _grown(out.xyxy.astype(np.float64), 1 / grow).astype(dets.xyxy.dtype)
+    return out
 
 
 def _record(tracks: dict, group: str, dets: sv.Detections, frame, idx: int,
@@ -424,21 +462,22 @@ def detection_step(video: str, start_f: int, end_f: int | None,
                 # vision model decides the class
                 bikes = sv.Detections.merge([bikes, motos]).with_nms(threshold=0.5, class_agnostic=True) if len(bikes) else motos
                 motos = sv.Detections.empty()
-            tracked = {
-                "ped": trackers["ped"].update_with_detections(by_class(everything, [_PERSON])),
-                "bike": trackers["bike"].update_with_detections(bikes),
-                "car": trackers["car"].update_with_detections(by_class(everything, config.CAR_CLASSES)),
-                "moto": trackers["moto"].update_with_detections(motos),
-            }
+            raw = {"ped": by_class(everything, [_PERSON]), "bike": bikes,
+                   "car": by_class(everything, config.CAR_CLASSES), "moto": motos}
+            tracked = {g: track_update(trackers[g], d, TRACK_GROW if g in TRACK_GROW_GROUPS else 1.0)
+                       for g, d in raw.items()}
             for g, d in tracked.items():
                 # filmstrip crops come from the 2nd pass (media_step), only for
                 # the candidates — no need to keep them for every track
                 _record(tracks, g, d, frame, i, keep_crops=False)
             _associate(tracks, tracked["ped"], tracked["bike"], tracked["moto"], scale)
-            # raw YOLO boxes (not only the tracked ones): an object the
-            # tracker has not confirmed yet must not become "other"
-            mov = motion.detect(frame, [everything, bikes])
-            _record(tracks, "motion", trackers["motion"].update_with_detections(mov), frame, i,
+            # only boxes that are part of a trajectory explain a blob: a raw
+            # box the tracker never confirms (fast cyclist, flickering person)
+            # used to erase the blob too, and the object vanished altogether.
+            # A blob of an object YOLO tracks a moment later is dropped later
+            # (coincides with the YOLO event on the same line)
+            mov = motion.detect(frame, list(tracked.values()))
+            _record(tracks, "motion", track_update(trackers["motion"], mov, TRACK_GROW), frame, i,
                     keep_crops=False)
 
         now = time.time()
@@ -629,11 +668,12 @@ def _real_motion(tr: Track, fps: float, scale: float = 1.0, fine: bool = False) 
     """Background-subtraction-only track: it has to last and really move
     (leaves, rain and blinking headlights stay in place). Inside the analysis
     area (`fine`), it also needs an object's size and a minimum distance."""
-    if tr.frames[-1] - tr.frames[0] < MOTION_MIN_S * fps:
-        return False
     heights = sorted(c[3] - c[1] for c in tr.boxes)
     p0, p1 = ground_point(tr.boxes[0]), ground_point(tr.boxes[-1])
     shift = np.hypot(p1[0] - p0[0], p1[1] - p0[1])
+    fast = len(tr.frames) >= MOTION_FAST_MIN_OBS and shift >= MOTION_FAST_SHIFT * scale
+    if tr.frames[-1] - tr.frames[0] < MOTION_MIN_S * fps and not fast:
+        return False
     if shift < MOTION_SHIFT_HEIGHTS * heights[len(heights) // 2]:
         return False
     if fine:
@@ -736,12 +776,23 @@ def generate_candidates(tracks: dict, lines: list[dict], width: int, height: int
     final = [e for e in final if id(e) not in removed]
 
     # motion that coincides with a YOLO event (same line, close in time and
-    # space) is the same object seen before/after the model caught it
+    # space) is the same object seen before/after the model caught it. Close
+    # in space: near centers, or boxes that mostly overlap at the same moment —
+    # a fast car's blob is a piece of it (or MOG2's trail), off-center from the
+    # ~900 px box (Andradas h17: 20 cars counted twice once fast blobs were kept)
     known = [e for e in final if e["group"] != "motion"]
+    def _overlap(a, b) -> float:
+        w = min(a[2], b[2]) - max(a[0], b[0])
+        h = min(a[3], b[3]) - max(a[1], b[1])
+        if w <= 0 or h <= 0:
+            return 0.0
+        return w * h / min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
     def _repeated(ev) -> bool:
         cx = (ev["bbox"][0] + ev["bbox"][2]) / 2
         return any(c["line_id"] == ev["line_id"] and abs(c["frame"] - ev["frame"]) <= fps
-                   and abs((c["bbox"][0] + c["bbox"][2]) / 2 - cx) <= 150 * scale for c in known)
+                   and (abs((c["bbox"][0] + c["bbox"][2]) / 2 - cx) <= 150 * scale
+                        or (abs(c["frame"] - ev["frame"]) <= MOTION_REPEATED_S * fps
+                            and _overlap(c["bbox"], ev["bbox"]) >= MOTION_REPEATED_OVERLAP)) for c in known)
     for ev in final:
         if ev["group"] == "motion":
             ev["origin"] = "motion"

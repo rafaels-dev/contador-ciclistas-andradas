@@ -45,7 +45,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from reader import VideoReader, _ffmpeg  # noqa: E402
+from reader import StderrTail, VideoReader, _ffmpeg  # noqa: E402
 
 CATEGORIES = ["cyclists", "kick_scooters", "mopeds", "unicycles", "pedestrians", "cars", "motorcycles", "other"]
 # fallback texts (the app sends them translated in plan["labels"])
@@ -188,6 +188,7 @@ class Encoder:
                *(nvenc if self.codec == "h264_nvenc" else x264),
                "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(target)]
         self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.stderr = StderrTail(self.proc.stderr)
         # pipe writes in a thread (writing releases the GIL): drawing the next
         # frame and sending the previous one to ffmpeg happen together
         self.queue: queue.Queue = queue.Queue(maxsize=16)
@@ -221,9 +222,8 @@ class Encoder:
         self.queue.put(None)
         self.thread.join()
         self.proc.stdin.close()
-        err = self.proc.stderr.read().decode(errors="replace")
         if self.proc.wait() != 0:
-            raise RuntimeError(f"ffmpeg failed: {err.strip()[-500:]}")
+            raise RuntimeError(f"ffmpeg failed: {self.stderr.text()[-500:]}")
 
 
 def load_boxes(tracks_file: str | None, tracks: set[str]) -> dict[str, dict[int, tuple]]:

@@ -24,6 +24,8 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import threading
+from collections import deque
 from pathlib import Path
 
 import cv2
@@ -31,15 +33,47 @@ import numpy as np
 
 MAX_WIDTH = 1920
 
+# variables renamed in 0.0.8 (CONTADOR_*): the old names keep working
+LEGACY_ENV = {"TRAFFIC_COUNTER_FFMPEG": "CONTADOR_FFMPEG",
+              "TRAFFIC_COUNTER_NO_NVDEC": "CONTADOR_SEM_NVDEC"}
+
+
+def env(name: str) -> str | None:
+    """Environment variable `name`, or its name before 0.0.8."""
+    value = os.environ.get(name)
+    if value is None and name in LEGACY_ENV:
+        value = os.environ.get(LEGACY_ENV[name])
+    return value
+
 
 def _ffmpeg() -> str:
-    for cand in (os.environ.get("TRAFFIC_COUNTER_FFMPEG"),
+    for cand in (env("TRAFFIC_COUNTER_FFMPEG"),
                  str(Path.home() / ".local/opt/ffmpeg-btbn/bin/ffmpeg"),
                  shutil.which("ffmpeg")):
         if cand and Path(cand).exists():
             return cand
     import imageio_ffmpeg
     return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+class StderrTail:
+    """Reads a process's stderr until it closes, keeping only the last lines
+    (for error messages) — without it the pipe fills and the process hangs."""
+
+    def __init__(self, stream, lines: int = 20):
+        self._lines: deque[bytes] = deque(maxlen=lines)
+        self._thread = threading.Thread(target=self._loop, args=(stream,), daemon=True)
+        self._thread.start()
+
+    def _loop(self, stream) -> None:
+        for line in iter(stream.readline, b""):
+            self._lines.append(line)
+        stream.close()
+
+    def text(self) -> str:
+        """The last lines; waits for the stream to close (call after the process ends)."""
+        self._thread.join(timeout=5)
+        return b"".join(self._lines).decode(errors="replace").strip()
 
 
 def write_jpg(path: str | Path, img: np.ndarray, quality: int = 85) -> None:
@@ -98,7 +132,7 @@ class VideoReader:
         self.factor = w / self.width
         self._size = self.width * self.height * 3 // 2
         self._proc: subprocess.Popen | None = None
-        use_gpu = gpu if gpu is not None else os.environ.get("TRAFFIC_COUNTER_NO_NVDEC") != "1"
+        use_gpu = gpu if gpu is not None else env("TRAFFIC_COUNTER_NO_NVDEC") != "1"
         self.gpu = use_gpu and self._open(gpu=True)
         if self.gpu and area and not self._gpu_crops():
             self.gpu = False
@@ -134,6 +168,7 @@ class VideoReader:
         self.close()
         self._proc = subprocess.Popen(self._command(gpu), stdout=subprocess.PIPE,
                                       stderr=subprocess.PIPE, bufsize=self._size * 4)
+        StderrTail(self._proc.stderr)
         self._first = self._read_raw()
         if self._first is None:
             self.close()
