@@ -85,7 +85,8 @@
       "all": "All",
       "divergent": "Model ≠ detector",
       "offLine": "Not counted on the line",
-      "duplicates": "Possible duplicate"
+      "duplicates": "Possible duplicate",
+      "manual": "Manual count"
     },
     "filter": "Filter",
     "moreFilters": "More filters…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Discard (not an object)",
     "confirmedCount": "Confirmed count",
     "total": "Total",
-    "summary": "{reviewed}/{total} reviewed · {counted} counted · {discarded} discarded"
+    "summary": "{reviewed}/{total} reviewed · {counted} counted · {discarded} discarded",
+    "manual": {
+      "badge": "manual",
+      "badgeHint": "Count added by hand",
+      "noDirection": "?",
+      "title": "Count by hand:",
+      "hint": "Pick the line and the direction, then press the category (or Shift+number) each time something the detector missed goes by. It counts at the frame on screen.",
+      "line": "Line for the manual count",
+      "direction": "Direction",
+      "directionHint": "Direction of whoever passes: A→B, B→A or not given (the D key switches)",
+      "addHint": "Counts {category} at the current frame (Shift+{key})",
+      "show": "show",
+      "undo": "Undo",
+      "inspectorTitle": "Manual count",
+      "addedAt": "Added by hand at {time} · frame {frame}",
+      "remove": "Remove count",
+      "summary": "{n, plural, one {# manual} other {# manual}}"
+    }
   },
   "render": {
     "panelTitle": "Count",
@@ -278,7 +296,8 @@
       "invalidLines": "Invalid lines.",
       "outsideFrame": "Coordinate outside the frame.",
       "invalidArea": "Invalid analysis area.",
-      "areaTooSmall": "The analysis area is too small."
+      "areaTooSmall": "The analysis area is too small.",
+      "invalidManual": "Invalid manual count."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Space",
     "playPause": "plays / pauses the video",
     "zoom": "timeline zoom",
-    "wholeTimeline": "whole timeline"
+    "wholeTimeline": "whole timeline",
+    "addManual": "counts by hand at the current frame",
+    "manualDirection": "switches the manual count direction",
+    "removeManual": "removes the focused manual count"
   },
   "timeline": {
     "title": "Timeline",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, other {# selected}}",
     "clear": "Clear",
     "moveTo": "Move to",
+    "delete": "Delete…",
+    "confirmDelete": "{n, plural, one {Delete the selected video?} other {Delete the # selected videos?}} Lines, detection and review are lost. Final videos already generated are kept.",
+    "confirmDeleteLocal": "{n, plural, one {Delete the selected video?} other {Delete the # selected videos?}} Lines, detection and review are lost. Final videos already generated are kept. Videos from the computer stay where they are: only what the app made from them is deleted.",
     "chooseGroup": "choose the group…",
     "leftOut": "{n, plural, one {# not fully reviewed yet is left out} other {# not fully reviewed yet are left out}}",
     "buildFinal": "Build final video…",

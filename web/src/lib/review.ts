@@ -14,6 +14,20 @@ export type Label = Category | "discarded";
  */
 export const NO_CONSULTATION = "detector";
 
+/**
+ * origin (and llm_model) of a count the person added by hand while watching
+ * the video — what the detector missed. It is born decided (label = the
+ * category), counts like any other in the totals and the final video, and
+ * survives a new detection (replaceCandidates keeps it).
+ */
+export const MANUAL = "manual";
+
+export const isManual = (c: Pick<Candidate, "origin">) => c.origin === MANUAL;
+
+/** Direction of a manual count: A→B, B→A or not given. */
+export const DIRECTIONS = ["A→B", "B→A", null] as const;
+export type Direction = (typeof DIRECTIONS)[number];
+
 /** Category names are translated: messages → categories.singular / categories.plural. */
 export const LABELS: readonly Label[] = ["cyclists", "kick_scooters", "mopeds", "unicycles", "pedestrians", "cars", "motorcycles", "other", "discarded"];
 
@@ -90,6 +104,11 @@ export function computeTotals(candidates: Pick<Candidate, "line_id" | "direction
 
 /** Two crossings of the same object arrive together; different objects in the same lane come spaced. */
 export const DUPLICATE_WINDOW_S = 1;
+/**
+ * A manual count has no box and is pressed with the reaction time of whoever
+ * watches (before or after the crossing): a wider window, with no box check.
+ */
+export const MANUAL_DUPLICATE_WINDOW_S = 2;
 
 function overlap(a: number[], b: number[]): number {
   const w = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
@@ -103,11 +122,14 @@ function overlap(a: number[], b: number[]): number {
  * Possible double count of the same object (e.g. the model looked at the
  * cyclist next to the car, or tracking split one object in two): same line
  * and direction, same class, crossing within DUPLICATE_WINDOW_S with
- * overlapping boxes. Only points it out for the human to check — discards
- * nothing. Returns id → ids of the similar candidates.
+ * overlapping boxes. A manual count is compared by line, class and time
+ * (MANUAL_DUPLICATE_WINDOW_S; a manual one without direction matches either):
+ * it catches marking by hand what the detector had already found. Only
+ * points it out for the human to check — discards nothing. Returns id → ids
+ * of the similar candidates.
  */
 export function possibleDuplicates(
-  candidates: Pick<Candidate, "id" | "line_id" | "direction" | "time_s" | "bbox">[],
+  candidates: (Pick<Candidate, "id" | "line_id" | "direction" | "time_s" | "bbox"> & { origin?: string | null })[],
   labelOf: (id: number) => Label | null,
 ): Map<number, number[]> {
   const pairs = new Map<number, number[]>();
@@ -117,11 +139,17 @@ export function possibleDuplicates(
     const a = order[i];
     const la = labelOf(a.id);
     if (!la || la === "discarded") continue;
-    for (let j = i + 1; j < order.length && order[j].time_s - a.time_s <= DUPLICATE_WINDOW_S; j++) {
+    for (let j = i + 1; j < order.length && order[j].time_s - a.time_s <= MANUAL_DUPLICATE_WINDOW_S; j++) {
       const b = order[j];
-      if (b.line_id !== a.line_id || b.direction !== a.direction || labelOf(b.id) !== la) continue;
-      const [ba, bb] = [box(a), box(b)];
-      if (!ba || !bb || overlap(ba, bb) < 0.3) continue;
+      if (b.line_id !== a.line_id || labelOf(b.id) !== la) continue;
+      const manual = a.origin === MANUAL || b.origin === MANUAL;
+      if (manual) {
+        if (a.direction && b.direction && a.direction !== b.direction) continue;
+      } else {
+        if (b.direction !== a.direction || b.time_s - a.time_s > DUPLICATE_WINDOW_S) continue;
+        const [ba, bb] = [box(a), box(b)];
+        if (!ba || !bb || overlap(ba, bb) < 0.3) continue;
+      }
       pairs.set(a.id, [...(pairs.get(a.id) ?? []), b.id]);
       pairs.set(b.id, [...(pairs.get(b.id) ?? []), a.id]);
     }

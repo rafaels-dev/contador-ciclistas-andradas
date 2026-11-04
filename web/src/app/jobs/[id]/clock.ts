@@ -40,9 +40,11 @@ export function useTime(clock: Clock): number {
 
 /** 3725.4 s at 15 fps → "1:02:05:06" (hours:minutes:seconds:frame). */
 export function frameTimecode(s: number, fps: number): string {
-  const q = Math.round(s * fps);
+  // the seconds come from the time itself: counting frames at the rounded rate (15 instead of
+  // the DVR's 14.87) drifted ~22 s by the 43rd minute, against the list's timecode()
   const f = Math.max(1, Math.round(fps));
-  const t = Math.floor(q / f);
+  const t = Math.floor(Math.max(0, s) + 1e-6);
+  const q = t * f + Math.min(f - 1, Math.floor((Math.max(0, s) - t) * fps + 1e-6));
   const h = Math.floor(t / 3600);
   const m = String(Math.floor((t % 3600) / 60)).padStart(2, "0");
   const ss = String(t % 60).padStart(2, "0");

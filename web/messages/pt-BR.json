@@ -85,7 +85,8 @@
       "all": "Todos",
       "divergent": "Modelo ≠ detector",
       "offLine": "Fora da linha",
-      "duplicates": "Possível duplicado"
+      "duplicates": "Possível duplicado",
+      "manual": "Contagem manual"
     },
     "filter": "Filtro",
     "moreFilters": "Mais filtros…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Descartar (não é objeto)",
     "confirmedCount": "Contagem confirmada",
     "total": "Total",
-    "summary": "{reviewed}/{total} revisados · {counted} contados · {discarded} descartados"
+    "summary": "{reviewed}/{total} revisados · {counted} contados · {discarded} descartados",
+    "manual": {
+      "badge": "manual",
+      "badgeHint": "Contagem adicionada à mão",
+      "noDirection": "?",
+      "title": "Contar à mão:",
+      "hint": "Escolha a linha e o sentido, e aperte a categoria (ou Shift+número) cada vez que passar algo que o detector não pegou. Conta no quadro que está na tela.",
+      "line": "Linha da contagem manual",
+      "direction": "Sentido",
+      "directionHint": "Sentido de quem passa: A→B, B→A ou não informado (tecla D alterna)",
+      "addHint": "Conta {category} no quadro atual (Shift+{key})",
+      "show": "ver",
+      "undo": "Desfazer",
+      "inspectorTitle": "Contagem manual",
+      "addedAt": "Adicionada à mão em {time} · quadro {frame}",
+      "remove": "Remover contagem",
+      "summary": "{n, plural, one {# manual} other {# manuais}}"
+    }
   },
   "render": {
     "panelTitle": "Contagem",
@@ -278,7 +296,8 @@
       "invalidLines": "Linhas inválidas.",
       "outsideFrame": "Coordenada fora do quadro.",
       "invalidArea": "Área de análise inválida.",
-      "areaTooSmall": "A área de análise é pequena demais."
+      "areaTooSmall": "A área de análise é pequena demais.",
+      "invalidManual": "Contagem manual inválida."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Espaço",
     "playPause": "toca / pausa o vídeo",
     "zoom": "zoom da linha do tempo",
-    "wholeTimeline": "linha do tempo inteira"
+    "wholeTimeline": "linha do tempo inteira",
+    "addManual": "conta à mão no quadro atual",
+    "manualDirection": "alterna o sentido da contagem manual",
+    "removeManual": "remove a contagem manual em foco"
   },
   "timeline": {
     "title": "Linha do tempo",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, one {# selecionado} other {# selecionados}}",
     "clear": "Limpar",
     "moveTo": "Mover para",
+    "delete": "Apagar…",
+    "confirmDelete": "{n, plural, one {Apagar o vídeo selecionado?} other {Apagar os # vídeos selecionados?}} Linhas, detecção e revisão se perdem. Os vídeos finais já gerados continuam.",
+    "confirmDeleteLocal": "{n, plural, one {Apagar o vídeo selecionado?} other {Apagar os # vídeos selecionados?}} Linhas, detecção e revisão se perdem. Os vídeos finais já gerados continuam. Os vídeos do computador ficam onde estão: só o que o app gerou a partir deles é apagado.",
     "chooseGroup": "escolha o grupo…",
     "leftOut": "{n, plural, one {# ainda sem revisão completa fica de fora} other {# ainda sem revisão completa ficam de fora}}",
     "buildFinal": "Montar vídeo final…",

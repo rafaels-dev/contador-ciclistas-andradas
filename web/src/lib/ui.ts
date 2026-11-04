@@ -1,3 +1,4 @@
+import type { Line } from "./db";
 import type { Label } from "./review";
 
 /**
@@ -41,4 +42,22 @@ export function timecode(s: number, hours = false): string {
   const m = Math.floor((t % 3600) / 60);
   const ss = String(t % 60).padStart(2, "0");
   return h || hours ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
+
+/**
+ * Where to write "A" and "B" beside a line, in px of a W×H frame. Side A is to
+ * the right of someone walking from (x1,y1) to (x2,y2) — same convention as
+ * the worker (crossing A→B / B→A).
+ */
+export function sideLabels(l: Line, W: number, H: number) {
+  const ax = l.x1 * W, ay = l.y1 * H, bx = l.x2 * W, by = l.y2 * H;
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy) || 1;
+  const off = Math.max(W, H) * 0.03;
+  const mx = (ax + bx) / 2, my = (ay + by) / 2;
+  return {
+    mx, my,
+    a: { x: mx + (dy / len) * off, y: my - (dx / len) * off },
+    b: { x: mx - (dy / len) * off, y: my + (dx / len) * off },
+  };
 }

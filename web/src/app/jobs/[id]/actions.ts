@@ -11,12 +11,16 @@ import {
   suggestionSummary,
   reviewCandidates,
   saveCamera,
+  insertManualCandidate,
+  updateManualCandidate,
+  deleteManualCandidate,
   type Area,
+  type Candidate,
   type Category,
   type Line,
 } from "@/lib/db";
 import { msg } from "@/i18n/message";
-import { LABELS, type Label } from "@/lib/review";
+import { DIRECTIONS, LABELS, type Label } from "@/lib/review";
 import { jobDir } from "@/lib/paths";
 import { cancelJob, startDetection, startDownload, startSuggestions, suggestionsRunning } from "@/lib/runner";
 
@@ -177,4 +181,83 @@ export async function setLineCategories(jobId: string, map: Record<string, strin
   const cam = job.camera_id ? listCameras().find((c) => c.id === job.camera_id) : undefined;
   if (cam) saveCamera(cam.id, cam.name, apply(JSON.parse(cam.lines) as Line[]));
   refresh();
+}
+
+export type ManualInput = {
+  frame: number;
+  line_id: string | null;
+  direction: string | null;
+  label: Category;
+  /** JPEG of the frame (data: URL) captured from the player — the list thumbnail */
+  snapshot?: string | null;
+  /** an existing snapshot (undoing a removal reuses the file) */
+  filmstrip?: string | null;
+};
+
+const SNAPSHOT_MAX = 2_000_000;
+
+/** Checks the fields of a manual count against the job (line exists, known category and direction). */
+function manualFields(job: NonNullable<ReturnType<typeof getJob>>, input: Pick<ManualInput, "line_id" | "direction">) {
+  const lines = JSON.parse(job.lines) as Line[];
+  const line_id = input.line_id ?? null;
+  if (line_id === null ? lines.length > 0 : !lines.some((l) => l.id === line_id)) throw new InvalidInput("job.errors.invalidManual");
+  const direction = input.direction ?? null;
+  if (!(DIRECTIONS as readonly (string | null)[]).includes(direction)) throw new InvalidInput("job.errors.invalidManual");
+  return { line_id, direction };
+}
+
+/**
+ * Count added by hand at a frame of the video (what the detector missed).
+ * Saves the frame captured by the player as its thumbnail and returns the
+ * new row, already decided, for the screen to add to its list.
+ */
+export async function addManualCount(jobId: string, input: ManualInput): Promise<ActionResult & { candidate?: Candidate }> {
+  const job = getJob(jobId);
+  if (!job) return { error: "job.errors.notFound" };
+  if (job.status !== "awaiting_review") return { error: "job.errors.reviewClosed" };
+  try {
+    const { line_id, direction } = manualFields(job, input);
+    if (!Number.isInteger(input.frame) || input.frame < 0 || !CATEGORIES.includes(input.label)) throw new InvalidInput("job.errors.invalidManual");
+    let filmstrip: string | null = null;
+    const dir = jobDir(jobId);
+    if (typeof input.filmstrip === "string" && /^manual\/[\w-]+\.jpg$/.test(input.filmstrip) && fs.existsSync(path.join(dir, input.filmstrip))) {
+      filmstrip = input.filmstrip;
+    } else if (typeof input.snapshot === "string" && input.snapshot.length < SNAPSHOT_MAX && input.snapshot.startsWith("data:image/jpeg;base64,")) {
+      const name = `manual/${input.frame}-${Date.now().toString(36)}.jpg`;
+      fs.mkdirSync(path.join(dir, "manual"), { recursive: true });
+      fs.writeFileSync(path.join(dir, name), Buffer.from(input.snapshot.slice(input.snapshot.indexOf(",") + 1), "base64"));
+      filmstrip = name;
+    }
+    const fps = job.fps || 15;
+    const candidate = insertManualCandidate(jobId, {
+      frame: input.frame, time_s: Math.round((input.frame / fps) * 100) / 100, line_id, direction, label: input.label, filmstrip,
+    });
+    return { candidate };
+  } catch (e) {
+    if (e instanceof InvalidInput) return { error: e.message };
+    throw e;
+  }
+}
+
+/** Moves a manual count to another line or direction (the category goes through decide). */
+export async function updateManualCount(jobId: string, id: number, input: Pick<ManualInput, "line_id" | "direction">): Promise<ActionResult> {
+  const job = getJob(jobId);
+  if (!job) return { error: "job.errors.notFound" };
+  if (job.status !== "awaiting_review") return { error: "job.errors.reviewClosed" };
+  try {
+    if (!updateManualCandidate(jobId, id, manualFields(job, input))) return { error: "job.errors.invalidManual" };
+    return {};
+  } catch (e) {
+    if (e instanceof InvalidInput) return { error: e.message };
+    throw e;
+  }
+}
+
+/** Removes a manual count (the snapshot stays on disk: undoing puts it back). */
+export async function removeManualCount(jobId: string, id: number): Promise<ActionResult> {
+  const job = getJob(jobId);
+  if (!job) return { error: "job.errors.notFound" };
+  if (job.status !== "awaiting_review") return { error: "job.errors.reviewClosed" };
+  if (!Number.isInteger(id) || !deleteManualCandidate(jobId, id)) return { error: "job.errors.invalidManual" };
+  return {};
 }

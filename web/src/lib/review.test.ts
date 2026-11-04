@@ -137,6 +137,20 @@ describe("possibleDuplicates", () => {
     expect(possibleDuplicates(list, () => null).size).toBe(0);
   });
 
+  it("a manual count next to the detector's: by line, class and time, no box", () => {
+    const manual = c(2, 11.8, null, { origin: "manual" });
+    expect(possibleDuplicates([c(1, 10, [0, 0, 100, 100]), manual], allCyclists).get(2)).toEqual([1]);
+    // without direction it matches either; with a different one, no
+    expect(possibleDuplicates([c(1, 10, [0, 0, 100, 100], { direction: "B→A" }), c(2, 11, null, { origin: "manual", direction: null })], allCyclists).get(2)).toEqual([1]);
+    expect(possibleDuplicates([c(1, 10, [0, 0, 100, 100], { direction: "B→A" }), c(2, 11, null, { origin: "manual" })], allCyclists).size).toBe(0);
+    // more than 2 s apart: another object
+    expect(possibleDuplicates([c(1, 10, [0, 0, 100, 100]), c(2, 12.5, null, { origin: "manual" })], allCyclists).size).toBe(0);
+  });
+
+  it("two detector candidates 1.5 s apart are still not duplicates (the wider window is only for manual ones)", () => {
+    expect(possibleDuplicates([c(1, 10, [0, 0, 100, 100]), c(2, 11.5, [0, 0, 100, 100])], allCyclists).size).toBe(0);
+  });
+
   it("input order does not matter", () => {
     const pairs = possibleDuplicates([c(2, 10.5, [0, 0, 100, 100]), c(3, 30, null), c(1, 10, [0, 0, 100, 100])], allCyclists);
     expect(pairs.get(1)).toEqual([2]);

@@ -9,6 +9,7 @@ import { msg } from "@/i18n/message";
 import { appLocale, translatorFor } from "@/i18n/server";
 import {
   CATEGORIES,
+  deleteJob,
   getJob,
   getRender,
   listCandidates,
@@ -25,6 +26,7 @@ import {
 import { downloadFromDrive } from "./drive";
 import { adjustEngine, enginePython, workerEnv } from "./engine";
 import { OpenRouterError, suggestCategory, suggestionModels } from "./openrouter";
+import { movedVideo } from "./legacy";
 import { REPO_ROOT, jobDir, renderDir } from "./paths";
 import { NO_CONSULTATION, countsOnLine } from "./review";
 
@@ -156,6 +158,26 @@ export function cancelJob(jobId: string): void {
   updateJob(jobId, { status: "error", error: msg("errors.cancelled"), message: null });
 }
 
+/**
+ * Removes videos from the library: stops what is running, deletes the
+ * database rows and the job folder (downloaded video, detection, media). A
+ * video from the computer is used in place and stays where it is. Final
+ * videos already generated keep their files.
+ */
+export function deleteJobs(ids: string[]): void {
+  for (const id of ids) {
+    if (!getJob(id)) continue;
+    cancelJob(id);
+    deleteJob(id); // a suggestion batch in progress sees the job is gone and stops
+    // Windows: a worker just killed may still hold files for a moment
+    try {
+      fs.rmSync(jobDir(id), { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    } catch (e) {
+      console.error(`[delete] ${jobDir(id)}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+}
+
 const SPEED_WINDOW_MS = 5000;
 
 /** 1536 → "1.5 KB" (powers of 1000, as Drive shows sizes), in the app language. */
@@ -233,7 +255,8 @@ export function startDownload(jobId: string): void {
 /** The job's video: the original local file (absolute path) or the one downloaded into the job folder. */
 export function videoPath(jobId: string): string {
   const file = getJob(jobId)?.video_file ?? "video.mp4";
-  return path.isAbsolute(file) ? file : path.join(/* turbopackIgnore: true */ jobDir(jobId), file);
+  // movedVideo: a video used in place from the repository's old avaliacao/ folder
+  return path.isAbsolute(file) ? (movedVideo(file) as string) : path.join(/* turbopackIgnore: true */ jobDir(jobId), file);
 }
 
 /** Metadata + first frame of the video already on disk → awaiting_lines. */
@@ -471,7 +494,7 @@ export function startSuggestions(jobId: string, locale: Locale = appLocale()): v
 
     let next = 0;
     const worker = async () => {
-      while (!abort && next < pending.length) {
+      while (!abort && next < pending.length && getJob(jobId)) {
         const c = pending[next++];
         for (let attempt = 1; ; attempt++) {
           try {

@@ -85,7 +85,8 @@
       "all": "Alle",
       "divergent": "Model ≠ detector",
       "offLine": "Niet geteld op de lijn",
-      "duplicates": "Mogelijk dubbel"
+      "duplicates": "Mogelijk dubbel",
+      "manual": "Handmatige telling"
     },
     "filter": "Filter",
     "moreFilters": "Meer filters…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Verwijderen (geen object)",
     "confirmedCount": "Bevestigde telling",
     "total": "Totaal",
-    "summary": "{reviewed}/{total} gecontroleerd · {counted} geteld · {discarded} verwijderd"
+    "summary": "{reviewed}/{total} gecontroleerd · {counted} geteld · {discarded} verwijderd",
+    "manual": {
+      "badge": "handmatig",
+      "badgeHint": "Met de hand toegevoegde telling",
+      "noDirection": "?",
+      "title": "Met de hand tellen:",
+      "hint": "Kies de lijn en de richting en druk op de categorie (of Shift+cijfer) telkens als er iets langskomt dat de detector miste. Er wordt geteld bij het beeld op het scherm.",
+      "line": "Lijn van de handmatige telling",
+      "direction": "Richting",
+      "directionHint": "Richting van wie passeert: A→B, B→A of niet opgegeven (toets D wisselt)",
+      "addHint": "Telt {category} bij het huidige beeld (Shift+{key})",
+      "show": "bekijken",
+      "undo": "Ongedaan maken",
+      "inspectorTitle": "Handmatige telling",
+      "addedAt": "Met de hand toegevoegd op {time} · beeld {frame}",
+      "remove": "Telling verwijderen",
+      "summary": "{n, plural, one {# handmatig} other {# handmatig}}"
+    }
   },
   "render": {
     "panelTitle": "Telling",
@@ -278,7 +296,8 @@
       "invalidLines": "Ongeldige lijnen.",
       "outsideFrame": "Coördinaat buiten het beeld.",
       "invalidArea": "Ongeldig analysegebied.",
-      "areaTooSmall": "Het analysegebied is te klein."
+      "areaTooSmall": "Het analysegebied is te klein.",
+      "invalidManual": "Ongeldige handmatige telling."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Spatie",
     "playPause": "speelt de video af / pauzeert",
     "zoom": "zoom van de tijdlijn",
-    "wholeTimeline": "hele tijdlijn"
+    "wholeTimeline": "hele tijdlijn",
+    "addManual": "telt met de hand bij het huidige beeld",
+    "manualDirection": "wisselt de richting van de handmatige telling",
+    "removeManual": "verwijdert de geselecteerde handmatige telling"
   },
   "timeline": {
     "title": "Tijdlijn",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, other {# geselecteerd}}",
     "clear": "Wissen",
     "moveTo": "Verplaatsen naar",
+    "delete": "Verwijderen…",
+    "confirmDelete": "{n, plural, one {De geselecteerde video verwijderen?} other {De # geselecteerde video's verwijderen?}} Lijnen, detectie en controle gaan verloren. Al gemaakte eindvideo's blijven bewaard.",
+    "confirmDeleteLocal": "{n, plural, one {De geselecteerde video verwijderen?} other {De # geselecteerde video's verwijderen?}} Lijnen, detectie en controle gaan verloren. Al gemaakte eindvideo's blijven bewaard. Video's van de computer blijven waar ze staan: alleen wat de app ervan heeft gemaakt wordt verwijderd.",
     "chooseGroup": "kies de groep…",
     "leftOut": "{n, plural, one {# die nog niet helemaal is gecontroleerd, valt erbuiten} other {# die nog niet helemaal zijn gecontroleerd, vallen erbuiten}}",
     "buildFinal": "Eindvideo samenstellen…",

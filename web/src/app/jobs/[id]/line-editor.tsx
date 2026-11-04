@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useTranslations } from "next-intl";
 import type { Area, Line } from "@/lib/db";
 import { confirmLines } from "./actions";
-import { BUTTON, FIELD, PANEL_TITLE } from "@/lib/ui";
+import { BUTTON, FIELD, PANEL_TITLE, sideLabels } from "@/lib/ui";
 import { CategoryChips } from "./line-categories";
 
 type Props = {
@@ -32,20 +32,6 @@ const POINT_COLOR: Record<keyof Points, string> = {
 };
 
 const COLORS = ["#facc15", "#22d3ee", "#f472b6", "#a3e635", "#fb923c", "#c084fc"];
-
-/** Side A is to the right of someone walking from (x1,y1) to (x2,y2) — same convention as the worker. */
-function sideLabels(l: Line, W: number, H: number) {
-  const ax = l.x1 * W, ay = l.y1 * H, bx = l.x2 * W, by = l.y2 * H;
-  const dx = bx - ax, dy = by - ay;
-  const len = Math.hypot(dx, dy) || 1;
-  const off = Math.max(W, H) * 0.03;
-  const mx = (ax + bx) / 2, my = (ay + by) / 2;
-  return {
-    mx, my,
-    a: { x: mx + (dy / len) * off, y: my - (dx / len) * off },
-    b: { x: mx - (dy / len) * off, y: my + (dx / len) * off },
-  };
-}
 
 /** Videos wider than this are downscaled for detection — that's where the analysis area makes a difference. */
 const PROCESSED_WIDTH = 1920;

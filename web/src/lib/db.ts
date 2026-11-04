@@ -178,7 +178,8 @@ export function replaceCandidates(
   const d = db();
   d.exec("BEGIN");
   try {
-    d.prepare("DELETE FROM candidates WHERE job_id = ?").run(jobId);
+    // the counts added by hand stay: a new detection does not undo the person's work
+    d.prepare("DELETE FROM candidates WHERE job_id = ? AND (origin IS NULL OR origin <> 'manual')").run(jobId);
     const ins = d.prepare(
       `INSERT INTO candidates (job_id, track, line_id, frame, time_s, direction, bbox, yolo_class,
          yolo_conf, alternative, origin, n_obs, filmstrip, context, clip)
@@ -193,6 +194,38 @@ export function replaceCandidates(
     d.exec("ROLLBACK");
     throw e;
   }
+}
+
+/** A count added by hand (lib/review.ts MANUAL): born decided, no suggestion to ask for. */
+export function insertManualCandidate(
+  jobId: string,
+  c: { frame: number; time_s: number; line_id: string | null; direction: string | null; label: Category; filmstrip: string | null },
+): Candidate {
+  const d = db();
+  const r = d
+    .prepare(
+      `INSERT INTO candidates (job_id, track, line_id, frame, time_s, direction, origin, filmstrip,
+         llm_status, llm_model, label, reviewed_at)
+       VALUES (?, '', ?, ?, ?, ?, 'manual', ?, 'ok', 'manual', ?, datetime('now'))`,
+    )
+    .run(jobId, c.line_id, c.frame, c.time_s, c.direction, c.filmstrip, c.label);
+  const id = Number(r.lastInsertRowid);
+  // a track of its own: the final video looks up boxes by track, and a manual count has none
+  d.prepare("UPDATE candidates SET track = ? WHERE id = ?").run(`manual:${id}`, id);
+  return plain(d.prepare("SELECT * FROM candidates WHERE id = ?").get(id)!) as Candidate;
+}
+
+/** Only manual counts can be removed or moved to another line/direction (the detector's are decided with label). */
+export function updateManualCandidate(jobId: string, id: number, fields: { line_id: string | null; direction: string | null }): boolean {
+  const r = db()
+    .prepare("UPDATE candidates SET line_id = ?, direction = ? WHERE id = ? AND job_id = ? AND origin = 'manual'")
+    .run(fields.line_id, fields.direction, id, jobId);
+  return Number(r.changes) > 0;
+}
+
+export function deleteManualCandidate(jobId: string, id: number): boolean {
+  const r = db().prepare("DELETE FROM candidates WHERE id = ? AND job_id = ? AND origin = 'manual'").run(id, jobId);
+  return Number(r.changes) > 0;
 }
 
 export function listCameras(): Camera[] {
@@ -251,6 +284,11 @@ export function deleteGroup(id: string): void {
   const d = db();
   d.prepare("UPDATE jobs SET group_id = NULL WHERE group_id = ?").run(id);
   d.prepare("DELETE FROM groups WHERE id = ?").run(id);
+}
+
+/** Removes the job and its candidates (ON DELETE CASCADE); the files are up to the caller. */
+export function deleteJob(id: string): void {
+  db().prepare("DELETE FROM jobs WHERE id = ?").run(id);
 }
 
 export function moveJobs(ids: string[], groupId: string | null): void {

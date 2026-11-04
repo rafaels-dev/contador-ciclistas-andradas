@@ -85,7 +85,8 @@
       "all": "Alle",
       "divergent": "Model ≠ detektor",
       "offLine": "Tælles ikke på linjen",
-      "duplicates": "Mulig dublet"
+      "duplicates": "Mulig dublet",
+      "manual": "Manuel optælling"
     },
     "filter": "Filter",
     "moreFilters": "Flere filtre…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Kassér (ikke et objekt)",
     "confirmedCount": "Bekræftet tælling",
     "total": "I alt",
-    "summary": "{reviewed}/{total} gennemgået · {counted} talt · {discarded} kasseret"
+    "summary": "{reviewed}/{total} gennemgået · {counted} talt · {discarded} kasseret",
+    "manual": {
+      "badge": "manuel",
+      "badgeHint": "Optælling tilføjet i hånden",
+      "noDirection": "?",
+      "title": "Tæl i hånden:",
+      "hint": "Vælg linjen og retningen, og tryk på kategorien (eller Shift+tal) hver gang noget, detektoren missede, passerer. Der tælles ved billedet på skærmen.",
+      "line": "Linje for den manuelle optælling",
+      "direction": "Retning",
+      "directionHint": "Retning for den, der passerer: A→B, B→A eller ikke angivet (tasten D skifter)",
+      "addHint": "Tæller {category} ved det aktuelle billede (Shift+{key})",
+      "show": "vis",
+      "undo": "Fortryd",
+      "inspectorTitle": "Manuel optælling",
+      "addedAt": "Tilføjet i hånden ved {time} · billede {frame}",
+      "remove": "Fjern optælling",
+      "summary": "{n, plural, one {# manuel} other {# manuelle}}"
+    }
   },
   "render": {
     "panelTitle": "Tælling",
@@ -278,7 +296,8 @@
       "invalidLines": "Ugyldige linjer.",
       "outsideFrame": "Koordinat uden for billedet.",
       "invalidArea": "Ugyldigt analyseområde.",
-      "areaTooSmall": "Analyseområdet er for lille."
+      "areaTooSmall": "Analyseområdet er for lille.",
+      "invalidManual": "Ugyldig manuel optælling."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Mellemrum",
     "playPause": "afspiller/sætter videoen på pause",
     "zoom": "zoom på tidslinjen",
-    "wholeTimeline": "hele tidslinjen"
+    "wholeTimeline": "hele tidslinjen",
+    "addManual": "tæller i hånden ved det aktuelle billede",
+    "manualDirection": "skifter retning for den manuelle optælling",
+    "removeManual": "fjerner den valgte manuelle optælling"
   },
   "timeline": {
     "title": "Tidslinje",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, other {# valgt}}",
     "clear": "Ryd",
     "moveTo": "Flyt til",
+    "delete": "Slet…",
+    "confirmDelete": "{n, plural, one {Vil du slette den valgte video?} other {Vil du slette de # valgte videoer?}} Linjer, detektion og gennemgang går tabt. Færdige videoer, der allerede er lavet, bevares.",
+    "confirmDeleteLocal": "{n, plural, one {Vil du slette den valgte video?} other {Vil du slette de # valgte videoer?}} Linjer, detektion og gennemgang går tabt. Færdige videoer, der allerede er lavet, bevares. Videoer fra computeren bliver, hvor de er: kun det, appen har lavet ud fra dem, slettes.",
     "chooseGroup": "vælg gruppen…",
     "leftOut": "{n, plural, one {# der ikke er helt gennemgået endnu, er udeladt} other {# der ikke er helt gennemgået endnu, er udeladt}}",
     "buildFinal": "Saml færdig video…",

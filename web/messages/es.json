@@ -85,7 +85,8 @@
       "all": "Todos",
       "divergent": "Modelo ≠ detector",
       "offLine": "No se cuenta en la línea",
-      "duplicates": "Posible duplicado"
+      "duplicates": "Posible duplicado",
+      "manual": "Conteo manual"
     },
     "filter": "Filtro",
     "moreFilters": "Más filtros…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Descartar (no es un objeto)",
     "confirmedCount": "Conteo confirmado",
     "total": "Total",
-    "summary": "{reviewed}/{total} revisados · {counted} contados · {discarded} descartados"
+    "summary": "{reviewed}/{total} revisados · {counted} contados · {discarded} descartados",
+    "manual": {
+      "badge": "manual",
+      "badgeHint": "Conteo añadido a mano",
+      "noDirection": "?",
+      "title": "Contar a mano:",
+      "hint": "Elija la línea y el sentido, y pulse la categoría (o Mayús+número) cada vez que pase algo que el detector no captó. Cuenta en el fotograma que está en pantalla.",
+      "line": "Línea del conteo manual",
+      "direction": "Sentido",
+      "directionHint": "Sentido de quien pasa: A→B, B→A o sin indicar (la tecla D alterna)",
+      "addHint": "Cuenta {category} en el fotograma actual (Mayús+{key})",
+      "show": "ver",
+      "undo": "Deshacer",
+      "inspectorTitle": "Conteo manual",
+      "addedAt": "Añadido a mano en {time} · fotograma {frame}",
+      "remove": "Quitar conteo",
+      "summary": "{n, plural, one {# manual} other {# manuales}}"
+    }
   },
   "render": {
     "panelTitle": "Conteo",
@@ -278,7 +296,8 @@
       "invalidLines": "Líneas no válidas.",
       "outsideFrame": "Coordenada fuera del fotograma.",
       "invalidArea": "Área de análisis no válida.",
-      "areaTooSmall": "El área de análisis es demasiado pequeña."
+      "areaTooSmall": "El área de análisis es demasiado pequeña.",
+      "invalidManual": "Conteo manual no válido."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Espacio",
     "playPause": "reproduce / pausa el video",
     "zoom": "zoom de la línea de tiempo",
-    "wholeTimeline": "toda la línea de tiempo"
+    "wholeTimeline": "toda la línea de tiempo",
+    "addManual": "cuenta a mano en el fotograma actual",
+    "manualDirection": "alterna el sentido del conteo manual",
+    "removeManual": "quita el conteo manual seleccionado"
   },
   "timeline": {
     "title": "Línea de tiempo",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, one {# seleccionado} other {# seleccionados}}",
     "clear": "Limpiar",
     "moveTo": "Mover a",
+    "delete": "Eliminar…",
+    "confirmDelete": "{n, plural, one {¿Eliminar el video seleccionado?} other {¿Eliminar los # videos seleccionados?}} Se pierden las líneas, la detección y la revisión. Los videos finales ya generados se conservan.",
+    "confirmDeleteLocal": "{n, plural, one {¿Eliminar el video seleccionado?} other {¿Eliminar los # videos seleccionados?}} Se pierden las líneas, la detección y la revisión. Los videos finales ya generados se conservan. Los videos de la computadora se quedan donde están: solo se elimina lo que la app generó a partir de ellos.",
     "chooseGroup": "elige el grupo…",
     "leftOut": "{n, plural, one {# que aún no está revisado por completo queda fuera} other {# que aún no están revisados por completo quedan fuera}}",
     "buildFinal": "Montar video final…",

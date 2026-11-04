@@ -85,7 +85,8 @@
       "all": "Alle",
       "divergent": "Modell ≠ Detektor",
       "offLine": "Auf der Linie nicht gezählt",
-      "duplicates": "Mögliches Duplikat"
+      "duplicates": "Mögliches Duplikat",
+      "manual": "Manuelle Zählung"
     },
     "filter": "Filter",
     "moreFilters": "Weitere Filter…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Verwerfen (kein Objekt)",
     "confirmedCount": "Bestätigte Zählung",
     "total": "Gesamt",
-    "summary": "{reviewed}/{total} geprüft · {counted} gezählt · {discarded} verworfen"
+    "summary": "{reviewed}/{total} geprüft · {counted} gezählt · {discarded} verworfen",
+    "manual": {
+      "badge": "manuell",
+      "badgeHint": "Von Hand hinzugefügte Zählung",
+      "noDirection": "?",
+      "title": "Von Hand zählen:",
+      "hint": "Linie und Richtung wählen, dann jedes Mal die Kategorie (oder Umschalt+Zahl) drücken, wenn etwas vorbeikommt, das der Detektor übersehen hat. Gezählt wird beim Bild auf dem Bildschirm.",
+      "line": "Linie der manuellen Zählung",
+      "direction": "Richtung",
+      "directionHint": "Richtung der Durchfahrt: A→B, B→A oder ohne Angabe (Taste D wechselt)",
+      "addHint": "Zählt {category} beim aktuellen Bild (Umschalt+{key})",
+      "show": "anzeigen",
+      "undo": "Rückgängig",
+      "inspectorTitle": "Manuelle Zählung",
+      "addedAt": "Von Hand hinzugefügt bei {time} · Bild {frame}",
+      "remove": "Zählung entfernen",
+      "summary": "{n, plural, one {# manuell} other {# manuell}}"
+    }
   },
   "render": {
     "panelTitle": "Zählung",
@@ -278,7 +296,8 @@
       "invalidLines": "Ungültige Linien.",
       "outsideFrame": "Koordinate außerhalb des Bildes.",
       "invalidArea": "Ungültiger Analysebereich.",
-      "areaTooSmall": "Der Analysebereich ist zu klein."
+      "areaTooSmall": "Der Analysebereich ist zu klein.",
+      "invalidManual": "Ungültige manuelle Zählung."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Leertaste",
     "playPause": "spielt das Video ab / pausiert es",
     "zoom": "Zoom der Zeitleiste",
-    "wholeTimeline": "ganze Zeitleiste"
+    "wholeTimeline": "ganze Zeitleiste",
+    "addManual": "zählt von Hand beim aktuellen Bild",
+    "manualDirection": "wechselt die Richtung der manuellen Zählung",
+    "removeManual": "entfernt die ausgewählte manuelle Zählung"
   },
   "timeline": {
     "title": "Zeitleiste",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, other {# ausgewählt}}",
     "clear": "Leeren",
     "moveTo": "Verschieben nach",
+    "delete": "Löschen…",
+    "confirmDelete": "{n, plural, one {Das ausgewählte Video löschen?} other {Die # ausgewählten Videos löschen?}} Linien, Erkennung und Prüfung gehen verloren. Bereits erstellte finale Videos bleiben erhalten.",
+    "confirmDeleteLocal": "{n, plural, one {Das ausgewählte Video löschen?} other {Die # ausgewählten Videos löschen?}} Linien, Erkennung und Prüfung gehen verloren. Bereits erstellte finale Videos bleiben erhalten. Videos vom Computer bleiben, wo sie sind: Gelöscht wird nur, was die App daraus erstellt hat.",
     "chooseGroup": "Gruppe wählen…",
     "leftOut": "{n, plural, one {# noch nicht vollständig geprüftes Video bleibt außen vor} other {# noch nicht vollständig geprüfte Videos bleiben außen vor}}",
     "buildFinal": "Endvideo zusammenstellen…",

@@ -85,7 +85,8 @@
       "all": "Tous",
       "divergent": "Modèle ≠ détecteur",
       "offLine": "Non compté sur la ligne",
-      "duplicates": "Doublon possible"
+      "duplicates": "Doublon possible",
+      "manual": "Comptage manuel"
     },
     "filter": "Filtre",
     "moreFilters": "Plus de filtres…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Écarter (ce n’est pas un objet)",
     "confirmedCount": "Comptage confirmé",
     "total": "Total",
-    "summary": "{reviewed}/{total} vérifiés · {counted} comptés · {discarded} écartés"
+    "summary": "{reviewed}/{total} vérifiés · {counted} comptés · {discarded} écartés",
+    "manual": {
+      "badge": "manuel",
+      "badgeHint": "Comptage ajouté à la main",
+      "noDirection": "?",
+      "title": "Compter à la main :",
+      "hint": "Choisissez la ligne et le sens, puis appuyez sur la catégorie (ou Maj+chiffre) chaque fois que passe un objet que le détecteur a manqué. Le comptage se fait sur l’image à l’écran.",
+      "line": "Ligne du comptage manuel",
+      "direction": "Sens",
+      "directionHint": "Sens de passage : A→B, B→A ou non précisé (la touche D alterne)",
+      "addHint": "Compte {category} sur l’image actuelle (Maj+{key})",
+      "show": "voir",
+      "undo": "Annuler",
+      "inspectorTitle": "Comptage manuel",
+      "addedAt": "Ajouté à la main à {time} · image {frame}",
+      "remove": "Supprimer le comptage",
+      "summary": "{n, plural, one {# manuel} other {# manuels}}"
+    }
   },
   "render": {
     "panelTitle": "Comptage",
@@ -278,7 +296,8 @@
       "invalidLines": "Lignes non valides.",
       "outsideFrame": "Coordonnée hors de l’image.",
       "invalidArea": "Zone d’analyse non valide.",
-      "areaTooSmall": "La zone d’analyse est trop petite."
+      "areaTooSmall": "La zone d’analyse est trop petite.",
+      "invalidManual": "Comptage manuel non valide."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Espace",
     "playPause": "lit / met en pause la vidéo",
     "zoom": "zoom de la timeline",
-    "wholeTimeline": "timeline entière"
+    "wholeTimeline": "timeline entière",
+    "addManual": "compte à la main sur l’image actuelle",
+    "manualDirection": "change le sens du comptage manuel",
+    "removeManual": "supprime le comptage manuel sélectionné"
   },
   "timeline": {
     "title": "Timeline",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, one {# sélectionnée} other {# sélectionnées}}",
     "clear": "Effacer",
     "moveTo": "Déplacer vers",
+    "delete": "Supprimer…",
+    "confirmDelete": "{n, plural, one {Supprimer la vidéo sélectionnée ?} other {Supprimer les # vidéos sélectionnées ?}} Les lignes, la détection et la révision sont perdues. Les vidéos finales déjà générées sont conservées.",
+    "confirmDeleteLocal": "{n, plural, one {Supprimer la vidéo sélectionnée ?} other {Supprimer les # vidéos sélectionnées ?}} Les lignes, la détection et la révision sont perdues. Les vidéos finales déjà générées sont conservées. Les vidéos de l’ordinateur restent où elles sont : seul ce que l’application en a tiré est supprimé.",
     "chooseGroup": "choisissez le groupe…",
     "leftOut": "{n, plural, one {# vidéo pas encore entièrement vérifiée est laissée de côté} other {# vidéos pas encore entièrement vérifiées sont laissées de côté}}",
     "buildFinal": "Créer la vidéo finale…",

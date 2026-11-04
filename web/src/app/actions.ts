@@ -10,7 +10,7 @@ import { requireAccess } from "@/lib/access";
 import { createJob, getGroup, updateJob } from "@/lib/db";
 import { driveFileId, driveFolderId, listFolderVideos, type DriveFile } from "@/lib/drive";
 import { isVideo, listFolder, localFilesAllowed, normalizePath, roots, type FolderContent, type FolderItem } from "@/lib/local-files";
-import { startDownload } from "@/lib/runner";
+import { deleteJobs, startDownload } from "@/lib/runner";
 
 /** `error`: a stored message (show it with formatStored and the root translator). */
 export type NewJobState = { error?: string; folder?: { id: string; files: DriveFile[] } };
@@ -115,4 +115,11 @@ export async function createJobsFromFolder(formData: FormData): Promise<void> {
   refresh(); // the side library (layout) is not rebuilt by the redirect alone
   if (ids.length === 1) redirect(`/jobs/${ids[0]}`);
   redirect(group ? `/?group=${group}` : "/");
+}
+
+/** Removes the videos from the library (the original file on the computer is kept). */
+export async function deleteVideos(ids: string[]): Promise<void> {
+  await requireAccess();
+  deleteJobs(ids.map(String).filter((id) => /^[\w-]{1,40}$/.test(id)));
+  refresh();
 }

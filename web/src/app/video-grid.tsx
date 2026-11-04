@@ -8,6 +8,7 @@ import type { Category, JobStatus } from "@/lib/db";
 import { COUNTED_CATEGORIES } from "@/lib/review";
 import { BUTTON, FIELD, timecode } from "@/lib/ui";
 import { moveToGroup } from "./_shell/actions";
+import { deleteVideos } from "./actions";
 import { createFinalVideo } from "./renders/actions";
 import { CategoryPicker } from "./renders/category-picker";
 
@@ -109,6 +110,22 @@ export function VideoGrid({ videos, groups, currentGroup }: Props) {
                 <option value="-">{tRoot("library.ungrouped")}</option>
               </select>
             </label>
+            <button
+              type="button"
+              disabled={pending}
+              className={BUTTON.danger}
+              onClick={() => {
+                const local = existing.some((id) => byId[id].local);
+                if (!confirm(t(local ? "confirmDeleteLocal" : "confirmDelete", { n: existing.length }))) return;
+                start(async () => {
+                  await deleteVideos(existing);
+                  setChecked([]);
+                  setExporting(null);
+                });
+              }}
+            >
+              {t("delete")}
+            </button>
             <span className="flex-1" />
             {notReady.length > 0 && <span className="text-xs text-muted">{t("leftOut", { n: notReady.length })}</span>}
             <button type="button" onClick={openExport} disabled={existing.length === notReady.length} className={BUTTON.primary}>

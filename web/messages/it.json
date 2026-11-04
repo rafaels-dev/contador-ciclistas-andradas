@@ -85,7 +85,8 @@
       "all": "Tutti",
       "divergent": "Modello ≠ rilevatore",
       "offLine": "Non contati sulla linea",
-      "duplicates": "Possibile duplicato"
+      "duplicates": "Possibile duplicato",
+      "manual": "Conteggio manuale"
     },
     "filter": "Filtro",
     "moreFilters": "Altri filtri…",
@@ -172,7 +173,24 @@
     "discardNotObject": "Scarta (non è un oggetto)",
     "confirmedCount": "Conteggio confermato",
     "total": "Totale",
-    "summary": "{reviewed}/{total} rivisti · {counted} contati · {discarded} scartati"
+    "summary": "{reviewed}/{total} rivisti · {counted} contati · {discarded} scartati",
+    "manual": {
+      "badge": "manuale",
+      "badgeHint": "Conteggio aggiunto a mano",
+      "noDirection": "?",
+      "title": "Conta a mano:",
+      "hint": "Scegli la linea e il senso, poi premi la categoria (o Maiusc+numero) ogni volta che passa qualcosa che il rilevatore non ha preso. Conta sul fotogramma sullo schermo.",
+      "line": "Linea del conteggio manuale",
+      "direction": "Senso",
+      "directionHint": "Senso di chi passa: A→B, B→A o non indicato (il tasto D alterna)",
+      "addHint": "Conta {category} sul fotogramma attuale (Maiusc+{key})",
+      "show": "vedi",
+      "undo": "Annulla",
+      "inspectorTitle": "Conteggio manuale",
+      "addedAt": "Aggiunto a mano a {time} · fotogramma {frame}",
+      "remove": "Rimuovi conteggio",
+      "summary": "{n, plural, one {# manuale} other {# manuali}}"
+    }
   },
   "render": {
     "panelTitle": "Conteggio",
@@ -278,7 +296,8 @@
       "invalidLines": "Linee non valide.",
       "outsideFrame": "Coordinata fuori dal fotogramma.",
       "invalidArea": "Area di analisi non valida.",
-      "areaTooSmall": "L'area di analisi è troppo piccola."
+      "areaTooSmall": "L'area di analisi è troppo piccola.",
+      "invalidManual": "Conteggio manuale non valido."
     }
   },
   "lineEditor": {
@@ -449,7 +468,10 @@
     "space": "Spazio",
     "playPause": "riproduce / mette in pausa il video",
     "zoom": "zoom della timeline",
-    "wholeTimeline": "timeline intera"
+    "wholeTimeline": "timeline intera",
+    "addManual": "conta a mano sul fotogramma attuale",
+    "manualDirection": "alterna il senso del conteggio manuale",
+    "removeManual": "rimuove il conteggio manuale selezionato"
   },
   "timeline": {
     "title": "Timeline",
@@ -518,6 +540,9 @@
     "selected": "{n, plural, one {# selezionato} other {# selezionati}}",
     "clear": "Cancella",
     "moveTo": "Sposta in",
+    "delete": "Elimina…",
+    "confirmDelete": "{n, plural, one {Eliminare il video selezionato?} other {Eliminare i # video selezionati?}} Linee, rilevamento e revisione vanno persi. I video finali già generati restano.",
+    "confirmDeleteLocal": "{n, plural, one {Eliminare il video selezionato?} other {Eliminare i # video selezionati?}} Linee, rilevamento e revisione vanno persi. I video finali già generati restano. I video del computer restano dove sono: viene eliminato solo ciò che l’app ne ha ricavato.",
     "chooseGroup": "scegli il gruppo…",
     "leftOut": "{n, plural, one {# non ancora rivisto del tutto resta escluso} other {# non ancora rivisti del tutto restano esclusi}}",
     "buildFinal": "Crea il video finale…",

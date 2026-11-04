@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import type { Area, Candidate, Category, Line } from "@/lib/db";
-import { computeTotals, COUNTED_CATEGORIES, NO_CONSULTATION, possibleDuplicates, proposal, readSuggestionError, type Label, type Proposal } from "@/lib/review";
-import { BUTTON, FIELD, LABEL_COLOR, PANEL_TITLE, timecode } from "@/lib/ui";
+import {
+  computeTotals, COUNTED_CATEGORIES, countsOnLine, DIRECTIONS, isManual, NO_CONSULTATION, possibleDuplicates, proposal, readSuggestionError,
+  type Direction, type Label, type Proposal,
+} from "@/lib/review";
+import { BUTTON, FIELD, LABEL_COLOR, PANEL_TITLE, sideLabels, timecode } from "@/lib/ui";
 import { formatStored, parseMessage } from "@/i18n/message";
 import { createFinalVideo } from "../../renders/actions";
 import { CategoryPicker } from "../../renders/category-picker";
-import { decide } from "./actions";
+import { addManualCount, decide, removeManualCount, updateManualCount } from "./actions";
 import { createClock, frameTimecode, useTime, type Clock } from "./clock";
 import { Timeline } from "./timeline";
 
@@ -27,12 +30,55 @@ const SHORTCUTS: [Label, string][] = [
   ["discarded", "0"],
 ];
 const BY_KEY: Record<string, Label> = { ...Object.fromEntries(SHORTCUTS.map(([c, k]) => [k, c])), x: "discarded" };
+/** Shift + the same number adds a manual count of that category at the playhead (e.code: works on any layout) */
+const MANUAL_BY_CODE = Object.fromEntries(
+  SHORTCUTS.filter(([c]) => c !== "discarded").flatMap(([c, k]) => [[`Digit${k}`, c], [`Numpad${k}`, c]]),
+) as Record<string, Category>;
+const MANUAL_KEY = Object.fromEntries(SHORTCUTS.map(([c, k]) => [c, k])) as Record<Category, string>;
 
-type Filter = "pending" | "reviewed" | "all" | "divergent" | "offLine" | "duplicates" | Label;
+type Filter = "pending" | "reviewed" | "all" | "divergent" | "offLine" | "duplicates" | "manual" | Label;
 
 const MAIN: Filter[] = ["pending", "reviewed", "all"];
-const OTHER_FILTERS: Filter[] = ["duplicates", "offLine", "divergent", "cyclists", "kick_scooters", "mopeds", "unicycles", "pedestrians", "cars", "motorcycles", "other", "discarded"];
-const NAMED_FILTERS = new Set<Filter>(["pending", "reviewed", "all", "divergent", "offLine", "duplicates"]);
+const OTHER_FILTERS: Filter[] = ["manual", "duplicates", "offLine", "divergent", "cyclists", "kick_scooters", "mopeds", "unicycles", "pedestrians", "cars", "motorcycles", "other", "discarded"];
+const NAMED_FILTERS = new Set<Filter>(["pending", "reviewed", "all", "divergent", "offLine", "duplicates", "manual"]);
+
+/** What undo (U) puts back: decisions, or a manual count added/removed. */
+type Undo =
+  | { kind: "labels"; items: { id: number; before: Label | null }[] }
+  | { kind: "added"; c: Candidate }
+  | { kind: "removed"; c: Candidate };
+
+const directionName = (tr: Translator, d: Direction | string | null) => d ?? tr("review.manual.noDirection");
+
+/**
+ * The frame on screen, cropped around the line where the object is crossing
+ * (with margin), as a small JPEG: the manual count's thumbnail in the list.
+ * null when the video is not showing (another tab) or cannot be read.
+ */
+function snapshot(v: HTMLVideoElement | null, line: Line | undefined): string | null {
+  if (!v || !v.videoWidth || v.readyState < 2) return null;
+  try {
+    const [W, H] = [v.videoWidth, v.videoHeight];
+    let [x0, y0, x1, y1] = [0, 0, W, H];
+    if (line) {
+      const m = 0.12 * Math.max(W, H);
+      [x0, x1] = [Math.min(line.x1, line.x2) * W - m, Math.max(line.x1, line.x2) * W + m];
+      [y0, y1] = [Math.min(line.y1, line.y2) * H - m, Math.max(line.y1, line.y2) * H + m];
+      // the list shows ~2.4:1 — widen the short side so the crop is not stretched
+      const [w, h] = [x1 - x0, y1 - y0];
+      if (w < h * 1.6) [x0, x1] = [x0 - (h * 1.6 - w) / 2, x1 + (h * 1.6 - w) / 2];
+      [x0, y0, x1, y1] = [Math.max(0, x0), Math.max(0, y0), Math.min(W, x1), Math.min(H, y1)];
+    }
+    const scale = Math.min(1, 480 / (x1 - x0));
+    const c = document.createElement("canvas");
+    c.width = Math.round((x1 - x0) * scale);
+    c.height = Math.round((y1 - y0) * scale);
+    c.getContext("2d")!.drawImage(v, x0, y0, x1 - x0, y1 - y0, 0, 0, c.width, c.height);
+    return c.toDataURL("image/jpeg", 0.8);
+  } catch {
+    return null;
+  }
+}
 
 /** Category name for a label; "discarded" reads as the action ("Discard"). */
 function labelName(tr: Translator, label: Label): string {
@@ -70,17 +116,23 @@ type Props = {
  * with the focused candidate's clip, inspector with the decision, and a
  * timeline of the whole video with one track per counting line.
  */
-export function Review({ jobId, base, candidates, lines, duration, fps, width, height, videoUrl, area, editable, linesPanel }: Props) {
+export function Review({ jobId, base, candidates: initial, lines, duration, fps, width, height, videoUrl, area, editable, linesPanel }: Props) {
   const t = useTranslations("review");
   const ts = useTranslations("shortcuts");
   const tr = useTranslations();
   const byId = useMemo(() => Object.fromEntries(lines.map((l) => [l.id, l])), [lines]);
+  // the manual counts are added and removed here, without reloading the page
+  const [candidates, setCandidates] = useState(initial);
   const [labels, setLabels] = useState<Record<number, Label | null>>(() => Object.fromEntries(candidates.map((c) => [c.id, c.label])));
   const [filter, setFilter] = useState<Filter>(editable ? "pending" : "all");
   const [lineFilter, setLineFilter] = useState("");
   const [focus, setFocus] = useState<number | null>(null);
   const [threshold, setThreshold] = useState(0.9);
-  const [history, setHistory] = useState<{ id: number; before: Label | null }[][]>([]);
+  const [history, setHistory] = useState<Undo[]>([]);
+  const [manualLine, setManualLine] = useState<string | null>(lines[0]?.id ?? null);
+  const [manualDirection, setManualDirection] = useState<Direction>("A→B");
+  /** the last manual count, shown over the video for a few seconds (with undo) */
+  const [added, setAdded] = useState<Candidate | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   const [sending, startRender] = useTransition();
@@ -127,11 +179,14 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
   const timeOfFrame = (q: number) => (table ? table[Math.min(table.length - 1, Math.max(0, q))] : Math.max(0, q) / fps);
 
   const candidateById = useMemo(() => Object.fromEntries(candidates.map((c) => [c.id, c])), [candidates]);
-  // fixed number of each candidate in the video (time order), the same under any filter
-  const number = useMemo(
-    () => Object.fromEntries([...candidates].sort((a, b) => a.time_s - b.time_s || a.id - b.id).map((c, i) => [c.id, i + 1])),
-    [candidates],
-  );
+  // fixed number of each candidate in the video (time order), the same under any filter;
+  // the manual counts have their own sequence (M1, M2…) so adding one does not renumber the others
+  const number = useMemo(() => {
+    const byTime = [...candidates].sort((a, b) => a.time_s - b.time_s || a.id - b.id);
+    const auto = byTime.filter((c) => !isManual(c)).map((c, i) => [c.id, String(i + 1)]);
+    const manual = byTime.filter(isManual).map((c, i) => [c.id, `M${i + 1}`]);
+    return Object.fromEntries([...auto, ...manual]) as Record<number, string>;
+  }, [candidates]);
   const proposals = useMemo(() => Object.fromEntries(candidates.map((c) => [c.id, proposal(c, byId)])), [candidates, byId]);
   const labelFor = (c: Candidate) => labels[c.id] ?? null;
   const divergent = (c: Candidate) => c.llm_status === "ok" && c.llm_suggestion !== c.yolo_class;
@@ -145,6 +200,7 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
       case "divergent": return divergent(c);
       case "offLine": return !!proposals[c.id].offLine;
       case "duplicates": return duplicates.has(c.id);
+      case "manual": return isManual(c);
       default: return labelOf(c) === f;
     }
   };
@@ -159,7 +215,7 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
     if (!editable || !decisions.length) return;
     const before = decisions.map((d) => ({ id: d.id, before: labels[d.id] ?? null }));
     setLabels((r) => ({ ...r, ...Object.fromEntries(decisions.map((d) => [d.id, d.label])) }));
-    if (!undoing) setHistory((u) => [...u.slice(-49), before]);
+    if (!undoing) remember({ kind: "labels", items: before });
     setError(null);
     start(async () => {
       const r = await decide(jobId, decisions);
@@ -179,13 +235,85 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
     setFocus(next?.id ?? c.id);
   }
 
+  function remember(u: Undo) {
+    setHistory((h) => [...h.slice(-49), u]);
+  }
+
   function undo() {
     const last = history.at(-1);
     if (!last) return;
     setHistory((u) => u.slice(0, -1));
-    apply(last.map((a) => ({ id: a.id, label: a.before })), true);
-    if (last.length === 1) setFocus(last[0].id);
+    if (last.kind === "added") void removeManual(last.c, true);
+    else if (last.kind === "removed") void addManual(last.c.label as Category, last.c, true);
+    else {
+      apply(last.items.map((a) => ({ id: a.id, label: a.before })), true);
+      if (last.items.length === 1) setFocus(last.items[0].id);
+    }
   }
+
+  /**
+   * Counts by hand, at the frame on screen, an object the detector missed:
+   * the category of the key/button, on the line and direction chosen in the
+   * bar under the video. Does not stop the video — whoever counts keeps
+   * watching. `from` re-creates a removed count (undo).
+   */
+  async function addManual(label: Category, from?: Candidate, undoing = false) {
+    if (!editable) return;
+    const frame = from?.frame ?? frameAt(clock.time());
+    const line_id = from ? from.line_id : manualLine;
+    const direction = from ? (from.direction as Direction) : manualDirection;
+    setError(null);
+    const r = await addManualCount(jobId, {
+      frame, line_id, direction, label,
+      filmstrip: from?.filmstrip ?? null,
+      snapshot: from ? null : snapshot(video.current, line_id ? byId[line_id] : undefined),
+    });
+    if (r.error || !r.candidate) return setError(actionError(tr, r.error ?? "job.errors.invalidManual"));
+    const c = r.candidate;
+    // in time order, like the detector's (the list and the timeline follow this array)
+    setCandidates((x) => [...x, c].sort((m, n) => m.frame - n.frame || m.id - n.id));
+    setLabels((x) => ({ ...x, [c.id]: c.label }));
+    if (!undoing) remember({ kind: "added", c });
+    setAdded(c);
+  }
+
+  async function removeManual(c: Candidate, undoing = false) {
+    if (!editable) return;
+    setError(null);
+    const r = await removeManualCount(jobId, c.id);
+    if (r.error) return setError(actionError(tr, r.error));
+    // keeps the category as it is now (it may have been changed after it was added)
+    const now = { ...c, label: labels[c.id] ?? c.label };
+    // the focus goes to its neighbor in the list (otherwise it fell to the first item and the video jumped to the start)
+    if (focused?.id === c.id) {
+      const i = visibleList.findIndex((x) => x.id === c.id);
+      setFocus((visibleList[i + 1] ?? visibleList[i - 1])?.id ?? null);
+    }
+    setCandidates((x) => x.filter((y) => y.id !== c.id));
+    if (!undoing) remember({ kind: "removed", c: now });
+    setAdded((a) => (a?.id === c.id ? null : a));
+  }
+
+  async function moveManual(c: Candidate, fields: { line_id: string | null; direction: Direction }) {
+    const before = { line_id: c.line_id, direction: c.direction };
+    setCandidates((x) => x.map((y) => (y.id === c.id ? { ...y, ...fields } : y)));
+    const r = await updateManualCount(jobId, c.id, fields);
+    if (r.error) {
+      setError(actionError(tr, r.error));
+      setCandidates((x) => x.map((y) => (y.id === c.id ? { ...y, ...before } : y)));
+    }
+  }
+
+  function cycleDirection() {
+    setManualDirection((d) => DIRECTIONS[(DIRECTIONS.indexOf(d) + 1) % DIRECTIONS.length]);
+  }
+
+  // the "+1" over the video goes away by itself
+  useEffect(() => {
+    if (!added) return;
+    const timer = setTimeout(() => setAdded(null), 6000);
+    return () => clearTimeout(timer);
+  }, [added]);
 
   /** goes to a candidate even if the current filter hides it */
   function goTo(id: number, filterIfHidden: Filter = "all") {
@@ -243,7 +371,13 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
       if (e.ctrlKey || e.metaKey || e.altKey || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName)) return;
       const k = e.key.toLowerCase();
       const i = focused ? visibleList.findIndex((c) => c.id === focused.id) : -1;
-      if (k === "arrowleft" || k === "arrowright") {
+      if (e.shiftKey && MANUAL_BY_CODE[e.code]) {
+        if (!editable) return;
+        void addManual(MANUAL_BY_CODE[e.code]);
+      }
+      else if (k === "d" && editable) cycleDirection();
+      else if (k === "delete" && focused && isManual(focused) && editable) void removeManual(focused);
+      else if (k === "arrowleft" || k === "arrowright") {
         const sign = k === "arrowleft" ? -1 : 1;
         if (e.shiftKey) step(0, sign);
         else step(sign);
@@ -406,11 +540,27 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
         <Monitor
           c={focused}
           base={base}
-          number={focused ? number[focused.id] : 0}
+          number={focused ? number[focused.id] : ""}
           line={focused?.line_id ? byId[focused.line_id] : undefined}
           tab={tab}
           onTab={setTab}
           player={{ url: videoUrl, clock, video, fps, end, width, height, lines, area, consumePlay, speed, onSpeed: changeSpeed, onStep: step, onPlay: playPause, frameAt, timeOf }}
+          manual={
+            editable
+              ? {
+                  lines,
+                  line: manualLine,
+                  onLine: setManualLine,
+                  direction: manualDirection,
+                  onDirection: setManualDirection,
+                  onAdd: (label) => void addManual(label),
+                  added,
+                  addedNumber: added ? number[added.id] : "",
+                  onUndo: undo,
+                  onShow: (id) => goTo(id, "manual"),
+                }
+              : null
+          }
         />
 
         <aside className="flex flex-col border-line bg-panel lg:min-h-0 lg:overflow-y-auto lg:border-l">
@@ -426,11 +576,20 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
               onDecide={(label) => decideFocused(focused, label)}
               onUndo={() => apply([{ id: focused.id, label: null }])}
               onGoTo={(id) => goTo(id, "duplicates")}
+              lines={lines}
+              timeOf={timeOf}
+              onMove={(fields) => void moveManual(focused, fields)}
+              onRemove={() => void removeManual(focused)}
             />
           ) : (
             <p className="p-4 text-sm text-muted">{t("noFocus")}</p>
           )}
-          <TotalsPanel totals={totals} lines={lines} total={candidates.length} />
+          <TotalsPanel
+            totals={totals}
+            lines={lines}
+            total={candidates.length}
+            manual={candidates.filter((c) => isManual(c) && labelFor(c) && labelFor(c) !== "discarded").length}
+          />
           {linesPanel}
           {editable && (
             <details className="border-t border-line px-4 py-3 text-xs text-muted">
@@ -445,6 +604,9 @@ export function Review({ jobId, base, candidates, lines, duration, fps, width, h
                   </span>
                 ))}
                 <dt><kbd>U</kbd></dt><dd>{ts("undo")}</dd>
+                <dt><kbd>Shift</kbd>+<kbd>1</kbd>…<kbd>8</kbd></dt><dd>{ts("addManual")}</dd>
+                <dt><kbd>D</kbd></dt><dd>{ts("manualDirection")}</dd>
+                <dt><kbd>Del</kbd></dt><dd>{ts("removeManual")}</dd>
                 <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>{ts("frame")}</dd>
                 <dt><kbd>{ts("space")}</kbd> <kbd>P</kbd></dt><dd>{ts("playPause")}</dd>
                 <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>{ts("zoom")}</dd>
@@ -484,7 +646,7 @@ type ListProps = {
   visible: Candidate[];
   base: string;
   focused: number | null;
-  number: Record<number, number>;
+  number: Record<number, string>;
   labelOf: (c: Candidate) => Label | null;
   labelFor: (c: Candidate) => Label | null;
   conf: (c: Candidate) => number | null;
@@ -519,8 +681,12 @@ function CandidateList({ visible, base, focused, number, labelOf, labelFor, conf
               active ? "bg-accent/15 shadow-[inset_3px_0_0_var(--accent)]" : "hover:bg-hover"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${base}/${c.filmstrip}`} alt="" loading="lazy" className={`h-10 w-24 shrink-0 rounded-sm bg-viewer object-cover ${r && !active ? "opacity-60" : ""}`} />
+            {c.filmstrip ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`${base}/${c.filmstrip}`} alt="" loading="lazy" className={`h-10 w-24 shrink-0 rounded-sm bg-viewer object-cover ${r && !active ? "opacity-60" : ""}`} />
+            ) : (
+              <span className="flex h-10 w-24 shrink-0 items-center justify-center rounded-sm bg-viewer text-[0.65rem] text-white/50">{t("manual.badge")}</span>
+            )}
             <span className="flex min-w-0 flex-1 flex-col gap-0.5">
               <span className="flex items-center gap-1.5 text-sm">
                 <span
@@ -539,6 +705,11 @@ function CandidateList({ visible, base, focused, number, labelOf, labelFor, conf
                   </span>
                 )}
                 {!r && p !== null && <span className="font-mono text-[0.7rem] text-faint">{format.number(p, { style: "percent", maximumFractionDigits: 0 })}</span>}
+                {isManual(c) && (
+                  <span className="shrink-0 rounded bg-info/15 px-1 text-[0.65rem] font-medium text-info" title={t("manual.badgeHint")} data-testid="manual-badge">
+                    {t("manual.badge")}
+                  </span>
+                )}
               </span>
               <span className="flex items-center gap-1.5 font-mono text-[0.7rem] text-faint">
                 <span>{timecode(timeOf(c))}</span>
@@ -583,14 +754,30 @@ type Player = {
   timeOf: (c: Candidate) => number;
 };
 
+type Manual = {
+  lines: Line[];
+  line: string | null;
+  onLine: (id: string | null) => void;
+  direction: Direction;
+  onDirection: (d: Direction) => void;
+  onAdd: (label: Category) => void;
+  /** the last count added, for the "+1" over the video */
+  added: Candidate | null;
+  addedNumber: string;
+  onUndo: () => void;
+  onShow: (id: number) => void;
+};
+
 type MonitorProps = {
   c: Candidate | null;
   base: string;
-  number: number;
+  number: string;
   line: Line | undefined;
   tab: Tab;
   onTab: (a: Tab) => void;
   player: Player;
+  /** manual counting (null = read only) */
+  manual: Manual | null;
 };
 
 /**
@@ -598,14 +785,14 @@ type MonitorProps = {
  * (frame-by-frame navigation), the focused candidate's clip, or the
  * crossing frame.
  */
-function Monitor({ c, base, number, line, tab, onTab, player }: MonitorProps) {
+function Monitor({ c, base, number, line, tab, onTab, player, manual }: MonitorProps) {
   const t = useTranslations("review");
   const shown: Tab = tab === "video" ? "video" : tab === "frame" && c?.context ? "frame" : c?.clip ? "clip" : c?.context ? "frame" : "video";
   return (
     <section className="flex min-w-0 flex-col bg-viewer lg:min-h-0" aria-label={t("monitor")}>
       <div className="relative flex min-h-64 flex-1 items-center justify-center overflow-hidden">
         {shown === "video" ? (
-          <OriginalVideo player={player} />
+          <OriginalVideo player={player} sides={!!manual} />
         ) : !c ? (
           <span className="text-sm text-white/50">{t("pickCandidate")}</span>
         ) : shown === "clip" ? (
@@ -644,9 +831,13 @@ function Monitor({ c, base, number, line, tab, onTab, player }: MonitorProps) {
             </button>
           ))}
         </div>
+        {manual?.added && <AddedToast manual={manual} fps={player.fps} timeOf={player.timeOf} />}
       </div>
       {shown === "video" ? (
-        <Transport player={player} />
+        <>
+          <Transport player={player} />
+          {manual && <ManualBar manual={manual} />}
+        </>
       ) : (
         c?.filmstrip && (
           <div className="border-t border-white/10 bg-black/40 px-3 py-2">
@@ -664,7 +855,7 @@ function Monitor({ c, base, number, line, tab, onTab, player }: MonitorProps) {
  * seeks (dragging the ruler) wait for the previous one to finish and keep
  * only the last; while playing, the video moves the playhead.
  */
-function OriginalVideo({ player }: { player: Player }) {
+function OriginalVideo({ player, sides }: { player: Player; sides: boolean }) {
   const t = useTranslations("review");
   const { url, clock, video, fps, width, height, lines, area, consumePlay, speed } = player;
   const box = useRef<HTMLDivElement>(null);
@@ -687,6 +878,8 @@ function OriginalVideo({ player }: { player: Player }) {
   useEffect(() => {
     const v = video.current;
     if (!v) return;
+    // the metadata may arrive before hydration (video already cached): onLoadedMetadata never fires
+    if (v.readyState >= 1 && v.videoWidth) setLoading(false);
     let seeking = false;
     let pending: number | null = null;
     // a quarter frame ahead: landing exactly on the boundary sometimes shows the previous frame
@@ -775,6 +968,17 @@ function OriginalVideo({ player }: { player: Player }) {
               <text x={l.x1 * width} y={l.y1 * height - width / 160} fill="var(--accent)" fontSize={width / 70} fontWeight={600} stroke="black" strokeWidth={width / 1200} paintOrder="stroke">
                 {l.name}
               </text>
+              {/* the sides, so whoever counts by hand knows which direction is A→B */}
+              {sides &&
+                (() => {
+                  const r = sideLabels(l, width, height);
+                  const font = Math.max(width, height) * 0.016;
+                  return (["a", "b"] as const).map((k) => (
+                    <text key={k} x={r[k].x} y={r[k].y} fill="var(--accent)" fontSize={font} fontWeight="bold" textAnchor="middle" dominantBaseline="middle" stroke="black" strokeWidth={font * 0.12} paintOrder="stroke" opacity={0.9}>
+                      {k.toUpperCase()}
+                    </text>
+                  ));
+                })()}
             </g>
           ))}
         </svg>
@@ -785,6 +989,94 @@ function OriginalVideo({ player }: { player: Player }) {
           {error}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Counting by hand while watching: pick the line and the direction once, then
+ * press the category (button or Shift+number) each time something the
+ * detector missed passes. The count goes at the frame on screen.
+ */
+function ManualBar({ manual }: { manual: Manual }) {
+  const t = useTranslations("review.manual");
+  const tr = useTranslations();
+  const { lines, line, onLine, direction, onDirection, onAdd } = manual;
+  const current = lines.find((l) => l.id === line);
+  const shown = COUNTED_CATEGORIES.filter((c) => countsOnLine(current, c));
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-t border-white/10 bg-black/60 px-3 py-1.5 text-xs text-white" role="group" aria-label={t("title")} data-testid="manual-bar">
+      <span className="font-semibold text-white/90" title={t("hint")}>
+        {t("title")}
+      </span>
+      {lines.length > 1 && (
+        <select value={line ?? ""} onChange={(e) => onLine(e.target.value || null)} className="rounded border border-white/15 bg-black/60 px-1 py-0.5 text-white" aria-label={t("line")}>
+          {lines.map((l) => (
+            <option key={l.id} value={l.id}>
+              {l.name}
+            </option>
+          ))}
+        </select>
+      )}
+      {lines.length > 0 && (
+        <span className="flex overflow-hidden rounded border border-white/15" role="group" aria-label={t("direction")} title={t("directionHint")}>
+          {DIRECTIONS.map((d) => (
+            <button
+              key={d ?? "-"}
+              type="button"
+              onClick={() => onDirection(d)}
+              aria-pressed={direction === d}
+              className={`px-1.5 py-0.5 font-mono ${direction === d ? "bg-white font-semibold text-black" : "bg-black/60 text-white/80 hover:bg-white/10"}`}
+            >
+              {directionName(tr, d)}
+            </button>
+          ))}
+        </span>
+      )}
+      <span className="mx-0.5 h-4 w-px bg-white/15" />
+      {shown.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onAdd(c)}
+          className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 hover:border-white/40 hover:bg-white/15"
+          title={t("addHint", { category: tr(`categories.singular.${c}`), key: MANUAL_KEY[c] })}
+          data-testid={`manual-add-${c}`}
+        >
+          <Swatch label={c} />
+          <span>+ {tr(`categories.singular.${c}`)}</span>
+          <kbd className="border-white/20 bg-transparent px-1 text-[0.6rem] text-white/60">⇧{MANUAL_KEY[c]}</kbd>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** "+1 Cyclist" over the video right after a manual count, with undo. */
+function AddedToast({ manual, fps, timeOf }: { manual: Manual; fps: number; timeOf: (c: Candidate) => number }) {
+  const t = useTranslations("review.manual");
+  const tr = useTranslations();
+  const c = manual.added!;
+  const line = manual.lines.find((l) => l.id === c.line_id);
+  return (
+    <div
+      key={c.id}
+      className="absolute bottom-3 left-3 z-10 flex items-center gap-2 rounded-md bg-black/80 px-3 py-1.5 text-sm text-white shadow-lg"
+      role="status"
+      data-testid="manual-toast"
+    >
+      <Swatch label={c.label} />
+      <span className="font-semibold">+1 {tr(`categories.singular.${c.label as Category}`)}</span>
+      <span className="font-mono text-xs text-white/60">
+        #{manual.addedNumber} · {frameTimecode(timeOf(c), fps)}
+        {line && ` · ${line.name} ${directionName(tr, c.direction)}`}
+      </span>
+      <button type="button" onClick={() => manual.onShow(c.id)} className="rounded px-1.5 text-xs text-white/80 underline hover:text-white">
+        {t("show")}
+      </button>
+      <button type="button" onClick={manual.onUndo} className="rounded bg-white/10 px-1.5 text-xs hover:bg-white/20">
+        {t("undo")} <kbd className="border-white/20 bg-transparent px-1 text-[0.6rem] text-white/60">U</kbd>
+      </button>
     </div>
   );
 }
@@ -850,12 +1142,17 @@ type InspectorProps = {
   prop: Proposal;
   label: Label | null;
   editable: boolean;
-  number: number;
+  number: string;
   /** candidates that may be the same object (same line, direction and class, almost together) */
-  duplicateOf: { c: Candidate; number: number }[];
+  duplicateOf: { c: Candidate; number: string }[];
   onDecide: (c: Label) => void;
   onUndo: () => void;
   onGoTo: (id: number) => void;
+  lines: Line[];
+  timeOf: (c: Candidate) => number;
+  /** manual count: another line/direction */
+  onMove: (fields: { line_id: string | null; direction: Direction }) => void;
+  onRemove: () => void;
 };
 
 /** "{category} is not counted on {line} — proposal: discard." */
@@ -903,15 +1200,62 @@ function SuggestionError({ c, prop, line }: { c: Candidate; prop: Proposal; line
   );
 }
 
-function Inspector({ c, line, prop, label, editable, number, duplicateOf, onDecide, onUndo, onGoTo }: InspectorProps) {
+/** A count added by hand: when, on which line and direction (editable), and remove. */
+function ManualInfo({ c, lines, editable, timeOf, onMove, onRemove }: Pick<InspectorProps, "c" | "lines" | "editable" | "timeOf" | "onMove" | "onRemove">) {
+  const t = useTranslations("review.manual");
+  const tr = useTranslations();
+  return (
+    <div className="flex flex-col gap-2" data-testid="manual-info">
+      <h2 className={PANEL_TITLE}>{t("inspectorTitle")}</h2>
+      <p className="text-sm text-muted">{t("addedAt", { time: timecode(timeOf(c), true), frame: c.frame })}</p>
+      {editable && lines.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {lines.length > 1 && (
+            <select value={c.line_id ?? ""} onChange={(e) => onMove({ line_id: e.target.value, direction: c.direction as Direction })} className={`${FIELD} py-1`} aria-label={t("line")}>
+              {lines.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <span className="flex overflow-hidden rounded-md border border-line" role="group" aria-label={t("direction")}>
+            {DIRECTIONS.map((d) => (
+              <button
+                key={d ?? "-"}
+                type="button"
+                onClick={() => onMove({ line_id: c.line_id, direction: d })}
+                aria-pressed={c.direction === d}
+                className={`px-2 py-1 font-mono text-xs ${c.direction === d ? "bg-accent font-semibold text-accent-ink" : "bg-raised text-muted hover:bg-hover"}`}
+              >
+                {directionName(tr, d)}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
+      {editable && (
+        <button type="button" onClick={onRemove} className={`${BUTTON.danger} self-start`} data-testid="manual-remove">
+          {t("remove")} <kbd className="text-[0.6rem]">Del</kbd>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function Inspector({ c, line, prop, label, editable, number, duplicateOf, onDecide, onUndo, onGoTo, lines, timeOf, onMove, onRemove }: InspectorProps) {
   const t = useTranslations("review");
   const tr = useTranslations();
   const format = useFormatter();
+  const manual = isManual(c);
   const corrected = label && label !== prop.label;
   const conf = c.llm_conf ?? 0;
   const cat = (x: Category) => tr(`categories.singular.${x}`);
   return (
     <div className="flex flex-col gap-4 px-4 py-3" data-testid="inspector">
+      {manual ? (
+        <ManualInfo c={c} lines={lines} editable={editable} timeOf={timeOf} onMove={onMove} onRemove={onRemove} />
+      ) : (
       <div className="flex flex-col gap-2">
         <h2 className={PANEL_TITLE}>{t("modelSuggestion")}</h2>
         {c.llm_status === "ok" && prop.label ? (
@@ -938,6 +1282,7 @@ function Inspector({ c, line, prop, label, editable, number, duplicateOf, onDeci
           {c.origin && c.origin !== "track" && ` · ${c.origin.replaceAll("_", " ")}`}
         </p>
       </div>
+      )}
 
       {duplicateOf.length > 0 && (
         <p className="rounded-md border border-warn/40 bg-warn/10 px-3 py-2 text-sm text-warn" data-testid="duplicate">
@@ -959,10 +1304,12 @@ function Inspector({ c, line, prop, label, editable, number, duplicateOf, onDeci
         <h2 className={PANEL_TITLE}>{t("decision", { n: number })}</h2>
         {label ? (
           <p className="flex items-center gap-2 text-sm">
-            <span className={`rounded px-2 py-0.5 text-xs font-semibold text-white ${corrected ? "bg-info" : "bg-ok"}`}>{corrected ? t("corrected") : t("confirmed")}</span>
+            <span className={`rounded px-2 py-0.5 text-xs font-semibold text-white ${manual || !corrected ? "bg-ok" : "bg-info"}`}>
+              {manual ? t("manual.badge") : corrected ? t("corrected") : t("confirmed")}
+            </span>
             <Swatch label={label} />
             {tr(`categories.singular.${label}`)}
-            {editable && (
+            {editable && !manual && (
               <button type="button" onClick={onUndo} className={`${BUTTON.ghost} ml-auto text-xs`}>
                 {t("undoOne")}
               </button>
@@ -1006,7 +1353,7 @@ function Inspector({ c, line, prop, label, editable, number, duplicateOf, onDeci
 const ORDER: Category[] = ["cyclists", "kick_scooters", "mopeds", "unicycles", "pedestrians", "motorcycles", "cars", "other"];
 
 /** Confirmed totals (human decisions only): category × line, with the directions on hover. */
-function TotalsPanel({ totals, lines, total }: { totals: ReturnType<typeof computeTotals>; lines: Line[]; total: number }) {
+function TotalsPanel({ totals, lines, total, manual }: { totals: ReturnType<typeof computeTotals>; lines: Line[]; total: number; manual: number }) {
   const t = useTranslations("review");
   const tr = useTranslations();
   const ids = lines.length ? lines.map((l) => l.id) : [""];
@@ -1058,6 +1405,7 @@ function TotalsPanel({ totals, lines, total }: { totals: ReturnType<typeof compu
       </table>
       <p className="font-mono text-[0.7rem] text-faint">
         {t("summary", { reviewed: total - totals.pending, total, counted: totals.counted, discarded: totals.discarded })}
+        {manual > 0 && ` · ${t("manual.summary", { n: manual })}`}
       </p>
     </section>
   );

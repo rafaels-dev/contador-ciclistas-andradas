@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslations } from "next-intl";
 import type { Candidate, Line } from "@/lib/db";
-import type { Label } from "@/lib/review";
+import { isManual, type Label } from "@/lib/review";
 import { LABEL_COLOR, timecode } from "@/lib/ui";
 import { frameTimecode, useTime, type Clock } from "./clock";
 
@@ -21,7 +21,7 @@ type Props = {
   visible: Set<number>;
   labelOf: (c: Candidate) => Label | null;
   decided: (c: Candidate) => boolean;
-  number: Record<number, number>;
+  number: Record<number, string>;
   onFocus: (id: number) => void;
   clock: Clock;
   /** where each candidate crosses, in the original video's time */
@@ -335,8 +335,9 @@ export function Timeline({ candidates, lines, duration, fps, focused, visible, l
                         className={`group absolute bottom-1.5 top-1.5 flex items-center ${visible.has(c.id) ? "" : "opacity-25"}`}
                         style={{ left: x - 2 }}
                       >
+                        {/* manual counts: a diamond, to tell them apart from the detector's */}
                         <span
-                          className={`h-full w-1 rounded-[1px] ${ok ? (color?.bg ?? "bg-faint") : `border ${color?.border ?? "border-faint"} bg-transparent`} ${
+                          className={`${isManual(c) ? "-ml-0.5 h-2.5 w-2.5 rotate-45" : "h-full w-1"} rounded-[1px] ${ok ? (color?.bg ?? "bg-faint") : `border ${color?.border ?? "border-faint"} bg-transparent`} ${
                             active ? "outline outline-2 outline-offset-1 outline-accent" : ""
                           } group-hover:scale-y-110`}
                         />
