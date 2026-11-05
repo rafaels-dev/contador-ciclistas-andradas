@@ -41,8 +41,10 @@ runs/
 .idea/
 *.swp
 *.swo
-avaliacao/videos/
-avaliacao/dataset/
+evaluation/videos/
+evaluation/dataset/
+# a mesma coisa na pasta antiga (avaliacao/, até a 0.0.7): o que não é versionado fica lá depois do git pull
+avaliacao/
 runs/
 
 # Segredos
@@ -50,13 +52,16 @@ runs/
 .env.*
 
 # Saídas geradas pela avaliação (só os scripts vão para o repo)
-avaliacao/diag_*/
-avaliacao/diag_*.json
-avaliacao/varredura*/
-avaliacao/mineracao/
-avaliacao/filmstrip_*/
-avaliacao/blobsnap_*/
-avaliacao/brilho/
+evaluation/diag_*/
+evaluation/diag_*.json
+evaluation/sweep*/
+evaluation/varredura*/
+evaluation/mining/
+evaluation/mineracao/
+evaluation/filmstrip_*/
+evaluation/blobsnap_*/
+evaluation/brightness/
+evaluation/brilho/
 
 # App web
 node_modules/

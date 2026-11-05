@@ -1,30 +1,30 @@
 import fs from "node:fs";
 
 /**
- * Tempo de exibição (s) de cada quadro de vídeo de um MP4/MOV, na ordem em que
- * aparecem — lido das tabelas do `moov` (stts/ctts/elst), sem decodificar.
+ * Presentation time (s) of each video frame of an MP4/MOV, in the order they
+ * appear — read from the `moov` tables (stts/ctts/elst), without decoding.
  *
- * O worker conta quadros (quadro ÷ fps), mas os arquivos de DVR têm buracos no
- * tempo (Andradas_06: 54.009 quadros em 3.631 s, não 3.600): o <video> do
- * navegador posiciona pelo tempo gravado. Esta tabela converte um no outro.
- * null se não for MP4/MOV ou se a estrutura não for reconhecida.
+ * The worker counts frames (frame ÷ fps), but DVR files have time gaps
+ * (Andradas_06: 54,009 frames in 3,631 s, not 3,600): the browser's <video>
+ * seeks by the recorded time. This table converts one into the other.
+ * null if it is not an MP4/MOV or the structure is not recognized.
  */
-export function temposDosQuadros(arquivo: string): number[] | null {
+export function frameTimes(file: string): number[] | null {
   let fd: number;
   try {
-    fd = fs.openSync(arquivo, "r");
+    fd = fs.openSync(file, "r");
   } catch {
     return null;
   }
   try {
-    const moov = acharMoov(fd, fs.fstatSync(fd).size);
+    const moov = findMoov(fd, fs.fstatSync(fd).size);
     if (!moov) return null;
-    for (const trak of filhos(moov, 0, moov.length, "trak")) {
-      const mdia = filho(moov, trak, "mdia");
+    for (const trak of children(moov, 0, moov.length, "trak")) {
+      const mdia = child(moov, trak, "mdia");
       if (!mdia) continue;
-      const hdlr = filho(moov, mdia, "hdlr");
-      if (!hdlr || moov.toString("latin1", hdlr.ini + 8, hdlr.ini + 12) !== "vide") continue;
-      return temposDaTrilha(moov, trak, mdia);
+      const hdlr = child(moov, mdia, "hdlr");
+      if (!hdlr || moov.toString("latin1", hdlr.start + 8, hdlr.start + 12) !== "vide") continue;
+      return trackTimes(moov, trak, mdia);
     }
     return null;
   } catch {
@@ -34,93 +34,93 @@ export function temposDosQuadros(arquivo: string): number[] | null {
   }
 }
 
-type Caixa = { ini: number; fim: number }; // conteúdo da caixa (depois do cabeçalho)
+type Box = { start: number; end: number }; // box content (after the header)
 
-function acharMoov(fd: number, tamanho: number): Buffer | null {
-  const cab = Buffer.alloc(16);
+function findMoov(fd: number, size: number): Buffer | null {
+  const head = Buffer.alloc(16);
   let pos = 0;
-  while (pos + 8 <= tamanho) {
-    fs.readSync(fd, cab, 0, 16, pos);
-    let tam = cab.readUInt32BE(0);
-    const tipo = cab.toString("latin1", 4, 8);
-    let cabecalho = 8;
-    if (tam === 1) {
-      tam = Number(cab.readBigUInt64BE(8));
-      cabecalho = 16;
-    } else if (tam === 0) tam = tamanho - pos;
-    if (tam < cabecalho) return null;
-    if (tipo === "moov") {
-      const buf = Buffer.alloc(tam - cabecalho);
-      fs.readSync(fd, buf, 0, buf.length, pos + cabecalho);
+  while (pos + 8 <= size) {
+    fs.readSync(fd, head, 0, 16, pos);
+    let len = head.readUInt32BE(0);
+    const type = head.toString("latin1", 4, 8);
+    let header = 8;
+    if (len === 1) {
+      len = Number(head.readBigUInt64BE(8));
+      header = 16;
+    } else if (len === 0) len = size - pos;
+    if (len < header) return null;
+    if (type === "moov") {
+      const buf = Buffer.alloc(len - header);
+      fs.readSync(fd, buf, 0, buf.length, pos + header);
       return buf;
     }
-    pos += tam;
+    pos += len;
   }
   return null;
 }
 
-function* filhos(buf: Buffer, ini: number, fim: number, tipo?: string): Generator<Caixa> {
-  let pos = ini;
-  while (pos + 8 <= fim) {
-    let tam = buf.readUInt32BE(pos);
-    let cabecalho = 8;
-    if (tam === 1) {
-      tam = Number(buf.readBigUInt64BE(pos + 8));
-      cabecalho = 16;
-    } else if (tam === 0) tam = fim - pos;
-    if (tam < cabecalho) return;
-    if (!tipo || buf.toString("latin1", pos + 4, pos + 8) === tipo) yield { ini: pos + cabecalho, fim: pos + tam };
-    pos += tam;
+function* children(buf: Buffer, start: number, end: number, type?: string): Generator<Box> {
+  let pos = start;
+  while (pos + 8 <= end) {
+    let len = buf.readUInt32BE(pos);
+    let header = 8;
+    if (len === 1) {
+      len = Number(buf.readBigUInt64BE(pos + 8));
+      header = 16;
+    } else if (len === 0) len = end - pos;
+    if (len < header) return;
+    if (!type || buf.toString("latin1", pos + 4, pos + 8) === type) yield { start: pos + header, end: pos + len };
+    pos += len;
   }
 }
 
-function filho(buf: Buffer, pai: Caixa, tipo: string): Caixa | undefined {
-  return filhos(buf, pai.ini, pai.fim, tipo).next().value ?? undefined;
+function child(buf: Buffer, parent: Box, type: string): Box | undefined {
+  return children(buf, parent.start, parent.end, type).next().value ?? undefined;
 }
 
-function temposDaTrilha(buf: Buffer, trak: Caixa, mdia: Caixa): number[] | null {
-  const mdhd = filho(buf, mdia, "mdhd");
+function trackTimes(buf: Buffer, trak: Box, mdia: Box): number[] | null {
+  const mdhd = child(buf, mdia, "mdhd");
   const stbl = (() => {
-    const minf = filho(buf, mdia, "minf");
-    return minf && filho(buf, minf, "stbl");
+    const minf = child(buf, mdia, "minf");
+    return minf && child(buf, minf, "stbl");
   })();
   if (!mdhd || !stbl) return null;
-  const versao = buf.readUInt8(mdhd.ini);
-  const escala = buf.readUInt32BE(mdhd.ini + (versao === 1 ? 20 : 12));
-  if (!escala) return null;
+  const version = buf.readUInt8(mdhd.start);
+  const timescale = buf.readUInt32BE(mdhd.start + (version === 1 ? 20 : 12));
+  if (!timescale) return null;
 
-  // stts: duração (em decodificação) de cada amostra
-  const stts = filho(buf, stbl, "stts");
+  // stts: duration (in decoding order) of each sample
+  const stts = child(buf, stbl, "stts");
   if (!stts) return null;
   const dts: number[] = [];
   let t = 0;
-  for (let i = 0, n = buf.readUInt32BE(stts.ini + 4); i < n; i++) {
-    const quantos = buf.readUInt32BE(stts.ini + 8 + i * 8);
-    const delta = buf.readUInt32BE(stts.ini + 12 + i * 8);
-    for (let k = 0; k < quantos; k++, t += delta) dts.push(t);
+  for (let i = 0, n = buf.readUInt32BE(stts.start + 4); i < n; i++) {
+    const count = buf.readUInt32BE(stts.start + 8 + i * 8);
+    const delta = buf.readUInt32BE(stts.start + 12 + i * 8);
+    for (let k = 0; k < count; k++, t += delta) dts.push(t);
   }
 
-  // ctts: deslocamento de composição (quadros B mostrados fora da ordem de decodificação)
-  const ctts = filho(buf, stbl, "ctts");
+  // ctts: composition offset (B frames shown out of decoding order)
+  const ctts = child(buf, stbl, "ctts");
   if (ctts) {
-    const v = buf.readUInt8(ctts.ini);
+    const v = buf.readUInt8(ctts.start);
     let s = 0;
-    for (let i = 0, n = buf.readUInt32BE(ctts.ini + 4); i < n; i++) {
-      const quantos = buf.readUInt32BE(ctts.ini + 8 + i * 8);
-      const desloc = v === 1 ? buf.readInt32BE(ctts.ini + 12 + i * 8) : buf.readUInt32BE(ctts.ini + 12 + i * 8);
-      for (let k = 0; k < quantos && s < dts.length; k++, s++) dts[s] += desloc;
+    for (let i = 0, n = buf.readUInt32BE(ctts.start + 4); i < n; i++) {
+      const count = buf.readUInt32BE(ctts.start + 8 + i * 8);
+      const offset = v === 1 ? buf.readInt32BE(ctts.start + 12 + i * 8) : buf.readUInt32BE(ctts.start + 12 + i * 8);
+      for (let k = 0; k < count && s < dts.length; k++, s++) dts[s] += offset;
     }
   }
 
-  // elst: o início da trilha pode ser cortado (media_time da primeira entrada)
-  let inicio = 0;
-  const edts = filho(buf, trak, "edts");
-  const elst = edts && filho(buf, edts, "elst");
-  if (elst && buf.readUInt32BE(elst.ini + 4) > 0) {
-    const v = buf.readUInt8(elst.ini);
-    const mediaTime = v === 1 ? Number(buf.readBigInt64BE(elst.ini + 8 + 8)) : buf.readInt32BE(elst.ini + 8 + 4);
-    if (mediaTime > 0) inicio = mediaTime;
+  // elst: the start of the track may be cut (media_time of the first entry)
+  let start = 0;
+  const edts = child(buf, trak, "edts");
+  const elst = edts && child(buf, edts, "elst");
+  if (elst && buf.readUInt32BE(elst.start + 4) > 0) {
+    const v = buf.readUInt8(elst.start);
+    const mediaTime = v === 1 ? Number(buf.readBigInt64BE(elst.start + 8 + 8)) : buf.readInt32BE(elst.start + 8 + 4);
+    if (mediaTime > 0) start = mediaTime;
   }
 
-  return dts.sort((a, b) => a - b).map((x) => Math.round(((x - inicio) / escala) * 1000) / 1000);
+  return dts.sort((a, b) => a - b).map((x) => Math.round(((x - start) / timescale) * 1000) / 1000);
 }

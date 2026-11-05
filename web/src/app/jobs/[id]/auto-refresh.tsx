@@ -3,32 +3,32 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-// várias partes da tela podem pedir atualização ao mesmo tempo (página e
-// barra de status): um único intervalo, no menor período pedido
-const pedidos = new Map<symbol, number>();
+// several parts of the screen may ask for refreshes at the same time (page
+// and status bar): a single interval, at the shortest period requested
+const requests = new Map<symbol, number>();
 let timer: ReturnType<typeof setInterval> | null = null;
-let periodo = 0;
-let atualizar: (() => void) | null = null;
+let period = 0;
+let refresh: (() => void) | null = null;
 
-function reagendar() {
-  const menor = pedidos.size ? Math.min(...pedidos.values()) : 0;
-  if (menor === periodo) return;
+function reschedule() {
+  const shortest = requests.size ? Math.min(...requests.values()) : 0;
+  if (shortest === period) return;
   if (timer) clearInterval(timer);
-  timer = menor ? setInterval(() => atualizar?.(), menor) : null;
-  periodo = menor;
+  timer = shortest ? setInterval(() => refresh?.(), shortest) : null;
+  period = shortest;
 }
 
-/** Recarrega os dados do servidor periodicamente enquanto algo trabalha. */
+/** Reloads the server data periodically while something is working. */
 export function AutoRefresh({ ms = 1500 }: { ms?: number }) {
   const router = useRouter();
   useEffect(() => {
-    const chave = Symbol();
-    atualizar = () => router.refresh();
-    pedidos.set(chave, ms);
-    reagendar();
+    const key = Symbol();
+    refresh = () => router.refresh();
+    requests.set(key, ms);
+    reschedule();
     return () => {
-      pedidos.delete(chave);
-      reagendar();
+      requests.delete(key);
+      reschedule();
     };
   }, [router, ms]);
   return null;

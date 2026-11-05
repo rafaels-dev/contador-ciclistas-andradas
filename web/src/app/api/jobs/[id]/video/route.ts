@@ -1,10 +1,10 @@
-import { servirVideo } from "@/lib/arquivos";
-import { obterJob } from "@/lib/db";
-import { caminhoVideo } from "@/lib/runner";
+import { getJob } from "@/lib/db";
+import { serveVideo } from "@/lib/files";
+import { videoPath } from "@/lib/runner";
 
-/** O vídeo original do job, com Range, para navegar quadro a quadro na revisão. */
+/** The job's original video, with Range, to step frame by frame in the review. */
 export async function GET(request: Request, ctx: RouteContext<"/api/jobs/[id]/video">) {
   const { id } = await ctx.params;
-  if (!/^[\w-]{1,40}$/.test(id) || !obterJob(id)) return new Response("Não encontrado", { status: 404 });
-  return servirVideo(request, caminhoVideo(id));
+  if (!/^[\w-]{1,40}$/.test(id) || !getJob(id)) return new Response("Not found", { status: 404 });
+  return serveVideo(request, videoPath(id));
 }

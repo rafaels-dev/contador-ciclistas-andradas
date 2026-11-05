@@ -4,157 +4,195 @@ import fs from "node:fs";
 import path from "node:path";
 import { EOL } from "node:os";
 import readline from "node:readline";
+import type { Locale } from "@/i18n/locales";
+import { msg } from "@/i18n/message";
+import { appLocale, translatorFor } from "@/i18n/server";
 import {
-  atualizarJob,
-  atualizarRender,
-  listarCandidatos,
-  obterRender,
-  obterJob,
-  registrarSugestao,
-  resumoSugestoes,
-  substituirCandidatos,
-  type Candidato,
-  type Categoria,
-  type Linha, type Area } from "./db";
-import { baixarDoDrive } from "./drive";
-import { ajustarMotor, ambienteDoWorker, pythonDoMotor } from "./motor";
-import { ErroOpenRouter, modelosDaSugestao, sugerirCategoria } from "./openrouter";
-import { contaNaLinha, SEM_CONSULTA } from "./revisao";
-import { RAIZ_REPO, dirJob, dirRender } from "./paths";
+  CATEGORIES,
+  deleteJob,
+  getJob,
+  getRender,
+  listCandidates,
+  recordSuggestion,
+  replaceCandidates,
+  suggestionSummary,
+  updateJob,
+  updateRender,
+  type Area,
+  type Candidate,
+  type Category,
+  type Line,
+} from "./db";
+import { downloadFromDrive } from "./drive";
+import { adjustEngine, enginePython, workerEnv } from "./engine";
+import { OpenRouterError, suggestCategory, suggestionModels } from "./openrouter";
+import { movedVideo } from "./legacy";
+import { REPO_ROOT, jobDir, renderDir } from "./paths";
+import { NO_CONSULTATION, countsOnLine } from "./review";
 
 /**
- * Orquestra as etapas pesadas de um job fora do ciclo de request: download
- * (Node) e scripts Python do worker/ (GPU). Detecções rodam em fila única —
- * a GPU de 8 GB não comporta dois vídeos em paralelo com folga.
+ * Orchestrates a job's heavy steps outside the request cycle: download
+ * (Node) and the Python scripts in worker/ (GPU). Detections run in a single
+ * queue — an 8 GB GPU cannot comfortably take two videos in parallel.
+ *
+ * Texts written to jobs.message / jobs.error are translatable messages
+ * (i18n/message.ts): the screen shows them in the current app language.
  */
 
-type EventoWorker =
-  | { tipo: "progresso"; etapa: string; p: number; fps?: number; candidatos?: number; video?: number; videos?: number }
-  | { tipo: "info"; fps: number; frames: number; largura: number; altura: number; duracao_s: number }
-  | { tipo: "fim"; candidatos?: number; eventos?: number; duracao_s?: number; codec?: string }
-  | { tipo: "erro"; mensagem: string };
+type WorkerEvent =
+  | { type: "progress"; stage: string; p: number; fps?: number; candidates?: number; video?: number; videos?: number }
+  | { type: "info"; fps: number; frames: number; width: number; height: number; duration_s: number }
+  | { type: "done"; candidates?: number; events?: number; duration_s?: number; codec?: string }
+  | { type: "error"; message: string; code?: string };
+
+/** Worker error codes → message keys. */
+const WORKER_ERRORS: Record<string, string> = {
+  video_unreadable: "errors.videoUnreadable",
+  video_no_frames: "errors.videoNoFrames",
+};
 
 const g = globalThis as {
-  __contadorFilaGpu?: Promise<unknown>;
-  __contadorDownloads?: Map<string, AbortController>;
-  __contadorCancelados?: Set<string>;
-  __contadorSugerindo?: Set<string>;
-  __contadorProcessos?: Map<string, Set<ChildProcess>>;
+  __tcGpuQueue?: Promise<unknown>;
+  __tcDownloads?: Map<string, AbortController>;
+  __tcCancelled?: Set<string>;
+  __tcSuggesting?: Set<string>;
+  __tcProcesses?: Map<string, Set<ChildProcess>>;
+  __tcExitHook?: boolean;
 };
-const downloads = (g.__contadorDownloads ??= new Map());
-const cancelados = (g.__contadorCancelados ??= new Set());
-const sugerindo = (g.__contadorSugerindo ??= new Set());
-// processos do worker por job/render, para cancelar sem depender do pkill
-const processos = (g.__contadorProcessos ??= new Map());
+const downloads = (g.__tcDownloads ??= new Map());
+const cancelled = (g.__tcCancelled ??= new Set());
+const suggesting = (g.__tcSuggesting ??= new Set());
+// worker processes per job/render, to cancel without relying on pkill
+const processes = (g.__tcProcesses ??= new Map());
 
-// app desktop: ao fechar a janela o servidor é encerrado — os workers (Python,
-// ffmpeg) não podem ficar órfãos rodando na GPU
-if (!(globalThis as { __contadorSaida?: boolean }).__contadorSaida) {
-  (globalThis as { __contadorSaida?: boolean }).__contadorSaida = true;
-  const encerrarTodos = () => {
-    for (const dono of processos.keys()) encerrarProcessos(dono);
+// desktop app: closing the window ends the server — the workers (Python,
+// ffmpeg) must not be left orphaned running on the GPU
+if (!g.__tcExitHook) {
+  g.__tcExitHook = true;
+  const killAll = () => {
+    for (const owner of processes.keys()) killProcesses(owner);
   };
-  process.on("exit", encerrarTodos);
-  for (const sinal of ["SIGTERM", "SIGINT"] as const) {
-    process.once(sinal, () => {
-      encerrarTodos();
+  process.on("exit", killAll);
+  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+    process.once(signal, () => {
+      killAll();
       process.exit(0);
     });
   }
 }
 
-/** Encerra os workers de um job/render, com os filhos (ffmpeg) junto. */
-function encerrarProcessos(dono: string): void {
-  for (const proc of processos.get(dono) ?? []) {
+/** Kills the workers of a job/render, children (ffmpeg) included. */
+function killProcesses(owner: string): void {
+  for (const proc of processes.get(owner) ?? []) {
     if (proc.exitCode !== null || !proc.pid) continue;
     if (process.platform === "win32") spawnSync("taskkill", ["/pid", String(proc.pid), "/T", "/F"], { windowsHide: true });
     else proc.kill("SIGTERM");
   }
 }
 
-function naFilaDaGpu<T>(tarefa: () => Promise<T>): Promise<T> {
-  const anterior = g.__contadorFilaGpu ?? Promise.resolve();
-  const proxima = anterior.catch(() => undefined).then(tarefa);
-  g.__contadorFilaGpu = proxima;
-  return proxima;
+function onGpuQueue<T>(task: () => Promise<T>): Promise<T> {
+  const previous = g.__tcGpuQueue ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(task);
+  g.__tcGpuQueue = next;
+  return next;
 }
 
-async function rodarWorker(script: string, args: string[], aoEvento: (e: EventoWorker) => void, dono?: string): Promise<void> {
-  await ajustarMotor();
+async function runWorker(script: string, args: string[], onEvent: (e: WorkerEvent) => void, owner?: string): Promise<void> {
+  await adjustEngine();
   return new Promise((resolve, reject) => {
-    const proc = spawn(pythonDoMotor(), [path.join("worker", script), ...args], {
-      cwd: RAIZ_REPO,
-      // PYTHONUTF8: no Windows o Python usa cp1252 no stdout e nos open() sem
-      // encoding — o JSON dos eventos ("A→B", "…") derrubava o worker
-      env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", ...ambienteDoWorker() },
+    const proc = spawn(enginePython(), [path.join("worker", script), ...args], {
+      cwd: REPO_ROOT,
+      // PYTHONUTF8: on Windows Python uses cp1252 on stdout and on open()
+      // without an encoding — the JSON of the events ("A→B", "…") crashed the worker
+      env: { ...process.env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1", ...workerEnv() },
       windowsHide: true,
     });
-    if (dono) {
-      const doDono = processos.get(dono) ?? new Set<ChildProcess>();
-      processos.set(dono, doDono.add(proc));
+    if (owner) {
+      const own = processes.get(owner) ?? new Set<ChildProcess>();
+      processes.set(owner, own.add(proc));
       proc.on("close", () => {
-        doDono.delete(proc);
-        if (!doDono.size) processos.delete(dono);
+        own.delete(proc);
+        if (!own.size) processes.delete(owner);
       });
     }
-    let erroWorker: string | null = null;
+    let workerError: string | null = null;
     let stderr = "";
-    readline.createInterface({ input: proc.stdout }).on("line", (linha) => {
-      let ev: EventoWorker;
+    readline.createInterface({ input: proc.stdout }).on("line", (line) => {
+      let ev: WorkerEvent;
       try {
-        ev = JSON.parse(linha);
+        ev = JSON.parse(line);
       } catch {
-        return; // saída solta de bibliotecas
+        return; // stray output from libraries
       }
-      if (ev.tipo === "erro") erroWorker = ev.mensagem;
-      aoEvento(ev);
+      if (ev.type === "error") workerError = ev.code && WORKER_ERRORS[ev.code] ? msg(WORKER_ERRORS[ev.code]) : ev.message;
+      onEvent(ev);
     });
     proc.stderr.on("data", (d) => {
       stderr = (stderr + d).slice(-4000);
     });
     proc.on("error", reject);
-    proc.on("close", (codigo) => {
-      if (codigo === 0) resolve();
-      else reject(new Error(erroWorker ?? `worker/${script} saiu com código ${codigo}: ${stderr.trim().split("\n").pop()}`));
+    proc.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(workerError ?? `worker/${script} exited with code ${code}: ${stderr.trim().split("\n").pop()}`));
     });
   });
 }
 
-function falhar(jobId: string, e: unknown): void {
-  const erro = cancelados.delete(jobId) ? "Cancelado pelo usuário." : e instanceof Error ? e.message : String(e);
-  atualizarJob(jobId, { status: "erro", erro, mensagem: null });
+function fail(jobId: string, e: unknown): void {
+  const error = cancelled.delete(jobId) ? msg("errors.cancelled") : e instanceof Error ? e.message : String(e);
+  updateJob(jobId, { status: "error", error, message: null });
 }
 
 /**
- * Interrompe download ou worker de um job. Os workers são achados pela
- * pasta do job na linha de comando (funciona mesmo para processos
- * iniciados antes de um hot reload ou de outra instância do módulo).
+ * Stops a job's download or worker. Workers are found through the job folder
+ * on the command line (works even for processes started before a hot reload
+ * or by another instance of the module).
  */
-export function cancelarJob(jobId: string): void {
-  cancelados.add(jobId);
+export function cancelJob(jobId: string): void {
+  cancelled.add(jobId);
   downloads.get(jobId)?.abort();
-  encerrarProcessos(jobId);
-  // processos de antes de um hot reload do `next dev` (não estão no mapa)
-  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/.*${dirJob(jobId)}(/| |$)`]);
-  // na fila da GPU (ainda sem processo): a tarefa confere o status ao começar
-  atualizarJob(jobId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
+  killProcesses(jobId);
+  // processes from before a `next dev` hot reload (not in the map)
+  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/.*${jobDir(jobId)}(/| |$)`]);
+  // in the GPU queue (no process yet): the task checks the status when it starts
+  updateJob(jobId, { status: "error", error: msg("errors.cancelled"), message: null });
 }
 
-const JANELA_VELOCIDADE_MS = 5000;
+/**
+ * Removes videos from the library: stops what is running, deletes the
+ * database rows and the job folder (downloaded video, detection, media). A
+ * video from the computer is used in place and stays where it is. Final
+ * videos already generated keep their files.
+ */
+export function deleteJobs(ids: string[]): void {
+  for (const id of ids) {
+    if (!getJob(id)) continue;
+    cancelJob(id);
+    deleteJob(id); // a suggestion batch in progress sees the job is gone and stops
+    // Windows: a worker just killed may still hold files for a moment
+    try {
+      fs.rmSync(jobDir(id), { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+    } catch (e) {
+      console.error(`[delete] ${jobDir(id)}: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+}
 
-/** 1536 → "1,5 KB" (potências de 1000, como o Drive mostra os tamanhos). */
-function formatarBytes(n: number): string {
-  const unidades = ["B", "KB", "MB", "GB", "TB"];
+const SPEED_WINDOW_MS = 5000;
+
+/** 1536 → "1.5 KB" (powers of 1000, as Drive shows sizes), in the app language. */
+function formatBytes(n: number, locale: Locale): string {
+  const units = ["B", "KB", "MB", "GB", "TB"];
   let i = 0;
-  while (n >= 1000 && i < unidades.length - 1) {
+  while (n >= 1000 && i < units.length - 1) {
     n /= 1000;
     i++;
   }
-  const casas = i === 0 || n >= 100 ? 0 : 1;
-  return `${n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })} ${unidades[i]}`;
+  const digits = i === 0 || n >= 100 ? 0 : 1;
+  return `${n.toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${units[i]}`;
 }
 
-function formatarDuracao(s: number): string {
+function formatDuration(s: number): string {
   s = Math.ceil(s);
   if (s < 60) return `${s} s`;
   const h = Math.floor(s / 3600);
@@ -163,423 +201,444 @@ function formatarDuracao(s: number): string {
 }
 
 /**
- * Texto de progresso de uma transferência ("417 MB de 3,7 GB · 64,4 MB/s ·
- * faltam 52 s"); a velocidade é a média dos últimos JANELA_VELOCIDADE_MS.
+ * Progress message of a transfer ("417 MB of 3.7 GB · 64.4 MB/s · 52 s
+ * left"); the speed is the average of the last SPEED_WINDOW_MS.
  */
-function medidorTransferencia(): (feito: number, total: number | null) => string {
-  const amostras: [number, number][] = []; // [ms, bytes]
-  return (feito, total) => {
-    const agora = Date.now();
-    amostras.push([agora, feito]);
-    while (amostras.length > 2 && agora - amostras[0][0] > JANELA_VELOCIDADE_MS) amostras.shift();
-    const [t0, b0] = amostras[0];
-    const porSeg = agora > t0 ? ((feito - b0) * 1000) / (agora - t0) : 0;
-    const partes = [total ? `${formatarBytes(feito)} de ${formatarBytes(total)}` : formatarBytes(feito)];
-    if (porSeg > 0) partes.push(`${formatarBytes(porSeg)}/s`);
-    if (porSeg > 0 && total) partes.push(`faltam ${formatarDuracao((total - feito) / porSeg)}`);
-    return partes.join(" · ");
+function transferMeter(locale: Locale): (done: number, total: number | null) => string {
+  const samples: [number, number][] = []; // [ms, bytes]
+  return (done, total) => {
+    const now = Date.now();
+    samples.push([now, done]);
+    while (samples.length > 2 && now - samples[0][0] > SPEED_WINDOW_MS) samples.shift();
+    const [t0, b0] = samples[0];
+    const perSecond = now > t0 ? ((done - b0) * 1000) / (now - t0) : 0;
+    return msg("runner.downloadProgress", {
+      done: formatBytes(done, locale),
+      total: total ? formatBytes(total, locale) : "none",
+      speed: perSecond > 0 ? formatBytes(perSecond, locale) : "none",
+      eta: perSecond > 0 && total ? formatDuration((total - done) / perSecond) : "none",
+    });
   };
 }
 
-/** Etapa 1: download + metadados + 1º frame → aguardando_linhas. */
-export function iniciarDownload(jobId: string): void {
+/** Step 1: download + metadata + first frame → awaiting_lines. */
+export function startDownload(jobId: string): void {
   void (async () => {
-    const job = obterJob(jobId);
+    const job = getJob(jobId);
     if (!job) return;
-    const dir = dirJob(jobId);
+    const dir = jobDir(jobId);
     fs.mkdirSync(dir, { recursive: true });
-    const destino = path.join(dir, "video.mp4");
+    const target = path.join(dir, "video.mp4");
 
     if (job.drive_id === "local") {
-      // vídeo do próprio computador: usado onde está, sem cópia
-      if (!fs.existsSync(job.link_drive)) throw new Error(`Arquivo não encontrado: ${job.link_drive}`);
-      atualizarJob(jobId, { status: "baixando", progresso: 0, erro: null, arquivo_video: job.link_drive });
+      // video from the computer itself: used in place, no copy
+      if (!fs.existsSync(job.drive_link)) throw new Error(msg("errors.fileNotFound", { path: job.drive_link }));
+      updateJob(jobId, { status: "downloading", progress: 0, error: null, video_file: job.drive_link });
     } else {
-      atualizarJob(jobId, { status: "baixando", progresso: 0, erro: null, mensagem: "Baixando do Google Drive…" });
-      const controle = new AbortController();
-      downloads.set(jobId, controle);
-      const medir = medidorTransferencia();
-      const { nome } = await baixarDoDrive(job.drive_id, destino, controle.signal, (feito, total) => {
-        atualizarJob(jobId, { progresso: total ? feito / total : 0, mensagem: `Baixando… ${medir(feito, total)}` });
+      updateJob(jobId, { status: "downloading", progress: 0, error: null, message: msg("runner.downloading") });
+      const control = new AbortController();
+      downloads.set(jobId, control);
+      const meter = transferMeter(appLocale());
+      const { name } = await downloadFromDrive(job.drive_id, target, control.signal, (done, total) => {
+        updateJob(jobId, { progress: total ? done / total : 0, message: meter(done, total) });
       });
       downloads.delete(jobId);
-      atualizarJob(jobId, { nome_arquivo: nome ?? job.nome_arquivo });
+      updateJob(jobId, { file_name: name ?? job.file_name });
     }
-    await lerVideo(jobId);
+    await readVideo(jobId);
   })().catch((e) => {
     downloads.delete(jobId);
-    falhar(jobId, e);
+    fail(jobId, e);
   });
 }
 
-/** Vídeo do job: o arquivo local original (caminho absoluto) ou o baixado na pasta do job. */
-export function caminhoVideo(jobId: string): string {
-  const arquivo = obterJob(jobId)?.arquivo_video ?? "video.mp4";
-  return path.isAbsolute(arquivo) ? arquivo : path.join(/* turbopackIgnore: true */ dirJob(jobId), arquivo);
+/** The job's video: the original local file (absolute path) or the one downloaded into the job folder. */
+export function videoPath(jobId: string): string {
+  const file = getJob(jobId)?.video_file ?? "video.mp4";
+  // movedVideo: a video used in place from the repository's old avaliacao/ folder
+  return path.isAbsolute(file) ? (movedVideo(file) as string) : path.join(/* turbopackIgnore: true */ jobDir(jobId), file);
 }
 
-/** Metadados + 1º frame do vídeo já em disco → aguardando_linhas. */
-async function lerVideo(jobId: string): Promise<void> {
-  const dir = dirJob(jobId);
-  atualizarJob(jobId, { mensagem: "Lendo o vídeo…", progresso: 1 });
-  const job = obterJob(jobId);
-  if (!job?.arquivo_video) atualizarJob(jobId, { arquivo_video: "video.mp4" });
-  await rodarWorker("info.py", [caminhoVideo(jobId), dir], (ev) => {
-    if (ev.tipo === "info") {
-      atualizarJob(jobId, {
+/** Metadata + first frame of the video already on disk → awaiting_lines. */
+async function readVideo(jobId: string): Promise<void> {
+  const dir = jobDir(jobId);
+  updateJob(jobId, { message: msg("runner.readingVideo"), progress: 1 });
+  const job = getJob(jobId);
+  if (!job?.video_file) updateJob(jobId, { video_file: "video.mp4" });
+  await runWorker("info.py", [videoPath(jobId), dir], (ev) => {
+    if (ev.type === "info") {
+      updateJob(jobId, {
         fps: ev.fps,
-        largura: ev.largura,
-        altura: ev.altura,
-        duracao_s: ev.duracao_s,
+        width: ev.width,
+        height: ev.height,
+        duration_s: ev.duration_s,
       });
     }
   }, jobId);
-  atualizarJob(jobId, { status: "aguardando_linhas", mensagem: null, progresso: 0 });
+  updateJob(jobId, { status: "awaiting_lines", message: null, progress: 0 });
 }
 
-type CandidatoWorker = {
+type WorkerCandidate = {
   id: number;
   track: string;
-  linha_id: string | null;
+  line_id: string | null;
   frame: number;
-  tempo_s: number;
-  direcao: string | null;
+  time_s: number;
+  direction: string | null;
   bbox: number[];
-  classe_yolo: Categoria;
-  conf_yolo: number;
-  alternativa: Categoria | null;
-  origem: string;
+  yolo_class: Category;
+  yolo_conf: number;
+  alternative: Category | null;
+  origin: string;
   n_obs: number;
   filmstrip: string;
-  contexto?: string;
-  clipe: string;
+  context?: string;
+  clip: string;
 };
 
-const ROTULO_ETAPA: Record<string, string> = {
-  detectando: "Detectando e rastreando objetos",
-  filmstrips: "Gerando miniaturas",
-  clipes: "Gerando clipes",
-};
-
-export function temTrilhas(jobId: string): boolean {
-  return fs.existsSync(path.join(dirJob(jobId), "trilhas.json.gz"));
+export function hasTracks(jobId: string): boolean {
+  return fs.existsSync(path.join(jobDir(jobId), "tracks.json.gz"));
 }
 
-/** Quando o worker gravou a prévia da detecção (o quadro atual), ou null se não há. */
-export function previaDeteccao(jobId: string): number | null {
+/** When the worker wrote the detection preview (the current frame), or null if there is none. */
+export function detectionPreview(jobId: string): number | null {
   try {
-    return fs.statSync(path.join(dirJob(jobId), "previa.jpg")).mtimeMs;
+    return fs.statSync(path.join(jobDir(jobId), "preview.jpg")).mtimeMs;
   } catch {
     return null;
   }
 }
 
-/** A área de análise (como passada ao worker) com que as trilhas salvas foram detectadas. */
-export function areaDasTrilhas(jobId: string): string | null {
+/** The analysis area (as passed to the worker) the saved tracks were detected with. */
+export function tracksArea(jobId: string): string | null {
   try {
-    const meta = JSON.parse(fs.readFileSync(path.join(dirJob(jobId), "trilhas_meta.json"), "utf8"));
+    const meta = JSON.parse(fs.readFileSync(path.join(jobDir(jobId), "tracks_meta.json"), "utf8"));
     return meta.area_arg ?? null;
   } catch {
-    return null; // trilhas de antes da área de análise: quadro inteiro
+    return null; // tracks from before the analysis area: whole frame
   }
 }
 
 /**
- * Etapa 2: detecção + candidatos (fila da GPU) → sugerindo. Se as trilhas da
- * detecção já existem (linhas editadas depois), refaz só os candidatos —
- * minutos em vez de repetir a detecção inteira.
+ * Step 2: detection + candidates (GPU queue) → suggesting. If the detection
+ * tracks already exist (lines edited later), only the candidates are redone
+ * — minutes instead of repeating the whole detection.
  */
-export function iniciarDeteccao(jobId: string, linhas: Linha[], area: Area | null): void {
-  const dir = dirJob(jobId);
-  const argArea = area ? [area.x, area.y, area.w, area.h].map((v) => v.toFixed(4)).join(",") : null;
-  // trilhas de outra área de análise não servem: a detecção é outra
-  const soCandidatos = temTrilhas(jobId) && areaDasTrilhas(jobId) === argArea;
-  const arqLinhas = path.join(dir, "linhas.json");
-  fs.writeFileSync(arqLinhas, JSON.stringify(linhas));
-  fs.rmSync(path.join(dir, "candidatos"), { recursive: true, force: true });
-  atualizarJob(jobId, {
-    status: "detectando",
-    linhas: JSON.stringify(linhas),
+export function startDetection(jobId: string, lines: Line[], area: Area | null, locale: Locale = appLocale()): void {
+  const dir = jobDir(jobId);
+  const areaArg = area ? [area.x, area.y, area.w, area.h].map((v) => v.toFixed(4)).join(",") : null;
+  // tracks of another analysis area are no good: the detection is different
+  const candidatesOnly = hasTracks(jobId) && tracksArea(jobId) === areaArg;
+  const linesFile = path.join(dir, "lines.json");
+  fs.writeFileSync(linesFile, JSON.stringify(lines));
+  fs.rmSync(path.join(dir, "candidates"), { recursive: true, force: true });
+  updateJob(jobId, {
+    status: "detecting",
+    lines: JSON.stringify(lines),
     area: area ? JSON.stringify(area) : null,
-    progresso: 0,
-    erro: null,
-    mensagem: soCandidatos ? "Na fila: refazendo candidatos com as novas linhas…" : "Na fila da GPU…",
+    progress: 0,
+    error: null,
+    message: msg(candidatesOnly ? "runner.queueCandidates" : "runner.queueGpu"),
   });
 
-  cancelados.delete(jobId);
-  void naFilaDaGpu(async () => {
-    if (cancelados.has(jobId) || obterJob(jobId)?.status !== "detectando") return;
-    const saida = path.join(dir, "candidatos");
-    const args = ["--video", caminhoVideo(jobId), "--saida", saida, "--linhas", arqLinhas,
-      "--trilhas", path.join(dir, "trilhas.json.gz"), "--etapa", soCandidatos ? "candidatos" : "tudo"];
-    if (argArea) args.push("--area", argArea);
-    if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos
-    await rodarWorker("detectar.py", args, (ev) => {
-      if (ev.tipo !== "progresso") return;
-      const fps = ev.fps ? ` (${ev.fps} fps)` : "";
-      const n = ev.candidatos != null ? ` — ${ev.candidatos} candidatos` : "";
-      atualizarJob(jobId, { progresso: ev.p, mensagem: `${ROTULO_ETAPA[ev.etapa] ?? ev.etapa}…${fps}${n}` });
+  cancelled.delete(jobId);
+  void onGpuQueue(async () => {
+    if (cancelled.has(jobId) || getJob(jobId)?.status !== "detecting") return;
+    const output = path.join(dir, "candidates");
+    const args = ["--video", videoPath(jobId), "--output", output, "--lines", linesFile,
+      "--tracks", path.join(dir, "tracks.json.gz"), "--stage", candidatesOnly ? "candidates" : "all"];
+    if (areaArg) args.push("--area", areaArg);
+    if (process.env.TRAFFIC_COUNTER_END_S) args.push("--end", process.env.TRAFFIC_COUNTER_END_S); // quick tests
+    await runWorker("detect.py", args, (ev) => {
+      if (ev.type !== "progress") return;
+      updateJob(jobId, {
+        progress: ev.p,
+        message: msg("runner.detectProgress", {
+          stage: ev.stage,
+          fps: ev.fps != null ? String(ev.fps) : "none",
+          candidates: ev.candidates != null ? String(ev.candidates) : "none",
+        }),
+      });
     }, jobId);
 
-    const itens = JSON.parse(fs.readFileSync(path.join(saida, "candidatos.json"), "utf8")) as CandidatoWorker[];
-    substituirCandidatos(
+    const items = JSON.parse(fs.readFileSync(path.join(output, "candidates.json"), "utf8")) as WorkerCandidate[];
+    replaceCandidates(
       jobId,
-      itens.map((c) => ({
+      items.map((c) => ({
         track: c.track,
-        linha_id: c.linha_id,
+        line_id: c.line_id,
         frame: c.frame,
-        tempo_s: c.tempo_s,
-        direcao: c.direcao,
+        time_s: c.time_s,
+        direction: c.direction,
         bbox: JSON.stringify(c.bbox),
-        classe_yolo: c.classe_yolo,
-        conf_yolo: c.conf_yolo,
-        alternativa: c.alternativa,
-        origem: c.origem,
+        yolo_class: c.yolo_class,
+        yolo_conf: c.yolo_conf,
+        alternative: c.alternative,
+        origin: c.origin,
         n_obs: c.n_obs,
-        filmstrip: `candidatos/${c.filmstrip}`,
-        contexto: c.contexto ? `candidatos/${c.contexto}` : null,
-        clipe: `candidatos/${c.clipe}`,
+        filmstrip: `candidates/${c.filmstrip}`,
+        context: c.context ? `candidates/${c.context}` : null,
+        clip: `candidates/${c.clip}`,
       })),
     );
-    atualizarJob(jobId, { status: "sugerindo", progresso: 0, mensagem: `${itens.length} candidatos detectados.` });
-    iniciarSugestoes(jobId);
-  }).catch((e) => falhar(jobId, e));
+    updateJob(jobId, { status: "suggesting", progress: 0, message: msg("runner.candidatesDetected", { n: items.length }) });
+    startSuggestions(jobId, locale);
+  }).catch((e) => fail(jobId, e));
 }
 
 // ----------------------------------------------------------------------
-// Etapa 3: sugestão do OpenRouter para TODO candidato (regra do projeto:
-// a revisão humana só começa quando todos têm sugestão).
+// Step 3: OpenRouter suggestion for EVERY candidate (project rule: the
+// human review only starts when every one has a suggestion).
 // ----------------------------------------------------------------------
 
-const CONCORRENCIA_LLM = Number(process.env.OPENROUTER_CONCORRENCIA ?? 6);
-const TENTATIVAS_LLM = 4;
-// dica do YOLO desligada por padrão: na calibração não melhorou o acerto e
-// arrisca puxar o modelo para o erro típico do detector (ciclista noturno
-// visto como pedestre). OPENROUTER_DICA_YOLO=1 liga.
-const DICA_YOLO = process.env.OPENROUTER_DICA_YOLO === "1";
+// OPENROUTER_CONCORRENCIA / OPENROUTER_DICA_YOLO: names before 0.0.8 (lib/env.ts maps them)
+const LLM_CONCURRENCY = Number(process.env.OPENROUTER_CONCURRENCY ?? 6);
+const LLM_ATTEMPTS = 4;
+// YOLO hint off by default: in calibration it did not improve accuracy and
+// risks pulling the model towards the detector's typical mistake (night
+// cyclist seen as a pedestrian). OPENROUTER_YOLO_HINT=1 turns it on.
+const YOLO_HINT = process.env.OPENROUTER_YOLO_HINT === "1";
 
-export function sugestoesAtivas(jobId: string): boolean {
-  return sugerindo.has(jobId);
+export function suggestionsRunning(jobId: string): boolean {
+  return suggesting.has(jobId);
 }
 
-const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// sugestões que pararam por causa da chave da IA: texto para quem não é da
-// área; a página do vídeo reconhece SUFIXO_CHAVE e oferece abrir Configurações
-export const SUFIXO_CHAVE = "Resolva em Configurações e clique em “Tentar novamente” — a detecção não é refeita.";
-function mensagemChave(status: number): string {
-  const motivo =
-    status === 402
-      ? "Acabaram os créditos da inteligência artificial (OpenRouter)."
-      : status === 403
-        ? "A chave da inteligência artificial não tem permissão para este uso."
-        : process.env.OPENROUTER_API_KEY
-          ? "A chave da inteligência artificial foi recusada."
-          : "A chave da inteligência artificial ainda não foi configurada.";
-  return `${motivo} ${SUFIXO_CHAVE}`;
+/**
+ * Suggestions that stopped because of the AI key: a message for
+ * non-technical users; the video page recognizes the errors.ai.* keys and
+ * offers to open Settings.
+ */
+function keyError(status: number): string {
+  const reason =
+    status === 402 ? "noCredits" : status === 403 ? "forbidden" : process.env.OPENROUTER_API_KEY ? "rejected" : "missing";
+  return msg(`errors.ai.${reason}`);
 }
 
-/** Registro de cada falha de sugestão: no log do servidor e em sugestoes_erros.jsonl na pasta do job (vai no relatório de diagnóstico). */
-function registrarErroSugestao(jobId: string, c: Candidato, erro: ErroOpenRouter, tentativas: number): string {
-  const dir = dirJob(jobId);
-  const tamanho = (rel: string | null) => {
+/** Record of each suggestion failure: in the server log and in suggestion_errors.jsonl in the job folder (goes into the diagnostics report). */
+function logSuggestionError(jobId: string, c: Candidate, error: OpenRouterError, attempts: number): string {
+  const dir = jobDir(jobId);
+  const size = (rel: string | null) => {
     try {
       return rel ? fs.statSync(path.join(dir, rel)).size : null;
     } catch {
       return null;
     }
   };
-  const registro = {
-    quando: new Date().toISOString(),
+  const record = {
+    at: new Date().toISOString(),
     job: jobId,
-    candidato: c.id,
+    candidate: c.id,
     track: c.track,
-    status: erro.status,
-    transitorio: erro.transitorio,
-    tentativas,
-    mensagem: erro.message,
-    detalhe: erro.detalhe,
-    modelos: modelosDaSugestao(),
+    status: error.status,
+    transient: error.transient,
+    attempts,
+    message: error.message,
+    detail: error.detail,
+    models: suggestionModels(),
     filmstrip: c.filmstrip,
-    filmstrip_bytes: tamanho(c.filmstrip),
-    contexto: c.contexto,
-    contexto_bytes: tamanho(c.contexto),
+    filmstrip_bytes: size(c.filmstrip),
+    context: c.context,
+    context_bytes: size(c.context),
   };
-  const linha = JSON.stringify(registro);
-  console.error(`[sugestoes] ${linha}`);
+  const line = JSON.stringify(record);
+  console.error(`[suggestions] ${line}`);
   try {
-    fs.appendFileSync(path.join(dir, "sugestoes_erros.jsonl"), `${linha}${EOL}`);
+    fs.appendFileSync(path.join(dir, "suggestion_errors.jsonl"), `${line}${EOL}`);
   } catch {}
-  return linha;
+  return line;
 }
 
-export function iniciarSugestoes(jobId: string): void {
-  if (sugerindo.has(jobId)) return;
-  sugerindo.add(jobId);
+export function startSuggestions(jobId: string, locale: Locale = appLocale()): void {
+  if (suggesting.has(jobId)) return;
+  suggesting.add(jobId);
   void (async () => {
-    const dir = dirJob(jobId);
-    // Carro do YOLO numa linha que não conta automóveis (ciclovia, calçada): a
-    // proposta já é descartar e o modelo de visão sempre concordou (Augusto de
-    // Lima: 236 de 236) — não paga a consulta. Mancha de movimento continua
-    // indo ao modelo: pode ser o ciclista colado no carro.
-    const linhasJob = new Map((JSON.parse(obterJob(jobId)?.linhas || "[]") as Linha[]).map((l) => [l.id, l]));
-    const pendentes = listarCandidatos(jobId).filter((c) => {
-      if (c.status_llm === "ok") return false;
-      if (c.origem === "track" && c.classe_yolo === "automoveis" && c.linha_id
-          && !contaNaLinha(linhasJob.get(c.linha_id), "automoveis")) {
-        registrarSugestao(c.id, {
-          sugestao_llm: "automoveis", conf_llm: c.conf_yolo, modelo_llm: SEM_CONSULTA, custo_llm: 0, status_llm: "ok",
-          justificativa_llm: "Veículo reconhecido pelo detector numa linha que não conta automóveis — não foi enviado ao modelo de visão.",
+    const dir = jobDir(jobId);
+    // A YOLO car on a line that does not count cars (bike lane, sidewalk):
+    // the proposal is already to discard and the vision model always agreed
+    // (Augusto de Lima: 236 of 236) — the call is not paid for. A motion blob
+    // still goes to the model: it may be the cyclist glued to the car.
+    const jobLines = new Map((JSON.parse(getJob(jobId)?.lines || "[]") as Line[]).map((l) => [l.id, l]));
+    const pending = listCandidates(jobId).filter((c) => {
+      if (c.llm_status === "ok") return false;
+      if (c.origin === "track" && c.yolo_class === "cars" && c.line_id
+          && !countsOnLine(jobLines.get(c.line_id), "cars")) {
+        recordSuggestion(c.id, {
+          llm_suggestion: "cars", llm_conf: c.yolo_conf, llm_model: NO_CONSULTATION, llm_cost: 0, llm_status: "ok",
+          llm_reason: msg("review.noConsultationReason"),
         });
         return false;
       }
       return true;
     });
-    for (const c of pendentes) {
-      if (c.status_llm === "falhou") {
-        registrarSugestao(c.id, {
-          sugestao_llm: null, conf_llm: null, justificativa_llm: null,
-          modelo_llm: null, custo_llm: null, status_llm: "pendente",
+    for (const c of pending) {
+      if (c.llm_status === "failed") {
+        recordSuggestion(c.id, {
+          llm_suggestion: null, llm_conf: null, llm_reason: null,
+          llm_model: null, llm_cost: null, llm_status: "pending",
         });
       }
     }
-    let abortar: string | null = null;
+    let abort: string | null = null;
 
-    const atualizarProgresso = () => {
-      const r = resumoSugestoes(jobId);
-      atualizarJob(jobId, {
-        status: "sugerindo",
-        progresso: r.total ? r.ok / r.total : 1,
-        mensagem: `Sugerindo classificação… ${r.ok} de ${r.total}${r.falhou ? ` (${r.falhou} falharam)` : ""} · US$ ${r.custo.toFixed(4)}`,
+    const updateProgress = () => {
+      const r = suggestionSummary(jobId);
+      updateJob(jobId, {
+        status: "suggesting",
+        progress: r.total ? r.ok / r.total : 1,
+        message: msg("runner.suggesting", { ok: r.ok, total: r.total, failed: r.failed, cost: r.cost.toFixed(4) }),
       });
     };
-    atualizarProgresso();
+    updateProgress();
 
-    let proximo = 0;
-    const trabalhador = async () => {
-      while (!abortar && proximo < pendentes.length) {
-        const c = pendentes[proximo++];
-        for (let tentativa = 1; ; tentativa++) {
+    let next = 0;
+    const worker = async () => {
+      while (!abort && next < pending.length && getJob(jobId)) {
+        const c = pending[next++];
+        for (let attempt = 1; ; attempt++) {
           try {
-            const r = await sugerirCategoria({
-              filmstrip: path.join(dir, c.filmstrip ?? ""),
-              contexto: c.contexto ? path.join(dir, c.contexto) : null,
-              dicaDetector: DICA_YOLO ? c.classe_yolo : null,
-            });
-            registrarSugestao(c.id, {
-              sugestao_llm: r.categoria,
-              conf_llm: r.confianca,
-              justificativa_llm: r.justificativa,
-              modelo_llm: r.modelo,
-              custo_llm: r.custo_usd,
-              status_llm: "ok",
+            const r = await suggestCategory(
+              {
+                filmstrip: path.join(dir, c.filmstrip ?? ""),
+                context: c.context ? path.join(dir, c.context) : null,
+                detectorHint: YOLO_HINT ? c.yolo_class : null,
+              },
+              { locale },
+            );
+            recordSuggestion(c.id, {
+              llm_suggestion: r.category,
+              llm_conf: r.confidence,
+              llm_reason: r.reason,
+              llm_model: r.model,
+              llm_cost: r.cost_usd,
+              llm_status: "ok",
             });
             break;
           } catch (e) {
-            const erro = e instanceof ErroOpenRouter ? e : new ErroOpenRouter(e instanceof Error ? e.message : String(e), null, false, e instanceof Error ? (e.stack ?? null) : null);
-            // chave inválida / sem créditos: não adianta continuar o lote
-            if (erro.status === 401 || erro.status === 402 || erro.status === 403) {
-              registrarErroSugestao(jobId, c, erro, tentativa);
-              abortar = mensagemChave(erro.status);
+            const error = e instanceof OpenRouterError ? e : new OpenRouterError(e instanceof Error ? e.message : String(e), null, false, e instanceof Error ? (e.stack ?? null) : null);
+            // invalid key / no credits: no point in going on with the batch
+            if (error.status === 401 || error.status === 402 || error.status === 403) {
+              logSuggestionError(jobId, c, error, attempt);
+              abort = keyError(error.status);
               break;
             }
-            if (!erro.transitorio || tentativa >= TENTATIVAS_LLM) {
-              registrarSugestao(c.id, {
-                sugestao_llm: null, conf_llm: null, justificativa_llm: erro.message,
-                modelo_llm: null, custo_llm: null, status_llm: "falhou",
-                erro_llm: registrarErroSugestao(jobId, c, erro, tentativa),
+            if (!error.transient || attempt >= LLM_ATTEMPTS) {
+              recordSuggestion(c.id, {
+                llm_suggestion: null, llm_conf: null, llm_reason: error.message,
+                llm_model: null, llm_cost: null, llm_status: "failed",
+                llm_error: logSuggestionError(jobId, c, error, attempt),
               });
               break;
             }
-            await esperar(1000 * 2 ** tentativa);
+            await wait(1000 * 2 ** attempt);
           }
         }
-        atualizarProgresso();
+        updateProgress();
       }
     };
-    await Promise.all(Array.from({ length: Math.max(1, CONCORRENCIA_LLM) }, trabalhador));
+    await Promise.all(Array.from({ length: Math.max(1, LLM_CONCURRENCY) }, worker));
 
-    const r = resumoSugestoes(jobId);
-    if (abortar) {
-      atualizarJob(jobId, { status: "erro", erro: abortar, mensagem: null });
-    } else if (r.falhou > 0 || r.ok < r.total) {
-      atualizarJob(jobId, {
-        mensagem: `${r.ok} de ${r.total} com sugestão; ${r.total - r.ok} falharam.`,
-      });
+    const r = suggestionSummary(jobId);
+    if (abort) {
+      updateJob(jobId, { status: "error", error: abort, message: null });
+    } else if (r.failed > 0 || r.ok < r.total) {
+      updateJob(jobId, { message: msg("runner.suggestionsPartial", { ok: r.ok, total: r.total, failed: r.total - r.ok }) });
     } else {
-      atualizarJob(jobId, {
-        status: "aguardando_revisao",
-        progresso: 1,
-        mensagem: `${r.total} candidatos com sugestão · custo US$ ${r.custo.toFixed(4)}`,
+      updateJob(jobId, {
+        status: "awaiting_review",
+        progress: 1,
+        message: msg("runner.suggestionsDone", { total: r.total, cost: r.cost.toFixed(4) }),
       });
     }
   })()
-    .catch((e) => falhar(jobId, e))
-    .finally(() => sugerindo.delete(jobId));
+    .catch((e) => fail(jobId, e))
+    .finally(() => suggesting.delete(jobId));
 }
 
 // ----------------------------------------------------------------------
-// Vídeo final: um ou mais jobs revisados num único vídeo, contador somando
-// entre eles. O plano congela as decisões humanas do momento do pedido.
+// Final video: one or more reviewed jobs in a single video, the counter
+// adding across them. The plan freezes the human decisions at request time.
 // ----------------------------------------------------------------------
 
-export function iniciarRender(renderId: string): void {
-  const render = obterRender(renderId);
-  if (!render) return;
-  const dir = dirRender(renderId);
-  fs.mkdirSync(dir, { recursive: true });
-  // categorias escolhidas para este vídeo final (null = todas): os eventos
-  // das outras ficam de fora do vídeo, da contagem e do painel
-  const escolhidas = render.categorias ? new Set(JSON.parse(render.categorias) as Categoria[]) : null;
-  const entra = (c: Categoria) => !escolhidas || escolhidas.has(c);
-  const videos = (JSON.parse(render.jobs) as string[]).map((jobId) => {
-    const job = obterJob(jobId);
-    if (!job) throw new Error(`Job ${jobId} não existe mais.`);
-    const djob = dirJob(jobId);
-    return {
-      job: jobId,
-      titulo: job.nome_arquivo ?? jobId,
-      video: caminhoVideo(job.id),
-      trilhas: path.join(djob, "trilhas.json.gz"),
-      linhas: (JSON.parse(job.linhas) as Linha[]).map((l) => (l.categorias?.length ? { ...l, categorias: l.categorias.filter(entra) } : l)),
-      eventos: listarCandidatos(jobId)
-        .filter((c) => c.rotulo && c.rotulo !== "descartado" && entra(c.rotulo))
-        .map((c) => ({ id: c.id, frame: c.frame, linha_id: c.linha_id, categoria: c.rotulo, direcao: c.direcao, track: c.track })),
-    };
-  });
-  const arqPlano = path.join(dir, "plano.json");
-  fs.writeFileSync(arqPlano, JSON.stringify({ categorias: escolhidas ? [...escolhidas] : null, videos }, null, 1));
-  for (const f of ["video_final.mp4", "relatorio.json", "eventos.csv"]) fs.rmSync(path.join(/* turbopackIgnore: true */ dir, f), { force: true });
-  atualizarRender(renderId, { status: "na_fila", progresso: 0, erro: null, mensagem: "Na fila da GPU…" });
+/** Texts burned into the final video and the CSV header, in the app language. */
+async function renderLabels(locale: Locale) {
+  const t = await translatorFor(locale);
+  return {
+    title: t("render.panelTitle"),
+    no_line: t("render.noLine"),
+    video_n: t("render.videoN", { n: "{n}", total: "{total}" }),
+    plural: Object.fromEntries(CATEGORIES.map((c) => [c, t(`categories.plural.${c}`)])),
+    singular: Object.fromEntries(CATEGORIES.map((c) => [c, t(`categories.singular.${c}`)])),
+    csv: ["video", "timeInVideo", "timeInFinal", "line", "category", "direction", "candidate"].map((k) => t(`render.csv.${k}`)),
+  };
+}
 
-  cancelados.delete(renderId);
-  void naFilaDaGpu(async () => {
-    if (cancelados.has(renderId) || obterRender(renderId)?.status !== "na_fila") return;
-    atualizarRender(renderId, { status: "renderizando", mensagem: "Começando…" });
-    const args = ["--plano", arqPlano, "--saida", dir];
-    if (process.env.CONTADOR_FIM_S) args.push("--fim", process.env.CONTADOR_FIM_S); // testes rápidos
-    let fim: EventoWorker | null = null;
-    await rodarWorker("renderizar.py", args, (ev) => {
-      if (ev.tipo === "fim") fim = ev;
-      if (ev.tipo !== "progresso") return;
-      const qual = ev.videos && ev.videos > 1 ? ` vídeo ${ev.video} de ${ev.videos}` : "";
-      atualizarRender(renderId, { progresso: ev.p, mensagem: `Gerando${qual}…${ev.fps ? ` (${ev.fps} fps)` : ""}` });
-    }, renderId);
-    const f = fim as Extract<EventoWorker, { tipo: "fim" }> | null;
-    atualizarRender(renderId, {
-      status: "pronto",
-      progresso: 1,
-      mensagem: f ? `${f.eventos} contagens · ${Math.round((f.duracao_s ?? 0) / 60)} min de vídeo` : null,
+export function startRender(renderId: string, locale: Locale = appLocale()): void {
+  void (async () => {
+    const render = getRender(renderId);
+    if (!render) return;
+    const dir = renderDir(renderId);
+    fs.mkdirSync(dir, { recursive: true });
+    // categories chosen for this final video (null = all): events of the
+    // others stay out of the video, the count and the panel
+    const chosen = render.categories ? new Set(JSON.parse(render.categories) as Category[]) : null;
+    const included = (c: Category) => !chosen || chosen.has(c);
+    const videos = (JSON.parse(render.jobs) as string[]).map((jobId) => {
+      const job = getJob(jobId);
+      if (!job) throw new Error(msg("errors.jobGone", { id: jobId }));
+      const jdir = jobDir(jobId);
+      return {
+        job: jobId,
+        title: job.file_name ?? jobId,
+        video: videoPath(job.id),
+        tracks: path.join(jdir, "tracks.json.gz"),
+        lines: (JSON.parse(job.lines) as Line[]).map((l) => (l.categories?.length ? { ...l, categories: l.categories.filter(included) } : l)),
+        events: listCandidates(jobId)
+          .filter((c) => c.label && c.label !== "discarded" && included(c.label))
+          .map((c) => ({ id: c.id, frame: c.frame, line_id: c.line_id, category: c.label, direction: c.direction, track: c.track })),
+      };
     });
-  }).catch((e) => {
-    const erro = cancelados.delete(renderId) ? "Cancelado pelo usuário." : e instanceof Error ? e.message : String(e);
-    atualizarRender(renderId, { status: "erro", erro, mensagem: null });
+    const planFile = path.join(dir, "plan.json");
+    fs.writeFileSync(planFile, JSON.stringify({ categories: chosen ? [...chosen] : null, labels: await renderLabels(locale), videos }, null, 1));
+    for (const f of ["final_video.mp4", "report.json", "events.csv"]) fs.rmSync(path.join(/* turbopackIgnore: true */ dir, f), { force: true });
+    updateRender(renderId, { status: "queued", progress: 0, error: null, message: msg("runner.queueGpu") });
+
+    cancelled.delete(renderId);
+    await onGpuQueue(async () => {
+      if (cancelled.has(renderId) || getRender(renderId)?.status !== "queued") return;
+      updateRender(renderId, { status: "rendering", message: msg("runner.renderStarting") });
+      const args = ["--plan", planFile, "--output", dir];
+      if (process.env.TRAFFIC_COUNTER_END_S) args.push("--end", process.env.TRAFFIC_COUNTER_END_S); // quick tests
+      let done: WorkerEvent | null = null;
+      await runWorker("render.py", args, (ev) => {
+        if (ev.type === "done") done = ev;
+        if (ev.type !== "progress") return;
+        updateRender(renderId, {
+          progress: ev.p,
+          message: msg("runner.renderProgress", {
+            video: ev.video ?? 1,
+            videos: ev.videos ?? 1,
+            fps: ev.fps != null ? String(ev.fps) : "none",
+          }),
+        });
+      }, renderId);
+      const d = done as Extract<WorkerEvent, { type: "done" }> | null;
+      updateRender(renderId, {
+        status: "ready",
+        progress: 1,
+        message: d ? msg("runner.renderDone", { events: d.events ?? 0, minutes: Math.round((d.duration_s ?? 0) / 60) }) : null,
+      });
+    });
+  })().catch((e) => {
+    const error = cancelled.delete(renderId) ? msg("errors.cancelled") : e instanceof Error ? e.message : String(e);
+    updateRender(renderId, { status: "error", error, message: null });
   });
 }
 
-export function cancelarRender(renderId: string): void {
-  cancelados.add(renderId);
-  encerrarProcessos(renderId);
-  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/renderizar.py --plano ${path.join(dirRender(renderId), "plano.json")}`]);
-  atualizarRender(renderId, { status: "erro", erro: "Cancelado pelo usuário.", mensagem: null });
+export function cancelRender(renderId: string): void {
+  cancelled.add(renderId);
+  killProcesses(renderId);
+  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/render.py --plan ${path.join(renderDir(renderId), "plan.json")}`]);
+  updateRender(renderId, { status: "error", error: msg("errors.cancelled"), message: null });
 }

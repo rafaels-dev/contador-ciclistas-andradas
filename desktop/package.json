@@ -1,22 +1,23 @@
 {
   "name": "contador-trafego",
-  "productName": "Contador de Tráfego",
+  "productName": "Traffic Counter",
   "desktopName": "contador-trafego.desktop",
-  "version": "0.0.7",
-  "description": "Contagem de ciclistas, pedestres e veículos com revisão humana",
+  "version": "0.0.8",
+  "description": "Counting cyclists, pedestrians and vehicles with human review",
   "homepage": "https://github.com/rafaels-dev/contador-ciclistas-andradas",
   "author": "Rafael Schettino <rcschettino@gmail.com>",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "private": true,
   "main": "main.cjs",
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "preparar": "node scripts/preparar.mjs",
-    "iniciar": "electron .",
-    "dist": "npm run preparar && electron-builder",
-    "dist:win": "npm run preparar && electron-builder --win",
-    "dist:mac": "npm run preparar && electron-builder --mac",
-    "dist:linux": "npm run preparar && electron-builder --linux"
+    "resources": "node scripts/prepare.mjs",
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "npm run resources && electron-builder",
+    "dist:win": "npm run resources && electron-builder --win",
+    "dist:mac": "npm run resources && electron-builder --mac",
+    "dist:linux": "npm run resources && electron-builder --linux"
   },
   "dependencies": {
     "electron-updater": "6.8.10"

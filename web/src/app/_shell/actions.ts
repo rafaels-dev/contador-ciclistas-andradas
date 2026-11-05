@@ -3,40 +3,40 @@
 import { randomUUID } from "node:crypto";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
-import { excluirGrupo, moverJobs, obterGrupo, salvarGrupo } from "@/lib/db";
+import { deleteGroup, getGroup, moveJobs, saveGroup } from "@/lib/db";
 
-function nomeValido(nome: unknown): string | null {
-  const n = String(nome ?? "").trim().slice(0, 80);
+function validName(name: unknown): string | null {
+  const n = String(name ?? "").trim().slice(0, 80);
   return n || null;
 }
 
-export async function criarGrupo(nome: string): Promise<void> {
-  const n = nomeValido(nome);
+export async function createGroup(name: string): Promise<void> {
+  const n = validName(name);
   if (!n) return;
   const id = randomUUID().slice(0, 8);
-  salvarGrupo(id, n);
-  // o redirect sozinho só troca a página: a biblioteca lateral (layout) ficava
-  // com a lista antiga, sem o grupo novo (Next 16.4, build de produção)
+  saveGroup(id, n);
+  // redirect alone only changes the page: the side library (layout) kept
+  // the old list, without the new group (Next 16.4, production build)
   refresh();
-  redirect(`/?grupo=${id}`);
+  redirect(`/?group=${id}`);
 }
 
-export async function renomearGrupo(id: string, nome: string): Promise<void> {
-  const n = nomeValido(nome);
-  if (!n || !obterGrupo(id)) return;
-  salvarGrupo(id, n);
+export async function renameGroup(id: string, name: string): Promise<void> {
+  const n = validName(name);
+  if (!n || !getGroup(id)) return;
+  saveGroup(id, n);
   refresh();
 }
 
-export async function apagarGrupo(id: string): Promise<void> {
-  excluirGrupo(String(id));
+export async function removeGroup(id: string): Promise<void> {
+  deleteGroup(String(id));
   refresh();
-  redirect("/?grupo=sem");
+  redirect("/?group=none");
 }
 
-/** grupoId null = tira do grupo. */
-export async function moverParaGrupo(ids: string[], grupoId: string | null): Promise<void> {
-  if (grupoId && !obterGrupo(grupoId)) return;
-  moverJobs(ids.map(String).filter((id) => /^[\w-]{1,40}$/.test(id)), grupoId);
+/** groupId null = take out of the group. */
+export async function moveToGroup(ids: string[], groupId: string | null): Promise<void> {
+  if (groupId && !getGroup(groupId)) return;
+  moveJobs(ids.map(String).filter((id) => /^[\w-]{1,40}$/.test(id)), groupId);
   refresh();
 }

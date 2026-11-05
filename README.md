@@ -1,270 +1,128 @@
-# Contador de Ciclistas, Pedestres, Automóveis e Motocicletas
+# Traffic Counter
 
-Ferramenta de inteligência artificial que analisa vídeos de câmeras de rua e conta automaticamente quatro categorias de usuários:
+**English** · [Português (Brasil)](README.pt-BR.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Dansk](README.da.md)
 
-- 🚲 **Ciclistas** — pessoas andando de bicicleta
-- 🚶 **Pedestres** — pessoas a pé
-- 🚗 **Automóveis** — carros, ônibus e caminhões
-- 🏍️ **Motocicletas**
+A desktop app that counts **cyclists, pedestrians, cars, motorcycles, kick scooters, electric mopeds and unicycles** in videos from fixed street cameras. A person reviews every count before the final result.
 
-A contagem é feita quando cada objeto cruza uma linha vertical no centro do vídeo. O programa gera um vídeo anotado em H.264 (tamanho próximo ao original) e um arquivo JSON com os totais e os instantes de cada evento.
+It was built for urban mobility research (it started with the bike lane camera in Andradas, Brazil) and works with any video from a camera that doesn't move. The app speaks English, Portuguese, Spanish, French, German, Dutch, Italian and Danish. It follows the computer's language, and you can pick another one in **Settings**.
 
----
+## How it works
 
-## Requisitos de hardware
+1. **Pick the video.** Use a file on your computer or a Google Drive link.
+2. **Draw the counting lines.** They can go at any angle (bike lane, sidewalk, a traffic lane), and you choose what each line counts. On 4K videos from a high camera, also mark the analysis area.
+3. **Detection.** The app finds and follows everything that moves, using YOLO object detection plus motion detection. It runs on an NVIDIA graphics card or on the processor.
+4. **Suggestions.** A vision model, called through OpenRouter with your own key, suggests the category of each object that crossed a line. The prompt and the category names follow the app language.
+5. **Review.** You check each object in an editor with the clip, the original video and a timeline, and accept or correct the suggestion. Keyboard shortcuts and bulk accept of the reliable cases keep it fast.
+6. **Final video.** You get an MP4 with the lines, the counts and a totals panel, plus a spreadsheet (`events.csv`) and a report (`report.json`). Several videos (the hours of a day, for example) can become a single final video with the totals added up.
 
-| Item | Mínimo | Recomendado |
+## Download and install
+
+Download the installer for the latest version from **[Releases](https://github.com/rafaels-dev/contador-ciclistas-andradas/releases/latest)**:
+
+| System | File |
+|---|---|
+| Windows 10/11 (64-bit) | `TrafficCounter-Setup-<version>.exe` |
+| macOS (Apple chip) | `TrafficCounter-<version>-arm64.dmg` |
+| macOS (Intel) | `TrafficCounter-<version>-x64.dmg` |
+| Linux | `.AppImage` or `.deb` |
+
+The installer doesn't ask for administrator rights, and the app updates itself. When a new version is ready, a **Restart and update** banner appears.
+
+The first time, a wizard sets up four things:
+
+- **Language.** The computer's language, or another one.
+- **Graphics card.** The app uses an NVIDIA card if there is one (much faster). You can choose the processor only.
+- **Detection engine.** The app downloads and installs Python and the AI libraries: about 1 GB without an NVIDIA card, 2.5 GB with one, and up to ~6 GB on disk.
+- **OpenRouter key.** OpenRouter is the pay-per-use service that makes the suggestions. Each suggestion costs a fraction of a cent: two hours of video of a busy avenue came to about US$ 0.10. Create a key at [openrouter.ai](https://openrouter.ai/keys) and paste it into the app, which tests it before saving.
+
+**Requirements:**
+- An NVIDIA graphics card (optional, recommended).
+- Disk space for the engine (~6 GB) and for the final videos.
+- Internet, to install the engine and for the suggestions.
+
+**If something goes wrong:** go to **Settings → Help and diagnostics**, click **Save diagnostics report**, and send the `.zip` file to whoever supports you. It contains the program log and what happened to each video. It does not contain the videos or your key.
+
+Updating from 0.0.7 or earlier (when the app was called "Contador de Tráfego"): the app moves your data to the new name the first time it starts. Nothing is detected again and no review is lost.
+
+## Privacy
+
+Videos are processed **on your computer** and are not sent anywhere. The app only talks to other systems in these cases:
+
+| When | Where to | What goes |
 |---|---|---|
-| RAM | 4 GB | 8 GB ou mais |
-| CPU | Qualquer dual-core | Quad-core ou melhor |
-| GPU | Não obrigatório | NVIDIA com CUDA (processa mais rápido) |
-| Espaço em disco | ~1,3× o tamanho do vídeo original | — |
+| Category suggestions (with the key you set up) | [OpenRouter](https://openrouter.ai/privacy) and the model provider it routes to (default: Anthropic; fallbacks: DeepSeek and Google) | Small crops of each candidate object (a sequence of crops and the crossing frame, as JPEG). Nothing else from the video. |
+| You paste a Google Drive link | [Google Drive](https://policies.google.com/privacy) | The download request for the linked file. |
+| Engine installation (first run or "Install now") | GitHub (Python), [PyPI](https://pypi.org) and download.pytorch.org | Download requests for the libraries. |
+| Updates (when the app opens and every 4 h) | This repository's [GitHub Releases](https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement) | A check for the latest version and, if there is one, its download. |
 
-> O vídeo de saída é gravado em H.264 via ffmpeg embutido no pacote `imageio` — sem instalação manual. Nos testes com a câmera de Andradas, um vídeo original de 47 MB gerou um arquivo anotado de 63 MB. As anotações visuais (caixas, texto, painel) aumentam levemente a complexidade dos frames, daí a diferença. Use `--sem-video` se quiser apenas os números, sem gerar vídeo.
+There is no telemetry, no user account and no usage data collection. The diagnostics report is only created when you ask for it. It is saved on your computer and leaves out the OpenRouter key.
 
----
+## Code signing policy
 
-## 1. Instale o Python
+The installers are built by GitHub Actions ([`.github/workflows/desktop.yml`](.github/workflows/desktop.yml)) straight from this repository's code, from each `v*` tag. Free code signing for open source projects has been requested from the [SignPath Foundation](https://signpath.org). Until it arrives, Windows and macOS warn on the first start that the app comes from an unidentified developer.
 
-O programa precisa do **Python 3.10 ou superior**.
+Team:
 
-### Windows
+- Committers (commits without additional review): [Rafael Schettino](https://github.com/rafaels-dev)
+- Reviewers: [Rafael Schettino](https://github.com/rafaels-dev)
+- Approvers (approve each signing): [Rafael Schettino](https://github.com/rafaels-dev)
 
-1. Acesse [python.org/downloads](https://www.python.org/downloads/) e baixe o instalador mais recente.
-2. Execute o instalador. **Marque a opção "Add Python to PATH"** antes de clicar em *Install Now*.
-3. Após a instalação, abra o **Prompt de Comando** (tecle `Win + R`, digite `cmd`, pressione Enter) e confirme:
-   ```
-   python --version
-   ```
-   Deve aparecer algo como `Python 3.12.x`.
+Every change to the `main` branch must pass the automated tests ([`.github/workflows/tests.yml`](.github/workflows/tests.yml)) before it can be merged.
 
-### macOS
+Privacy: see the [Privacy](#privacy) section. This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it, except in the cases listed there.
 
-1. Acesse [python.org/downloads](https://www.python.org/downloads/) e baixe o instalador para macOS.
-2. Execute o `.pkg` e siga os passos.
-3. Abra o **Terminal** (Finder → Aplicativos → Utilitários → Terminal) e confirme:
-   ```
-   python3 --version
-   ```
+## For developers
 
-### Linux (Ubuntu / Debian)
+Layout:
 
-O Python já costuma vir instalado. Confirme no terminal:
-```bash
-python3 --version
-```
-Se não estiver instalado:
-```bash
-sudo apt update && sudo apt install python3 python3-pip python3-venv -y
-```
+- `web/`: the app (Next.js). Screens, SQLite database, step orchestration and the OpenRouter calls. Translations are in `web/messages/<language>.json` (next-intl) and the vision prompts in `web/src/lib/prompts.ts`.
+- `worker/`: Python. Detection and tracking (`detect.py`), final video (`render.py`), video reading with FFmpeg/NVDEC (`reader.py`).
+- `desktop/`: Electron and installers (electron-builder). See [`desktop/README.md`](desktop/README.md).
+- `counter/`, `process_video.py`, `stream_realtime.py`: the original command-line counter (automatic counting on a vertical line, without review), kept for batch and real-time processing.
+- `evaluation/`: tools to evaluate the counting and calibrate the models.
+- `tests/`, `web/src/**/*.test.ts` and `web/evals/`: automated tests and prompt evals.
 
----
-
-## 2. Baixe o projeto
-
-Se você recebeu os arquivos por zip ou pen drive, extraia tudo em uma pasta de fácil acesso, por exemplo:
-
-- Windows: `C:\Users\SeuNome\contador-ciclistas`
-- macOS/Linux: `/home/seunome/contador-ciclistas`
-
-Se tiver o **Git** instalado, pode clonar diretamente:
-```bash
-git clone <url-do-repositorio>
-cd contador-ciclistas-andradas
-```
-
----
-
-## 3. Crie um ambiente virtual e instale as dependências
-
-Um ambiente virtual isola as bibliotecas deste projeto sem interferir no resto do seu computador. O comando `pip install` já instala tudo que é necessário, incluindo o ffmpeg embutido para geração do vídeo em H.264 — **não é preciso instalar o ffmpeg separadamente**.
-
-### Windows
-
-Abra o **Prompt de Comando** na pasta do projeto (você pode digitar `cmd` na barra de endereço do Explorador de Arquivos) e execute:
-
-```bat
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-```
-
-Quando o ambiente estiver ativo, você verá `(venv)` no início da linha do prompt.
-
-### macOS e Linux
-
-Abra o **Terminal** na pasta do projeto e execute:
+To run the app in development, you need Python 3.11 with the dependencies and Node.js 22+:
 
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+python -m venv venv && source venv/bin/activate      # Windows: venv\Scripts\activate
+pip install torch==2.12.0 torchvision==0.27.0 --index-url https://download.pytorch.org/whl/cpu   # or cu126 for NVIDIA
+pip install -r requirements-dev.txt
+cd web && npm ci && npm run dev                       # http://127.0.0.1:3000
 ```
 
-Quando ativo, você verá `(venv)` no início da linha.
-
-> **Na primeira execução**, o programa baixará automaticamente o modelo de IA (~6 MB). É necessário ter conexão com a internet somente nessa primeira vez.
-
----
-
-## 4. Como usar
-
-> **Importante:** sempre ative o ambiente virtual antes de rodar o programa (passo 3). Se fechar e reabrir o terminal, ative novamente com `venv\Scripts\activate` (Windows) ou `source venv/bin/activate` (macOS/Linux).
-
-### Uso básico — processar o vídeo padrão
-
-Coloque o vídeo chamado `Andradas.mp4` na mesma pasta do programa e execute:
+Tests (the same as CI, required to merge into `main`):
 
 ```bash
-# Windows
-python processar_video.py
-
-# macOS / Linux
-python3 processar_video.py
+python -m pytest                      # worker and counter (at the root)
+cd web && npm run lint && npm run typecheck && npm test
+cd web && npm run eval:prompts        # vision prompt in every language (paid; see web/evals/README.md)
 ```
 
-Ao terminar, serão criados dois arquivos na mesma pasta:
-- `Andradas_anotado.mp4` — vídeo em H.264 com as detecções desenhadas e os contadores na tela
-- `resultado.json` — dados detalhados em formato de texto estruturado
+Adding a language: add a `web/messages/<code>.json` with every key of `en.json`, an entry in `web/src/i18n/locales.ts`, and the prompt in `web/src/lib/prompts.ts`. Then run the prompt evals.
 
-### Especificar outro vídeo
+Command-line counter:
 
 ```bash
-python processar_video.py --video minha_camera.mp4
+python process_video.py --video camera.mp4                 # annotated video + result.json
+python process_video.py --video camera.mp4 --no-video      # numbers only
+python stream_realtime.py rtsp://192.168.1.100/cam4         # JSON events in real time
 ```
 
-### Escolher o nome do vídeo de saída
+## License
 
-```bash
-python processar_video.py --video entrada.mp4 --saida saida_anotada.mp4
-```
+Copyright © 2026 Rafael Schettino.
 
-### Processar apenas um trecho (em segundos)
+This program is free software, distributed under the **GNU Affero General Public License, version 3** ([`LICENSE`](LICENSE)). You can use, study, modify and redistribute it. If you distribute modified versions, or offer them to other people over a network, you must make the source code available under the same license.
 
-```bash
-# Processar do segundo 30 ao segundo 90
-python processar_video.py --inicio 30 --fim 90
-```
+Main third-party components, all open source:
 
-### Só obter as estatísticas, sem gerar vídeo
-
-Mais rápido — útil quando você só quer os números:
-
-```bash
-python processar_video.py --sem-video
-```
-
-### Referência completa das opções
-
-| Opção | Descrição | Padrão |
-|---|---|---|
-| `--video ARQUIVO` | Caminho para o vídeo a analisar | `Andradas.mp4` |
-| `--saida ARQUIVO` | Nome do vídeo anotado gerado | `<nome-do-video>_anotado.mp4` |
-| `--json ARQUIVO` | Nome do arquivo JSON com resultados | `resultado.json` |
-| `--sem-video` | Não gera vídeo anotado (mais rápido) | — |
-| `--inicio SEGUNDOS` | Começa a processar a partir desse segundo | `0` |
-| `--fim SEGUNDOS` | Para de processar nesse segundo | fim do vídeo |
-
----
-
-## 5. Exemplo de saída no terminal
-
-```
-Vídeo     : Andradas.mp4
-Resolução : 1920x1080 @ 15.0fps  |  Duração: 371.7s
-Intervalo : frames 0–5576 (371.7s)
-
-Codec de saída: H.264 (libx264)
-
-  🏍️ motocicletas   frame 63   (00:04.20) | total: 1
-  🚶 pedestres      frame 88   (00:05.87) | total: 1
-  🚲 ciclistas      frame 2083 (02:18.87) | total: 1
-  🚲 ciclistas      frame 2377 (02:38.47) | total: 2
-  🚶 pedestres      frame 2402 (02:40.13) | total: 2
-  ...
-
-────────────────────────────────────────────────────
-  Ciclistas    : 2
-  Pedestres    : 7
-  Automóveis   : 11
-  Motocicletas : 11
-────────────────────────────────────────────────────
-  Processamento: 175.3s (2.12× tempo real)
-  Vídeo anotado: Andradas_anotado.mp4
-  Tamanho      : 62.7 MB
-  JSON         : resultado.json
-```
-
-Cada linha mostra o momento exato (em `MM:SS.ss`) em que um novo objeto foi contado.
-
----
-
-## 6. Entendendo o vídeo anotado
-
-No vídeo gerado você verá:
-
-- **Linha branca vertical** no centro — é a linha de contagem; objetos são registrados ao cruzá-la
-- **Caixas coloridas** ao redor de cada objeto detectado:
-  - 🟢 Verde — ciclistas
-  - 🟡 Amarelo — pedestres
-  - 🟠 Laranja — automóveis
-  - 🔵 Ciano — motocicletas
-- **Painel de contagem** no canto superior esquerdo com os totais acumulados
-
----
-
-## 7. Ajustando as configurações
-
-Se precisar adaptar o programa para outra câmera ou local, edite o arquivo `config.py` com um editor de texto simples (Bloco de Notas, TextEdit, gedit):
-
-| Configuração | O que faz | Padrão |
-|---|---|---|
-| `LINHA_X` | Posição horizontal da linha de contagem (pixels) | `960` (centro de 1920px) |
-| `CONFIANCA` | Sensibilidade da detecção (0.0 a 1.0). Valor menor detecta mais objetos, mas pode gerar falsos positivos | `0.40` |
-| `DIST_MAX_CYCLIST_PX` | Distância máxima (pixels) entre pessoa e bicicleta para considerar ciclista | `250` |
-
----
-
-## 8. Resolução de problemas
-
-### "python não é reconhecido como um comando"
-- **Windows:** o Python não foi adicionado ao PATH durante a instalação. Reinstale e marque a opção **"Add Python to PATH"**.
-- **macOS/Linux:** tente usar `python3` em vez de `python`.
-
-### "ModuleNotFoundError: No module named 'ultralytics'"
-O ambiente virtual não está ativo ou as dependências não foram instaladas. Execute:
-```bash
-# Windows
-venv\Scripts\activate
-pip install -r requirements.txt
-
-# macOS / Linux
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-### "Erro: não foi possível abrir 'Andradas.mp4'"
-O vídeo não foi encontrado na pasta. Verifique:
-1. Se o arquivo existe na mesma pasta que `processar_video.py`
-2. O nome exato do arquivo (incluindo a extensão `.mp4`)
-3. Use `--video` para indicar o caminho completo: `python processar_video.py --video C:\Videos\meu_video.mp4`
-
-### O processamento está muito lento
-- Use `--sem-video` para não gerar o vídeo anotado (economiza tempo)
-- Processe apenas um trecho com `--inicio` e `--fim`
-- Um computador com GPU NVIDIA acelera significativamente o processo
-
-### O vídeo anotado não abre
-O vídeo de saída usa o codec H.264, compatível com a grande maioria dos players modernos (Windows Media Player, Fotos do Windows, QuickTime, VLC). Se o seu player não abrir, instale o **VLC Media Player** ([videolan.org](https://www.videolan.org/)) — ele suporta qualquer formato.
-
-### A linha "Codec de saída" mostra "mp4v (fallback)"
-Isso ocorre em situações raras em que o ffmpeg embutido não pôde ser carregado. O vídeo ainda será gerado, porém em qualidade equivalente e com tamanho maior (~3× o original). Para resolver, tente reinstalar as dependências:
-```bash
-pip install --force-reinstall imageio[ffmpeg]
-```
-
----
-
-## Suporte
-
-Em caso de dúvidas ou problemas, entre em contato com a equipe responsável pelo projeto.
+| Component | License |
+|---|---|
+| [Ultralytics YOLO](https://github.com/ultralytics/ultralytics) and the `yolov8n.pt` weights (including the fine-tune in `runs/ft_blur`) | AGPL-3.0 |
+| [PyTorch](https://pytorch.org) | BSD-3-Clause |
+| [OpenCV](https://opencv.org) | Apache-2.0 |
+| [supervision](https://github.com/roboflow/supervision) | MIT |
+| [FFmpeg](https://ffmpeg.org) (via imageio-ffmpeg) | LGPL/GPL |
+| [Electron](https://www.electronjs.org), [Next.js](https://nextjs.org), [next-intl](https://next-intl.dev), [React](https://react.dev) | MIT |
+| [uv](https://github.com/astral-sh/uv) | MIT / Apache-2.0 |

@@ -1,23 +1,23 @@
-// Ponte mínima entre a página (o app Next) e a janela: plataforma, cor dos
-// botões da janela ao trocar o tema, o diálogo nativo de arquivos e a
-// atualização do app.
+// Minimal bridge between the page (the Next app) and the window: platform,
+// window button colors when the theme changes, the native file dialog and the
+// app update.
 const { contextBridge, ipcRenderer } = require("electron");
 
-const PLATAFORMA = { win32: "win", darwin: "mac" }[process.platform] ?? "linux";
+const PLATFORM = { win32: "win", darwin: "mac" }[process.platform] ?? "linux";
 
-contextBridge.exposeInMainWorld("contadorDesktop", {
-  plataforma: PLATAFORMA,
-  versao: ipcRenderer.sendSync("versao"),
-  tema: (t) => ipcRenderer.send("tema", t),
-  escolherVideos: () => ipcRenderer.invoke("escolher-videos"),
-  // atualização baixada em segundo plano (faixa "Reiniciar e atualizar")
-  atualizacao: {
-    estado: () => ipcRenderer.invoke("atualizacao-estado"),
-    aoMudar: (cb) => {
-      const ouvinte = (_e, estado) => cb(estado);
-      ipcRenderer.on("atualizacao", ouvinte);
-      return () => ipcRenderer.removeListener("atualizacao", ouvinte);
+contextBridge.exposeInMainWorld("trafficCounterDesktop", {
+  platform: PLATFORM,
+  version: ipcRenderer.sendSync("version"),
+  theme: (t) => ipcRenderer.send("theme", t),
+  pickVideos: () => ipcRenderer.invoke("pick-videos"),
+  // update downloaded in the background ("Restart and update" banner)
+  update: {
+    state: () => ipcRenderer.invoke("update-state"),
+    onChange: (cb) => {
+      const listener = (_e, state) => cb(state);
+      ipcRenderer.on("update", listener);
+      return () => ipcRenderer.removeListener("update", listener);
     },
-    instalar: () => ipcRenderer.send("atualizacao-instalar"),
+    install: () => ipcRenderer.send("update-install"),
   },
 });

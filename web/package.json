@@ -1,23 +1,27 @@
 {
   "name": "web",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
     "start": "next start -H 127.0.0.1",
     "lint": "eslint",
-    "producao": "node scripts/producao.mjs",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "production": "node scripts/production.mjs",
+    "eval:prompts": "npx -y -p node@24.11.0 -p promptfoo@0.124.1 -- promptfoo eval -c evals/promptfooconfig.yaml"
   },
   "dependencies": {
     "@next/env": "^16.4.2",
     "next": "16.4.2",
+    "next-intl": "^4.14.9",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "use-intl": "^4.14.9"
   },
   "devDependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.22",
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^24.19.2",
     "@types/react": "^19",

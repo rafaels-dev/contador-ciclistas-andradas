@@ -1,6 +1,7 @@
-/** Na abertura do servidor: corrige motores instalados por versões antigas (ver ajustarMotor). */
+/** On server start: fixes engines installed by older versions (see adjustEngine). */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const { ajustarMotor } = await import("./lib/motor");
-  void ajustarMotor();
+  await import("./lib/legacy-env");
+  const { adjustEngine } = await import("./lib/engine");
+  void adjustEngine();
 }

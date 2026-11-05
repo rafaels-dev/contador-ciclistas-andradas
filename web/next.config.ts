@@ -1,20 +1,23 @@
 import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
-// O .env (OPENROUTER_API_KEY etc.) fica na raiz do repositório, compartilhado
-// com o worker Python — carrega de lá além do web/.env* padrão.
+// The .env (OPENROUTER_API_KEY etc.) lives at the repository root, shared
+// with the Python worker — load it from there besides the standard web/.env*.
 loadEnvConfig(path.resolve(__dirname, ".."));
 
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
 const nextConfig: NextConfig = {
-  // servidor autocontido em .next/standalone — é o que o app desktop embute
-  // (desktop/scripts/preparar.mjs). Não muda o `next dev`.
+  // self-contained server in .next/standalone — what the desktop app embeds
+  // (desktop/scripts/prepare.mjs). Does not change `next dev`.
   output: "standalone",
-  // os dados (vídeos, banco) são lidos em tempo de execução, nunca empacotados
-  outputFileTracingExcludes: { "*": ["data/**", "scripts/**"] },
+  // data (videos, database) is read at run time, never bundled
+  outputFileTracingExcludes: { "*": ["data/**", "scripts/**", "evals/**"] },
   cacheComponents: true,
-  // sem partialPrefetching: no build de produção (Next 16.4) ele impedia o
-  // refresh() das server actions de atualizar a tela (no `next dev` funcionava)
+  // no partialPrefetching: in the production build (Next 16.4) it stopped
+  // server actions' refresh() from updating the screen (it worked in `next dev`)
   turbopack: {
     root: path.resolve(__dirname),
     rules: {
@@ -26,4 +29,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

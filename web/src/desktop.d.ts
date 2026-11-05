@@ -1,20 +1,20 @@
-type EstadoAtualizacao = { fase: "nenhuma" | "baixando" | "pronta"; versao: string | null; progresso: number | null };
+type UpdateState = { phase: "none" | "downloading" | "ready"; version: string | null; progress: number | null };
 
-/** Ponte do app desktop (desktop/preload.cjs); ausente no navegador. */
+/** Desktop app bridge (desktop/preload.cjs); absent in the browser. */
 interface Window {
-  contadorDesktop?: {
-    plataforma: "win" | "mac" | "linux";
-    versao: string;
-    /** recolore os botões da janela ao trocar o tema */
-    tema?: (t: "dark" | "light") => void;
-    /** diálogo nativo de arquivos; devolve os caminhos escolhidos */
-    escolherVideos?: () => Promise<string[]>;
-    /** atualização do app (electron-updater): baixa sozinha; a faixa oferece reiniciar */
-    atualizacao?: {
-      estado: () => Promise<EstadoAtualizacao>;
-      /** devolve a função que para de ouvir */
-      aoMudar: (cb: (e: EstadoAtualizacao) => void) => () => void;
-      instalar: () => void;
+  trafficCounterDesktop?: {
+    platform: "win" | "mac" | "linux";
+    version: string;
+    /** recolors the window buttons when the theme changes */
+    theme?: (t: "dark" | "light") => void;
+    /** native file dialog; returns the chosen paths */
+    pickVideos?: () => Promise<string[]>;
+    /** app update (electron-updater): downloads by itself; the banner offers to restart */
+    update?: {
+      state: () => Promise<UpdateState>;
+      /** returns the function that stops listening */
+      onChange: (cb: (e: UpdateState) => void) => () => void;
+      install: () => void;
     };
   };
 }

@@ -1,39 +1,42 @@
-# Instaladores do Contador de Tráfego (npm run dist:win | dist:mac | dist:linux).
-# Como o Spotify: instala por usuário, sem pedir administrador, abre ao fim e
-# se atualiza sozinho pelos GitHub Releases (electron-updater).
+# Traffic Counter installers (npm run dist:win | dist:mac | dist:linux).
+# Like Spotify: installs per user, without asking for administrator, opens at
+# the end and updates itself from the GitHub Releases (electron-updater).
+# appId and the package name stay as in 0.0.7 (contador-trafego): changing
+# them would make the update install a second app instead of replacing this one.
 appId: br.com.contadortrafego.app
-productName: Contador de Tráfego
+productName: Traffic Counter
 copyright: Copyright © 2026 Rafael Schettino
 directories:
   output: dist
   buildResources: build
 files:
   - main.cjs
+  - data-folder.cjs
   - preload.cjs
   - package.json
   - build/icon.png
 extraResources:
-  - from: recursos/web
+  - from: resources/web
     to: web
-  # o electron-builder exclui node_modules por padrão — o servidor precisa dele
-  - from: recursos/web/node_modules
+  # electron-builder excludes node_modules by default — the server needs it
+  - from: resources/web/node_modules
     to: web/node_modules
     filter: ["**/*"]
-  - from: recursos/motor
-    to: motor
-  - from: recursos/bin
+  - from: resources/engine
+    to: engine
+  - from: resources/bin
     to: bin
 asar: true
 
 win:
   target: nsis
-  artifactName: ContadorDeTrafego-Setup-${version}.${ext}
+  artifactName: TrafficCounter-Setup-${version}.${ext}
 nsis:
   oneClick: true
   perMachine: false
   runAfterFinish: true
   createDesktopShortcut: always
-  shortcutName: Contador de Tráfego
+  shortcutName: Traffic Counter
   deleteAppDataOnUninstall: false
 
 mac:
@@ -41,17 +44,17 @@ mac:
     - target: dmg
       arch: [arm64, x64]
   category: public.app-category.video
-  # assinatura ad-hoc: sem certificado da Apple, o Mac com chip M exige ao menos
-  # isto para abrir (o usuário ainda confirma em Ajustes → Privacidade)
+  # ad-hoc signature: without an Apple certificate, an M-chip Mac requires at
+  # least this to open (the user still confirms in Settings → Privacy)
   identity: "-"
-  artifactName: ContadorDeTrafego-${version}-${arch}.${ext}
+  artifactName: TrafficCounter-${version}-${arch}.${ext}
 
 linux:
   target: [AppImage, deb]
   category: AudioVideo
   syncDesktopName: true
   maintainer: Rafael Schettino <rcschettino@gmail.com>
-  artifactName: ContadorDeTrafego-${version}-${arch}.${ext}
+  artifactName: TrafficCounter-${version}-${arch}.${ext}
 
 publish:
   provider: github

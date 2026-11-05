@@ -1,23 +1,25 @@
 import path from "node:path";
+// old variable names (CONTADOR_DADOS…) before anything below reads them
+import "./legacy-env";
 
-// turbopackIgnore: sem ele o rastreio de arquivos do build tenta incluir o
-// repositório inteiro e os vídeos de data/ (dezenas de GB) no servidor
+// turbopackIgnore: without it the build's file tracing tries to include the
+// whole repository and the videos in data/ (tens of GB) in the server
 
 /**
- * Raiz do repositório (onde ficam config.py, requirements.txt, os pesos do
- * YOLO e o worker Python). No app desktop, a pasta de recursos do instalador.
+ * Repository root (where config.py, requirements.txt, the YOLO weights and
+ * the Python worker live). In the desktop app, the installer's resources folder.
  */
-export const RAIZ_REPO = process.env.CONTADOR_RAIZ ?? path.resolve(/* turbopackIgnore: true */ process.cwd(), "..");
+export const REPO_ROOT = process.env.TRAFFIC_COUNTER_ROOT ?? path.resolve(/* turbopackIgnore: true */ process.cwd(), "..");
 
-/** Dados locais do app (banco + arquivos por job). Ignorado pelo git. */
-export const DIR_DADOS = process.env.CONTADOR_DADOS ?? path.join(/* turbopackIgnore: true */ process.cwd(), "data");
+/** Local app data (database + per-job files). Ignored by git. */
+export const DATA_DIR = process.env.TRAFFIC_COUNTER_DATA ?? path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 
-export const ARQUIVO_DB = path.join(DIR_DADOS, "app.db");
+export const DB_FILE = path.join(DATA_DIR, "app.db");
 
-export function dirJob(jobId: string): string {
-  return path.join(DIR_DADOS, "jobs", jobId);
+export function jobDir(jobId: string): string {
+  return path.join(DATA_DIR, "jobs", jobId);
 }
 
-export function dirRender(renderId: string): string {
-  return path.join(DIR_DADOS, "renders", renderId);
+export function renderDir(renderId: string): string {
+  return path.join(DATA_DIR, "renders", renderId);
 }

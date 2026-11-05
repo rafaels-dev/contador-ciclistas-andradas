@@ -1,12 +1,12 @@
-// App desktop do Contador de Tráfego: uma janela sem moldura (barra de título
-// desenhada pelo próprio app, como o Spotify) sobre o servidor Next embutido,
-// que roda num processo filho e escuta só em 127.0.0.1.
+// Traffic Counter desktop app: a frameless window (title bar drawn by the
+// app itself, like Spotify) over the embedded Next server, which runs in a
+// child process and listens only on 127.0.0.1.
 //
-// Pastas:
-//   recursos/web    servidor Next standalone (scripts/preparar.mjs)
-//   recursos/motor  worker Python, config.py, pesos do YOLO, requirements.txt
-//   recursos/bin    uv, que instala o Python do motor na 1ª execução
-//   <userData>/     dados (banco, vídeos processados), config.env, motor/ (venv)
+// Folders:
+//   resources/web     standalone Next server (scripts/prepare.mjs)
+//   resources/engine  Python worker, config.py, YOLO weights, requirements.txt
+//   resources/bin     uv, which installs the engine's Python on the first run
+//   <userData>/       data (database, processed videos), config.env, engine/ (venv)
 
 const { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, session, shell, utilityProcess } = require("electron");
 const { execFileSync } = require("node:child_process");
@@ -15,19 +15,20 @@ const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
+const { dataPath: dataPathIn, readWindowState: readWindowFile, useDataFolder } = require("./data-folder.cjs");
 
 const WIN = process.platform === "win32";
 const MAC = process.platform === "darwin";
 
-// cores da barra de título (iguais aos tokens --panel/--muted do app)
-const BARRA = {
+// title bar colors (the same as the app's --panel/--muted tokens)
+const TITLE_BAR = {
   dark: { color: "#222327", symbolColor: "#a0a3a9" },
   light: { color: "#f5f5f2", symbolColor: "#5c5f66" },
 };
-const FUNDO = { dark: "#1a1b1e", light: "#e6e6e2" };
+const BACKGROUND = { dark: "#1a1b1e", light: "#e6e6e2" };
 
-// em desenvolvimento: aponta para um servidor já rodando em vez de subir o embutido
-const URL_DEV = process.env.CONTADOR_DESKTOP_URL;
+// in development: points to a server already running instead of starting the embedded one
+const DEV_URL = process.env.TRAFFIC_COUNTER_DESKTOP_URL ?? process.env.CONTADOR_DESKTOP_URL;
 
 const WSL = process.platform === "linux" && (() => {
   try {
@@ -36,31 +37,34 @@ const WSL = process.platform === "linux" && (() => {
     return false;
   }
 })();
-// no WSL, janela desenhada pela GPU vira "[WARN:COPY MODE]" no título (o WSLg
-// não compartilha esses buffers com o Windows): desenha pelo processador
+// on WSL, a window drawn by the GPU gets "[WARN:COPY MODE]" in the title (WSLg
+// does not share those buffers with Windows): draw with the processor
 if (WSL) app.disableHardwareAcceleration();
 
-// em desenvolvimento, dados separados dos do app instalado (mesmo nome de
-// produto = mesma pasta): senão o lock de instância única do instalado
-// derruba a janela de desenvolvimento com ERR_FAILED
-if (!app.isPackaged) app.setPath("userData", path.join(app.getPath("appData"), "Contador de Tráfego (dev)"));
+// In development, data apart from the installed app's (same product name =
+// same folder): otherwise the installed app's single-instance lock kills the
+// development window with ERR_FAILED.
+const DATA = useDataFolder(app.getPath("appData"), app.isPackaged ? "" : " (dev)");
+app.setPath("userData", DATA);
+// where the old data stayed, when a rename in useDataFolder failed
+const dataPath = (name, legacy) => dataPathIn(DATA, name, legacy);
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
-let janela = null;
-let servidor = null;
-// origem do app (http://127.0.0.1:<porta>): a janela só navega dentro dela
-let origemApp = null;
+let mainWindow = null;
+let server = null;
+// app origin (http://127.0.0.1:<port>): the window only navigates inside it
+let appOrigin = null;
 
-// token sorteado a cada execução: o servidor só atende quem o apresenta
-// (web/src/lib/acesso.ts) — e só esta janela o recebe, como cookie
+// token drawn on every run: the server only serves whoever presents it
+// (web/src/lib/access.ts) — and only this window gets it, as a cookie
 const TOKEN = crypto.randomBytes(32).toString("hex");
 
-function recursos(...partes) {
-  return app.isPackaged ? path.join(process.resourcesPath, ...partes) : path.join(__dirname, "recursos", ...partes);
+function resources(...parts) {
+  return app.isPackaged ? path.join(process.resourcesPath, ...parts) : path.join(__dirname, "resources", ...parts);
 }
 
-function portaLivre() {
+function freePort() {
   return new Promise((resolve, reject) => {
     const s = net.createServer();
     s.unref();
@@ -72,115 +76,111 @@ function portaLivre() {
   });
 }
 
-function esperarServidor(url, limiteMs = 60_000) {
-  const inicio = Date.now();
+function waitForServer(url, limitMs = 60_000) {
+  const start = Date.now();
   return new Promise((resolve, reject) => {
-    const tentar = () => {
+    const attempt = () => {
       http
         .get(url, (r) => {
           r.resume();
           resolve();
         })
         .on("error", () => {
-          if (Date.now() - inicio > limiteMs) reject(new Error("O servidor do app não respondeu."));
-          else setTimeout(tentar, 250);
+          if (Date.now() - start > limitMs) reject(new Error("The app server did not answer."));
+          else setTimeout(attempt, 250);
         });
     };
-    tentar();
+    attempt();
   });
 }
 
-async function subirServidor() {
-  const porta = await portaLivre();
-  const dados = app.getPath("userData");
-  const uv = recursos("bin", WIN ? "uv.exe" : "uv");
-  servidor = utilityProcess.fork(recursos("web", "server.js"), [], {
-    serviceName: "Servidor do Contador",
+async function startServer() {
+  const port = await freePort();
+  const uv = resources("bin", WIN ? "uv.exe" : "uv");
+  const logFile = dataPath("server.log", "servidor.log");
+  server = utilityProcess.fork(resources("web", "server.js"), [], {
+    serviceName: "Traffic Counter server",
     stdio: "pipe",
     env: {
       ...process.env,
       NODE_ENV: "production",
-      PORT: String(porta),
+      PORT: String(port),
       HOSTNAME: "127.0.0.1",
-      CONTADOR_DADOS: path.join(dados, "dados"),
-      CONTADOR_ENV: path.join(dados, "config.env"),
-      CONTADOR_MOTOR: path.join(dados, "motor"),
-      CONTADOR_RAIZ: recursos("motor"),
-      CONTADOR_TOKEN: TOKEN,
-      CONTADOR_VERSAO: app.getVersion(),
-      CONTADOR_LOG: path.join(dados, "servidor.log"), // o relatório de diagnóstico inclui o fim dele
-      ...(fs.existsSync(uv) ? { CONTADOR_UV: uv } : {}),
+      TRAFFIC_COUNTER_DATA: dataPath("data", "dados"),
+      TRAFFIC_COUNTER_ENV: path.join(DATA, "config.env"),
+      // engines installed up to 0.0.7 stay in motor/ (see useDataFolder)
+      TRAFFIC_COUNTER_ENGINE: dataPath("engine", "motor"),
+      TRAFFIC_COUNTER_ROOT: resources("engine"),
+      TRAFFIC_COUNTER_TOKEN: TOKEN,
+      TRAFFIC_COUNTER_VERSION: app.getVersion(),
+      TRAFFIC_COUNTER_LOG: logFile, // the diagnostics report includes its end
+      // the computer's languages, in order of preference: the app's default language
+      TRAFFIC_COUNTER_SYSTEM_LOCALES: [...app.getPreferredSystemLanguages(), app.getLocale()].join(","),
+      ...(fs.existsSync(uv) ? { TRAFFIC_COUNTER_UV: uv } : {}),
     },
   });
-  const log = fs.createWriteStream(path.join(dados, "servidor.log"), { flags: "a" });
-  servidor.stdout?.pipe(log);
-  servidor.stderr?.pipe(log);
-  servidor.on("exit", (codigo) => {
-    servidor = null;
+  const log = fs.createWriteStream(logFile, { flags: "a" });
+  server.stdout?.pipe(log);
+  server.stderr?.pipe(log);
+  server.on("exit", (code) => {
+    server = null;
     if (!app.isQuitting) {
-      dialog.showErrorBox("Contador de Tráfego", `O servidor do app parou (código ${codigo}). Veja ${path.join(dados, "servidor.log")}.`);
+      dialog.showErrorBox("Traffic Counter", `The app server stopped (code ${code}). See ${logFile}.`);
       app.quit();
     }
   });
-  const url = `http://127.0.0.1:${porta}`;
-  await esperarServidor(url);
-  // downloads (vídeo final, CSV): sem isto o diálogo "Salvar como" do
-  // Chromium vem com a URL no título; propõe a pasta Downloads do usuário
+  const url = `http://127.0.0.1:${port}`;
+  await waitForServer(url);
+  // downloads (final video, CSV): without this Chromium's "Save as" dialog
+  // shows the URL in the title; proposes the user's Downloads folder
   session.defaultSession.on("will-download", (_e, item) => {
     item.setSaveDialogOptions({
-      title: "Salvar como",
       defaultPath: path.join(app.getPath("downloads"), item.getFilename()),
     });
   });
-  await session.defaultSession.cookies.set({ url, name: "contador_token", value: TOKEN, httpOnly: true, sameSite: "strict" });
+  await session.defaultSession.cookies.set({ url, name: "tc_token", value: TOKEN, httpOnly: true, sameSite: "strict" });
   return url;
 }
 
 /**
- * No WSL o Chromium lê o tema do GTK (claro, sem configuração), não o do
- * Windows: segue o "modo dos apps" do registro do Windows. Nos sistemas
- * nativos o Electron já acompanha o tema do computador.
+ * On WSL Chromium reads the GTK theme (light, unconfigured), not Windows':
+ * follows the Windows registry "app mode". On native systems Electron already
+ * follows the computer's theme.
  */
-function seguirTemaDoWindowsNoWsl() {
+function followWindowsThemeOnWsl() {
   if (!WSL) return;
   try {
-    const saida = execFileSync("reg.exe", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], {
+    const out = execFileSync("reg.exe", ["query", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize", "/v", "AppsUseLightTheme"], {
       encoding: "utf8",
       timeout: 3000,
     });
-    const m = /AppsUseLightTheme\s+REG_DWORD\s+0x(\d+)/.exec(saida);
+    const m = /AppsUseLightTheme\s+REG_DWORD\s+0x(\d+)/.exec(out);
     if (m) nativeTheme.themeSource = Number(m[1]) ? "light" : "dark";
   } catch {
-    // sem reg.exe (interop do WSL desligado): fica o padrão do Chromium
+    // no reg.exe (WSL interop off): Chromium's default stays
   }
 }
 
-// tamanho e posição da janela entre sessões
-const arquivoJanela = () => path.join(app.getPath("userData"), "janela.json");
-function lerEstadoJanela() {
-  try {
-    return JSON.parse(fs.readFileSync(arquivoJanela(), "utf8"));
-  } catch {
-    return { width: 1440, height: 900 };
-  }
-}
+// window size and position between sessions
+const windowFile = () => path.join(DATA, "window.json");
+const readWindowState = () => readWindowFile(dataPath("window.json", "janela.json"));
 
-function criarJanela() {
-  const tema = nativeTheme.shouldUseDarkColors ? "dark" : "light";
-  const estado = lerEstadoJanela();
-  janela = new BrowserWindow({
-    width: estado.width,
-    height: estado.height,
-    x: estado.x,
-    y: estado.y,
+function createWindow() {
+  const theme = nativeTheme.shouldUseDarkColors ? "dark" : "light";
+  const state = readWindowState();
+  mainWindow = new BrowserWindow({
+    width: state.width,
+    height: state.height,
+    x: state.x,
+    y: state.y,
     minWidth: 1024,
     minHeight: 640,
     show: false,
-    title: "Contador de Tráfego",
-    backgroundColor: FUNDO[tema],
+    title: "Traffic Counter",
+    backgroundColor: BACKGROUND[theme],
     titleBarStyle: "hidden",
-    // Windows/Linux: botões do sistema sobre a barra do app; macOS: semáforo
-    ...(MAC ? { trafficLightPosition: { x: 14, y: 12 } } : { titleBarOverlay: { ...BARRA[tema], height: 40 } }),
+    // Windows/Linux: system buttons over the app's bar; macOS: traffic lights
+    ...(MAC ? { trafficLightPosition: { x: 14, y: 12 } } : { titleBarOverlay: { ...TITLE_BAR[theme], height: 40 } }),
     icon: path.join(__dirname, "build", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -189,150 +189,150 @@ function criarJanela() {
       nodeIntegration: false,
     },
   });
-  if (estado.maximizado) janela.maximize();
-  janela.once("ready-to-show", () => janela.show());
+  if (state.maximized) mainWindow.maximize();
+  mainWindow.once("ready-to-show", () => mainWindow.show());
 
-  const salvar = () => {
-    if (!janela || janela.isDestroyed()) return;
-    const b = janela.getNormalBounds();
-    fs.writeFileSync(arquivoJanela(), JSON.stringify({ ...b, maximizado: janela.isMaximized() }));
+  const save = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    const b = mainWindow.getNormalBounds();
+    fs.writeFileSync(windowFile(), JSON.stringify({ ...b, maximized: mainWindow.isMaximized() }));
   };
-  janela.on("close", salvar);
+  mainWindow.on("close", save);
 
-  // links externos (Drive, OpenRouter) abrem no navegador padrão — só
-  // http(s); qualquer outro esquema (file:, smb:, ms-…) é ignorado
-  const abrirFora = (url) => {
+  // external links (Drive, OpenRouter) open in the default browser — only
+  // http(s); any other scheme (file:, smb:, ms-…) is ignored
+  const openOutside = (url) => {
     try {
       if (["http:", "https:"].includes(new URL(url).protocol)) void shell.openExternal(url);
     } catch {}
   };
-  janela.webContents.setWindowOpenHandler(({ url }) => {
-    abrirFora(url);
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    openOutside(url);
     return { action: "deny" };
   });
-  janela.webContents.on("will-navigate", (e, url) => {
-    let origem = null;
+  mainWindow.webContents.on("will-navigate", (e, url) => {
+    let origin = null;
     try {
-      origem = new URL(url).origin;
+      origin = new URL(url).origin;
     } catch {}
-    if (origem && origem === origemApp) return;
+    if (origin && origin === appOrigin) return;
     e.preventDefault();
-    abrirFora(url);
+    openOutside(url);
   });
-  return janela;
+  return mainWindow;
 }
 
-ipcMain.on("versao", (e) => {
+ipcMain.on("version", (e) => {
   e.returnValue = app.getVersion();
 });
 
-// tema efetivo da página (escolha do usuário ou o do sistema): só recolore a
-// janela — não fixa nativeTheme, senão "Sistema" deixaria de seguir o computador
-ipcMain.on("tema", (e, tema) => {
-  if (tema !== "dark" && tema !== "light") return;
+// the page's effective theme (the user's choice or the system's): only
+// recolors the window — does not pin nativeTheme, or "System" would stop following the computer
+ipcMain.on("theme", (e, theme) => {
+  if (theme !== "dark" && theme !== "light") return;
   const w = BrowserWindow.fromWebContents(e.sender);
-  if (w && !MAC) w.setTitleBarOverlay({ ...BARRA[tema], height: 40 });
-  w?.setBackgroundColor(FUNDO[tema]);
+  if (w && !MAC) w.setTitleBarOverlay({ ...TITLE_BAR[theme], height: 40 });
+  w?.setBackgroundColor(BACKGROUND[theme]);
 });
 
-ipcMain.handle("escolher-videos", async (e) => {
+ipcMain.handle("pick-videos", async (e) => {
   const w = BrowserWindow.fromWebContents(e.sender);
+  // no title or filter name: the system dialog uses its own, in the computer's language
   const r = await dialog.showOpenDialog(w, {
-    title: "Escolher vídeos",
     properties: ["openFile", "multiSelections"],
-    filters: [{ name: "Vídeos", extensions: ["mp4", "mkv", "avi", "mov", "m4v", "ts", "webm"] }],
+    filters: [{ name: "Video", extensions: ["mp4", "mkv", "avi", "mov", "m4v", "ts", "webm"] }],
   });
   return r.canceled ? [] : r.filePaths;
 });
 
 app.on("second-instance", () => {
-  if (!janela) return;
-  if (janela.isMinimized()) janela.restore();
-  janela.focus();
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
 });
 
 app.on("before-quit", () => {
   app.isQuitting = true;
-  servidor?.kill();
+  server?.kill();
 });
 
 app.whenReady().then(async () => {
-  seguirTemaDoWindowsNoWsl();
-  // sem barra de menus no Windows/Linux; no macOS o menu do app é obrigatório
+  followWindowsThemeOnWsl();
+  // no menu bar on Windows/Linux; on macOS the app menu is mandatory
   Menu.setApplicationMenu(MAC ? Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }, { role: "windowMenu" }]) : null);
-  const w = criarJanela();
+  const w = createWindow();
   try {
-    const url = URL_DEV ?? (await subirServidor());
-    origemApp = new URL(url).origin;
+    const url = DEV_URL ?? (await startServer());
+    appOrigin = new URL(url).origin;
     await w.loadURL(url);
   } catch (e) {
-    dialog.showErrorBox("Contador de Tráfego", String(e?.message ?? e));
+    dialog.showErrorBox("Traffic Counter", String(e?.message ?? e));
     app.quit();
     return;
   }
-  if (app.isPackaged) iniciarAtualizacoes();
+  if (app.isPackaged) startUpdates();
 });
 
 // ----------------------------------------------------------------------
-// Atualização: baixa em segundo plano e instala ao fechar (como antes), mas
-// agora a janela mostra uma faixa "Versão X pronta — Reiniciar e atualizar".
-// A notificação nativa do checkForUpdatesAndNotify não aparecia no Windows e
-// quem deixava o app aberto nunca sabia que havia versão nova.
+// Updates: downloads in the background and installs on close (as before),
+// and the window shows a "Version X ready — Restart and update" banner.
+// checkForUpdatesAndNotify's native notification did not show on Windows
+// and whoever left the app open never knew there was a new version.
 // ----------------------------------------------------------------------
-/** @type {{ fase: "nenhuma" | "baixando" | "pronta", versao: string | null, progresso: number | null }} */
-let atualizacao = { fase: "nenhuma", versao: null, progresso: null };
-let atualizador = null;
-const CHECAR_A_CADA_MS = 4 * 60 * 60 * 1000; // app que fica aberto o dia todo também recebe
+/** @type {{ phase: "none" | "downloading" | "ready", version: string | null, progress: number | null }} */
+let update = { phase: "none", version: null, progress: null };
+let updater = null;
+const CHECK_EVERY_MS = 4 * 60 * 60 * 1000; // an app left open all day also gets it
 
-function avisarAtualizacao(mudanca) {
-  atualizacao = { ...atualizacao, ...mudanca };
-  for (const w of BrowserWindow.getAllWindows()) w.webContents.send("atualizacao", atualizacao);
+function announceUpdate(change) {
+  update = { ...update, ...change };
+  for (const w of BrowserWindow.getAllWindows()) w.webContents.send("update", update);
 }
 
-function iniciarAtualizacoes() {
+function startUpdates() {
   const { autoUpdater } = require("electron-updater");
-  atualizador = autoUpdater;
+  updater = autoUpdater;
   autoUpdater.autoDownload = true;
-  // a instalação ao fechar é feita por instalarAtualizacao() (visível), não a silenciosa do electron-updater
+  // installing on close is done by installUpdate() (visible), not electron-updater's silent one
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.on("update-available", (info) => avisarAtualizacao({ fase: "baixando", versao: info.version, progresso: 0 }));
-  autoUpdater.on("download-progress", (p) => avisarAtualizacao({ fase: "baixando", progresso: (p.percent ?? 0) / 100 }));
-  autoUpdater.on("update-downloaded", (info) => avisarAtualizacao({ fase: "pronta", versao: info.version, progresso: 1 }));
+  autoUpdater.on("update-available", (info) => announceUpdate({ phase: "downloading", version: info.version, progress: 0 }));
+  autoUpdater.on("download-progress", (p) => announceUpdate({ phase: "downloading", progress: (p.percent ?? 0) / 100 }));
+  autoUpdater.on("update-downloaded", (info) => announceUpdate({ phase: "ready", version: info.version, progress: 1 }));
   autoUpdater.on("error", (e) => {
-    console.error(`[atualizacao] ${e?.message ?? e}`);
-    // sem internet etc.: some a faixa de download; a próxima checagem tenta de novo
-    if (atualizacao.fase === "baixando") avisarAtualizacao({ fase: "nenhuma", progresso: null });
+    console.error(`[update] ${e?.message ?? e}`);
+    // no internet etc.: the download banner goes away; the next check tries again
+    if (update.phase === "downloading") announceUpdate({ phase: "none", progress: null });
   });
-  const checar = () => {
-    if (atualizacao.fase !== "pronta") autoUpdater.checkForUpdates().catch((e) => console.error(`[atualizacao] ${e?.message ?? e}`));
+  const check = () => {
+    if (update.phase !== "ready") autoUpdater.checkForUpdates().catch((e) => console.error(`[update] ${e?.message ?? e}`));
   };
-  checar();
-  setInterval(checar, CHECAR_A_CADA_MS).unref?.();
+  check();
+  setInterval(check, CHECK_EVERY_MS).unref?.();
 }
 
-let instalando = false;
+let installing = false;
 /**
- * Instala a versão baixada. NÃO silencioso: a instalação silenciosa remove a
- * versão velha e leva 1–2 min para pôr a nova, sem nada na tela — parecia
- * que o app tinha sido desinstalado. Assim o Windows mostra o progresso do
- * instalador e o app abre de novo no fim.
+ * Installs the downloaded version. NOT silent: the silent install removes the
+ * old version and takes 1–2 min to put the new one, with nothing on screen —
+ * it looked like the app had been uninstalled. This way Windows shows the
+ * installer's progress and the app opens again at the end.
  */
-function instalarAtualizacao() {
-  if (!atualizador || atualizacao.fase !== "pronta" || instalando) return false;
-  instalando = true;
-  app.isQuitting = true; // sem o aviso "o servidor do app parou"
-  servidor?.kill();
-  atualizador.quitAndInstall(false, true);
+function installUpdate() {
+  if (!updater || update.phase !== "ready" || installing) return false;
+  installing = true;
+  app.isQuitting = true; // no "the app server stopped" warning
+  server?.kill();
+  updater.quitAndInstall(false, true);
   return true;
 }
 
-ipcMain.handle("atualizacao-estado", () => atualizacao);
-ipcMain.on("atualizacao-instalar", () => instalarAtualizacao());
-// fechar o app com uma versão já baixada também instala (como antes), mas à vista
+ipcMain.handle("update-state", () => update);
+ipcMain.on("update-install", () => installUpdate());
+// closing the app with a version already downloaded also installs (as before), but visibly
 app.on("before-quit", (e) => {
-  if (!instalando && atualizacao.fase === "pronta") {
+  if (!installing && update.phase === "ready") {
     e.preventDefault();
-    instalarAtualizacao();
+    installUpdate();
   }
 });
 
