@@ -27,6 +27,7 @@ import { downloadFromDrive } from "./drive";
 import { adjustEngine, enginePython, workerEnv } from "./engine";
 import { OpenRouterError, suggestCategory, suggestionModels } from "./openrouter";
 import { movedVideo } from "./legacy";
+import { parseHighlights } from "./highlights";
 import { REPO_ROOT, jobDir, renderDir } from "./paths";
 import { NO_CONSULTATION, countsOnLine } from "./review";
 
@@ -599,8 +600,17 @@ export function startRender(renderId: string, locale: Locale = appLocale()): voi
           .map((c) => ({ id: c.id, frame: c.frame, line_id: c.line_id, category: c.label, direction: c.direction, track: c.track })),
       };
     });
+    // passages only: the cut categories among the ones in the video
+    const hl = parseHighlights(render.highlights);
+    const highlights = hl && { ...hl, categories: hl.categories?.filter(included) ?? null };
+    if (highlights && !videos.some((v) => v.events.some((e) => !highlights.categories || highlights.categories.includes(e.category as Category)))) {
+      throw new Error(msg("renders.errors.noPassages"));
+    }
     const planFile = path.join(dir, "plan.json");
-    fs.writeFileSync(planFile, JSON.stringify({ categories: chosen ? [...chosen] : null, labels: await renderLabels(locale), videos }, null, 1));
+    fs.writeFileSync(
+      planFile,
+      JSON.stringify({ categories: chosen ? [...chosen] : null, highlights, labels: await renderLabels(locale), videos }, null, 1),
+    );
     for (const f of ["final_video.mp4", "report.json", "events.csv"]) fs.rmSync(path.join(/* turbopackIgnore: true */ dir, f), { force: true });
     updateRender(renderId, { status: "queued", progress: 0, error: null, message: msg("runner.queueGpu") });
 

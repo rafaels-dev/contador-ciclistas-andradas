@@ -601,7 +601,9 @@
       "remaining": "{name} : {n, plural, one {# candidat reste à vérifier} other {# candidats restent à vérifier}}.",
       "invalidCategories": "Catégories non valides.",
       "noCategory": "Cochez au moins une catégorie pour la vidéo finale.",
-      "noVideo": "Choisissez au moins une vidéo."
+      "noVideo": "Choisissez au moins une vidéo.",
+      "invalidHighlights": "Options de passages non valides.",
+      "noPassages": "Aucun passage des catégories choisies pour couper."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "La vérification de l’une de ces vidéos a changé après la génération de cette vidéo finale.",
     "renderAgainCurrent": "Générer à nouveau avec la vérification actuelle",
     "renderAgain": "Générer à nouveau",
-    "changeCategories": "Changer les catégories…",
+    "changeCategories": "Changer les catégories ou le format…",
     "monitor": "Moniteur",
     "generating": "Génération de la vidéo…",
     "noVideo": "Aucune vidéo",
@@ -639,11 +641,26 @@
       "line": "Ligne",
       "category": "Catégorie",
       "direction": "Sens"
-    }
+    },
+    "passagesBadge": "Passages de {list} seulement · {before} s avant, {after} s après",
+    "passagesBadgeAll": "Passages seulement · {before} s avant, {after} s après",
+    "betweenCuts": "Entre les coupes : compté, mais absent de la vidéo"
   },
   "categoryPicker": {
     "legend": "Ce qui entre dans la vidéo finale et le comptage",
     "checkAll": "tout cocher",
     "none": "Cochez au moins une catégorie."
+  },
+  "finalOptions": {
+    "format": "Format de la vidéo",
+    "whole": "Vidéo entière",
+    "passages": "Passages seulement",
+    "wholeHint": "Tout l’enregistrement, avec le compteur.",
+    "passagesHint": "Seulement quelques secondes avant et après chaque passage, avec l’heure de chacun. Le compteur additionne toujours tout, y compris ce qui passe entre les coupes.",
+    "before": "Avant",
+    "after": "Après",
+    "cutOn": "Couper sur les passages de :",
+    "noCut": "Choisissez au moins une catégorie pour couper.",
+    "uncheckAll": "tout décocher"
   }
 }

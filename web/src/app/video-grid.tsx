@@ -5,12 +5,12 @@ import { useLocale, useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { formatStored } from "@/i18n/message";
 import type { Category, JobStatus } from "@/lib/db";
-import { COUNTED_CATEGORIES } from "@/lib/review";
 import { BUTTON, FIELD, timecode } from "@/lib/ui";
 import { moveToGroup } from "./_shell/actions";
 import { deleteVideos } from "./actions";
 import { createFinalVideo } from "./renders/actions";
-import { CategoryPicker } from "./renders/category-picker";
+import { choiceArgs, choiceReady, FinalVideoOptions, initialChoice } from "./renders/final-options";
+import type { Highlights } from "@/lib/highlights";
 
 export type GridVideo = {
   id: string;
@@ -162,7 +162,7 @@ export function VideoGrid({ videos, groups, currentGroup }: Props) {
           error={error ? formatStored(tRoot, error) : null}
           pending={pending}
           onClose={() => setExporting(null)}
-          onGenerate={(categories) => start(async () => setError((await createFinalVideo(exporting, categories)).error ?? null))}
+          onGenerate={(categories, highlights) => start(async () => setError((await createFinalVideo(exporting, categories, highlights)).error ?? null))}
         />
       )}
     </div>
@@ -279,14 +279,14 @@ type TrayProps = {
   error: string | null;
   pending: boolean;
   onClose: () => void;
-  onGenerate: (categories: Category[]) => void;
+  onGenerate: (categories: Category[], highlights: Highlights | null) => void;
 };
 
 /** The sequence of the final video, like a track: each video is a block proportional to its duration. */
 function ExportTray({ order, byId, setOrder, error, pending, onClose, onGenerate }: TrayProps) {
   const t = useTranslations("grid");
   const total = order.reduce((s, id) => s + (byId[id]?.duration_s ?? 0), 0) || 1;
-  const [categories, setCategories] = useState<Category[]>([...COUNTED_CATEGORIES]);
+  const [choice, setChoice] = useState(initialChoice);
   const move = (i: number, d: number) => {
     const n = [...order];
     [n[i], n[i + d]] = [n[i + d], n[i]];
@@ -332,9 +332,9 @@ function ExportTray({ order, byId, setOrder, error, pending, onClose, onGenerate
           </li>
         ))}
       </ol>
-      <CategoryPicker value={categories} onChange={setCategories} />
+      <FinalVideoOptions value={choice} onChange={setChoice} />
       <div className="flex items-center gap-3">
-        <button type="button" disabled={!order.length || !categories.length || pending} onClick={() => onGenerate(categories)} className={BUTTON.primary}>
+        <button type="button" disabled={!order.length || !choiceReady(choice) || pending} onClick={() => onGenerate(...choiceArgs(choice))} className={BUTTON.primary}>
           {pending ? t("sending") : t("generate", { n: order.length })}
         </button>
         {error && <span className="text-sm text-danger">{error}</span>}

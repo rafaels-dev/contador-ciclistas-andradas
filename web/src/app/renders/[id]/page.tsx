@@ -6,6 +6,7 @@ import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 import { formatStored } from "@/i18n/message";
 import { CATEGORIES, getJob, getRender, listCandidates, type Category } from "@/lib/db";
+import { parseHighlights } from "@/lib/highlights";
 import { renderDir } from "@/lib/paths";
 import { BUTTON, LABEL_COLOR, PANEL_TITLE, timecode } from "@/lib/ui";
 import { AutoRefresh } from "../../jobs/[id]/auto-refresh";
@@ -20,7 +21,8 @@ type Report = {
   totals: Record<string, Partial<Record<Category, number>>>;
   by_direction: Record<string, Partial<Record<Category, Record<string, number>>>>;
   videos: { title: string; start_in_final_s: number; duration_s: number; totals: Record<string, Partial<Record<Category, number>>> }[];
-  events: { video: string; candidate: number; line: string; category: Category; direction: string; time_in_video_s: number; time_in_final_s: number }[];
+  /** null: an event between the cuts of a passages-only video (it counts, it is not shown) */
+  events: { video: string; candidate: number; line: string; category: Category; direction: string; time_in_video_s: number; time_in_final_s: number | null }[];
 };
 
 /** `job` is missing in plans migrated from older versions: the position in render.jobs stands for it. */
@@ -55,6 +57,7 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
   const working = render.status === "queued" || render.status === "rendering";
   const jobs = JSON.parse(render.jobs) as string[];
   const renderCategories = render.categories ? (JSON.parse(render.categories) as Category[]) : null;
+  const highlights = parseHighlights(render.highlights);
   const rep = render.status === "ready" ? readJson<Report>(path.join(dir, "report.json")) : null;
   const version = encodeURIComponent(render.updated_at);
   const statusText = t(`status.${render.status}`);
@@ -101,6 +104,17 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
             {t("onlyCategories", { list: renderCategories.map((c) => tRoot(`categories.plural.${c}`)).join(", ") })}
           </span>
         )}
+        {highlights && (
+          <span className="rounded-full border border-accent/50 px-2 py-0.5 text-xs text-accent-text" data-testid="render-highlights">
+            {highlights.categories
+              ? t("passagesBadge", {
+                  before: highlights.before_s,
+                  after: highlights.after_s,
+                  list: highlights.categories.map((c) => tRoot(`categories.plural.${c}`)).join(", "),
+                })
+              : t("passagesBadgeAll", { before: highlights.before_s, after: highlights.after_s })}
+          </span>
+        )}
       </header>
 
       {working && (
@@ -121,14 +135,14 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
       {render.status === "error" && (
         <div className="m-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger/40 bg-danger/10 p-4">
           <p className="flex-1 text-danger">{formatStored(tRoot, render.error)}</p>
-          <RenderAgainButton renderId={render.id} categories={renderCategories} label={t("tryAgain")} />
+          <RenderAgainButton renderId={render.id} categories={renderCategories} highlights={highlights} label={t("tryAgain")} />
         </div>
       )}
 
       {outdated && (
         <div className="flex flex-wrap items-center gap-3 border-b border-warn/40 bg-warn/10 px-4 py-2 text-sm text-warn">
           <span className="flex-1">{t("outdated")}</span>
-          <RenderAgainButton renderId={render.id} categories={renderCategories} label={t("renderAgainCurrent")} />
+          <RenderAgainButton renderId={render.id} categories={renderCategories} highlights={highlights} label={t("renderAgainCurrent")} />
         </div>
       )}
 
@@ -156,7 +170,7 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
                   {t("reportJson")}
                 </a>
               </div>
-              {!outdated && <RenderAgainButton renderId={render.id} categories={renderCategories} label={t("renderAgain")} />}
+              {!outdated && <RenderAgainButton renderId={render.id} categories={renderCategories} highlights={highlights} label={t("renderAgain")} />}
             </section>
           )}
 
@@ -242,7 +256,7 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
             </div>
             <div className="flex h-8 items-center border-b border-r border-line px-3 text-xs font-medium text-muted">{t("countsTrack")}</div>
             <div className="relative h-8 border-b border-line bg-raised/50">
-              {rep.events.map((e) => (
+              {rep.events.map((e) => e.time_in_final_s != null && (
                 <JumpTo
                   key={`${e.video}-${e.candidate}`}
                   s={e.time_in_final_s}
@@ -274,7 +288,13 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
                 {rep.events.map((e) => (
                   <tr key={`${e.video}-${e.candidate}`} className="border-t border-line/60">
                     <td className="py-1 pr-3">
-                      <JumpTo s={e.time_in_final_s}>{hms(e.time_in_final_s)}</JumpTo>
+                      {e.time_in_final_s != null ? (
+                        <JumpTo s={e.time_in_final_s}>{hms(e.time_in_final_s)}</JumpTo>
+                      ) : (
+                        <span className="text-xs text-faint" title={t("betweenCuts")}>
+                          —
+                        </span>
+                      )}
                     </td>
                     <td className="py-1 pr-3">
                       {e.video} <span className="font-mono text-xs text-faint">({hms(e.time_in_video_s)})</span>

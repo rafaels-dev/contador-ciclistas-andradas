@@ -601,7 +601,9 @@
       "remaining": "{name}: {n, plural, one {# candidate left to review} other {# candidates left to review}}.",
       "invalidCategories": "Invalid categories.",
       "noCategory": "Check at least one category for the final video.",
-      "noVideo": "Choose at least one video."
+      "noVideo": "Choose at least one video.",
+      "invalidHighlights": "Invalid passage options.",
+      "noPassages": "No passage of the categories chosen to cut on."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "The review of one of these videos changed after this final video was generated.",
     "renderAgainCurrent": "Generate again with the current review",
     "renderAgain": "Generate again",
-    "changeCategories": "Change categories…",
+    "changeCategories": "Change categories or format…",
     "monitor": "Monitor",
     "generating": "Generating the video…",
     "noVideo": "No video",
@@ -639,11 +641,26 @@
       "line": "Line",
       "category": "Category",
       "direction": "Direction"
-    }
+    },
+    "passagesBadge": "Passages of {list} only · {before} s before, {after} s after",
+    "passagesBadgeAll": "Passages only · {before} s before, {after} s after",
+    "betweenCuts": "Between the cuts: counted, but not shown in the video"
   },
   "categoryPicker": {
     "legend": "What goes into the final video and the count",
     "checkAll": "check all",
     "none": "Check at least one category."
+  },
+  "finalOptions": {
+    "format": "Video format",
+    "whole": "Whole video",
+    "passages": "Passages only",
+    "wholeHint": "The whole recording, with the counter.",
+    "passagesHint": "Only a few seconds before and after each passage, with the time of each one. The counter still adds everything, including what goes by between the cuts.",
+    "before": "Before",
+    "after": "After",
+    "cutOn": "Cut on passages of:",
+    "noCut": "Pick at least one category to cut on.",
+    "uncheckAll": "uncheck all"
   }
 }

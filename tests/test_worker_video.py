@@ -98,3 +98,22 @@ def test_a_block_crossing_the_line_becomes_one_candidate(tmp_path):
         rows = list(csv.reader(f, delimiter=";"))
     assert rows[0][0] == "vídeo"
     assert rows[1][3:5] == ["Line 1", "Ciclista"]
+
+    # passages only: 1 s before and after the cyclist; the car at frame 5 has no
+    # cut of its own but still counts (and has no time in the final video)
+    data = json.loads(plan.read_text(encoding="utf-8"))
+    data["highlights"] = {"before_s": 1.0, "after_s": 1.0, "categories": ["cyclists"]}
+    data["videos"][0]["events"].append({"id": 8, "frame": 5, "line_id": "l1", "category": "cars",
+                                        "direction": "A→B", "track": None})
+    plan.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+    out = tmp_path / "passages"
+    run_worker("render.py", "--plan", plan, "--output", out)
+    report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert report["totals"] == {"Line 1": {"cyclists": 1, "cars": 1}}
+    assert 1.9 <= report["videos"][0]["duration_s"] <= 2.2
+    assert len(report["cuts"]) == 1 and report["cuts"][0]["start_in_final_s"] == 0
+    times = {e["category"]: e["time_in_final_s"] for e in report["events"]}
+    assert times["cars"] is None and 0.9 <= times["cyclists"] <= 1.1
+    probe = cv2.VideoCapture(str(out / "final_video.mp4"))
+    assert 28 <= probe.get(cv2.CAP_PROP_FRAME_COUNT) <= 33
+    probe.release()

@@ -601,7 +601,9 @@
       "remaining": "{name}: {n, plural, one {falta # candidato por revisar} other {faltan # candidatos por revisar}}.",
       "invalidCategories": "Categorías no válidas.",
       "noCategory": "Marca al menos una categoría para el video final.",
-      "noVideo": "Elige al menos un video."
+      "noVideo": "Elige al menos un video.",
+      "invalidHighlights": "Opciones de pasos no válidas.",
+      "noPassages": "Ningún paso de las categorías elegidas para cortar."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "La revisión de uno de estos videos cambió después de generar este video final.",
     "renderAgainCurrent": "Generar de nuevo con la revisión actual",
     "renderAgain": "Generar de nuevo",
-    "changeCategories": "Cambiar categorías…",
+    "changeCategories": "Cambiar categorías o formato…",
     "monitor": "Monitor",
     "generating": "Generando el video…",
     "noVideo": "Sin video",
@@ -639,11 +641,26 @@
       "line": "Línea",
       "category": "Categoría",
       "direction": "Sentido"
-    }
+    },
+    "passagesBadge": "Solo los pasos de {list} · {before} s antes, {after} s después",
+    "passagesBadgeAll": "Solo los pasos · {before} s antes, {after} s después",
+    "betweenCuts": "Entre los cortes: cuenta, pero no aparece en el vídeo"
   },
   "categoryPicker": {
     "legend": "Qué entra en el video final y en el conteo",
     "checkAll": "marcar todas",
     "none": "Marca al menos una categoría."
+  },
+  "finalOptions": {
+    "format": "Formato del vídeo",
+    "whole": "Vídeo completo",
+    "passages": "Solo los pasos",
+    "wholeHint": "Toda la grabación, con el contador.",
+    "passagesHint": "Solo unos segundos antes y después de cada paso, con la hora de cada uno. El contador sigue sumando todo, también lo que pasa entre los cortes.",
+    "before": "Antes",
+    "after": "Después",
+    "cutOn": "Cortar en los pasos de:",
+    "noCut": "Marque al menos una categoría para cortar.",
+    "uncheckAll": "desmarcar todas"
   }
 }
