@@ -601,7 +601,9 @@
       "remaining": "{name}: {n, plural, one {# kandidat mangler gennemgang} other {# kandidater mangler gennemgang}}.",
       "invalidCategories": "Ugyldige kategorier.",
       "noCategory": "Markér mindst én kategori til den færdige video.",
-      "noVideo": "Vælg mindst én video."
+      "noVideo": "Vælg mindst én video.",
+      "invalidHighlights": "Ugyldige passage-indstillinger.",
+      "noPassages": "Ingen passage af de kategorier, der er valgt at klippe ved."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "Gennemgangen af en af disse videoer er ændret, efter at denne færdige video blev lavet.",
     "renderAgainCurrent": "Lav igen med den aktuelle gennemgang",
     "renderAgain": "Lav igen",
-    "changeCategories": "Skift kategorier…",
+    "changeCategories": "Skift kategorier eller format…",
     "monitor": "Skærm",
     "generating": "Laver videoen…",
     "noVideo": "Ingen video",
@@ -639,11 +641,26 @@
       "line": "Linje",
       "category": "Kategori",
       "direction": "Retning"
-    }
+    },
+    "passagesBadge": "Kun passager af {list} · {before} s før, {after} s efter",
+    "passagesBadgeAll": "Kun passager · {before} s før, {after} s efter",
+    "betweenCuts": "Mellem klippene: talt med, men ikke i videoen"
   },
   "categoryPicker": {
     "legend": "Hvad der kommer med i den færdige video og tællingen",
     "checkAll": "markér alle",
     "none": "Markér mindst én kategori."
+  },
+  "finalOptions": {
+    "format": "Videoformat",
+    "whole": "Hele videoen",
+    "passages": "Kun passager",
+    "wholeHint": "Hele optagelsen, med tælleren.",
+    "passagesHint": "Kun et par sekunder før og efter hver passage, med tidspunktet for hver. Tælleren lægger stadig alt sammen, også det der passerer mellem klippene.",
+    "before": "Før",
+    "after": "Efter",
+    "cutOn": "Klip ved passager af:",
+    "noCut": "Vælg mindst én kategori at klippe ved.",
+    "uncheckAll": "fravælg alle"
   }
 }

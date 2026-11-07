@@ -601,7 +601,9 @@
       "remaining": "{name}: {n, plural, one {nog # kandidaat te controleren} other {nog # kandidaten te controleren}}.",
       "invalidCategories": "Ongeldige categorieën.",
       "noCategory": "Vink minstens één categorie aan voor de eindvideo.",
-      "noVideo": "Kies minstens één video."
+      "noVideo": "Kies minstens één video.",
+      "invalidHighlights": "Ongeldige passage-opties.",
+      "noPassages": "Geen passage van de gekozen categorieën om op te knippen."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "De controle van een van deze video's is gewijzigd nadat deze eindvideo is gemaakt.",
     "renderAgainCurrent": "Opnieuw maken met de huidige controle",
     "renderAgain": "Opnieuw maken",
-    "changeCategories": "Categorieën wijzigen…",
+    "changeCategories": "Categorieën of formaat wijzigen…",
     "monitor": "Monitor",
     "generating": "De video maken…",
     "noVideo": "Geen video",
@@ -639,11 +641,26 @@
       "line": "Lijn",
       "category": "Categorie",
       "direction": "Richting"
-    }
+    },
+    "passagesBadge": "Alleen passages van {list} · {before} s voor, {after} s na",
+    "passagesBadgeAll": "Alleen passages · {before} s voor, {after} s na",
+    "betweenCuts": "Tussen de knippen: geteld, maar niet in de video"
   },
   "categoryPicker": {
     "legend": "Wat in de eindvideo en de telling komt",
     "checkAll": "alles aanvinken",
     "none": "Vink minstens één categorie aan."
+  },
+  "finalOptions": {
+    "format": "Videoformaat",
+    "whole": "Hele video",
+    "passages": "Alleen passages",
+    "wholeHint": "De hele opname, met de teller.",
+    "passagesHint": "Alleen een paar seconden voor en na elke passage, met het tijdstip van elke passage. De teller telt nog steeds alles op, ook wat tussen de knippen voorbijkomt.",
+    "before": "Voor",
+    "after": "Na",
+    "cutOn": "Knippen bij passages van:",
+    "noCut": "Kies minstens één categorie om op te knippen.",
+    "uncheckAll": "alles uitvinken"
   }
 }

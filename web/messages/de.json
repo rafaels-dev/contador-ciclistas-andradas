@@ -601,7 +601,9 @@
       "remaining": "{name}: {n, plural, one {noch # Kandidat zu prüfen} other {noch # Kandidaten zu prüfen}}.",
       "invalidCategories": "Ungültige Kategorien.",
       "noCategory": "Wählen Sie mindestens eine Kategorie für das Endvideo aus.",
-      "noVideo": "Wählen Sie mindestens ein Video aus."
+      "noVideo": "Wählen Sie mindestens ein Video aus.",
+      "invalidHighlights": "Ungültige Durchfahrt-Optionen.",
+      "noPassages": "Keine Durchfahrt der zum Schneiden gewählten Kategorien."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "Die Prüfung eines dieser Videos hat sich geändert, nachdem dieses Endvideo erstellt wurde.",
     "renderAgainCurrent": "Mit der aktuellen Prüfung neu erstellen",
     "renderAgain": "Neu erstellen",
-    "changeCategories": "Kategorien ändern…",
+    "changeCategories": "Kategorien oder Format ändern…",
     "monitor": "Monitor",
     "generating": "Video wird erstellt…",
     "noVideo": "Kein Video",
@@ -639,11 +641,26 @@
       "line": "Linie",
       "category": "Kategorie",
       "direction": "Richtung"
-    }
+    },
+    "passagesBadge": "Nur Durchfahrten von {list} · {before} s vorher, {after} s nachher",
+    "passagesBadgeAll": "Nur Durchfahrten · {before} s vorher, {after} s nachher",
+    "betweenCuts": "Zwischen den Schnitten: gezählt, aber nicht im Video"
   },
   "categoryPicker": {
     "legend": "Was in das Endvideo und die Zählung einfließt",
     "checkAll": "alle auswählen",
     "none": "Wählen Sie mindestens eine Kategorie aus."
+  },
+  "finalOptions": {
+    "format": "Videoformat",
+    "whole": "Ganzes Video",
+    "passages": "Nur Durchfahrten",
+    "wholeHint": "Die ganze Aufnahme, mit dem Zähler.",
+    "passagesHint": "Nur ein paar Sekunden vor und nach jeder Durchfahrt, jeweils mit Uhrzeit. Der Zähler addiert weiterhin alles, auch was zwischen den Schnitten vorbeikommt.",
+    "before": "Vorher",
+    "after": "Nachher",
+    "cutOn": "Schneiden bei Durchfahrten von:",
+    "noCut": "Mindestens eine Kategorie zum Schneiden wählen.",
+    "uncheckAll": "alle abwählen"
   }
 }

@@ -601,7 +601,9 @@
       "remaining": "{name}: {n, plural, one {falta # candidato na revisão} other {faltam # candidatos na revisão}}.",
       "invalidCategories": "Categorias inválidas.",
       "noCategory": "Marque pelo menos uma categoria para o vídeo final.",
-      "noVideo": "Escolha pelo menos um vídeo."
+      "noVideo": "Escolha pelo menos um vídeo.",
+      "invalidHighlights": "Opções de passagens inválidas.",
+      "noPassages": "Nenhuma passagem das categorias escolhidas para cortar."
     }
   },
   "renderPage": {
@@ -618,7 +620,7 @@
     "outdated": "A revisão de algum destes vídeos mudou depois que este vídeo final foi gerado.",
     "renderAgainCurrent": "Gerar de novo com a revisão atual",
     "renderAgain": "Gerar de novo",
-    "changeCategories": "Mudar categorias…",
+    "changeCategories": "Mudar categorias ou formato…",
     "monitor": "Monitor",
     "generating": "Gerando o vídeo…",
     "noVideo": "Sem vídeo",
@@ -639,11 +641,26 @@
       "line": "Linha",
       "category": "Categoria",
       "direction": "Sentido"
-    }
+    },
+    "passagesBadge": "Só as passagens de {list} · {before} s antes, {after} s depois",
+    "passagesBadgeAll": "Só as passagens · {before} s antes, {after} s depois",
+    "betweenCuts": "Entre os cortes: conta, mas não aparece no vídeo"
   },
   "categoryPicker": {
     "legend": "O que entra no vídeo final e na contagem",
     "checkAll": "marcar todas",
     "none": "Marque pelo menos uma categoria."
+  },
+  "finalOptions": {
+    "format": "Formato do vídeo",
+    "whole": "Vídeo inteiro",
+    "passages": "Só as passagens",
+    "wholeHint": "A gravação inteira, com o contador.",
+    "passagesHint": "Só alguns segundos antes e depois de cada passagem, com a hora de cada uma. O contador continua somando tudo, inclusive o que passa entre os cortes.",
+    "before": "Antes",
+    "after": "Depois",
+    "cutOn": "Cortar nas passagens de:",
+    "noCut": "Marque pelo menos uma categoria para cortar.",
+    "uncheckAll": "desmarcar todas"
   }
 }

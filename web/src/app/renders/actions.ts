@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { msg } from "@/i18n/message";
 import { CATEGORIES, createRender, getJob, getRender, reviewSummary, updateRender, type Category } from "@/lib/db";
+import { validHighlights, type Highlights } from "@/lib/highlights";
 import { cancelRender, startRender } from "@/lib/runner";
 
 /**
@@ -30,36 +31,57 @@ function validCategories(choice: unknown): { categories: Category[] | null } | {
   return { categories: cats.length === CATEGORIES.length ? null : cats };
 }
 
+/** Passages-only choice, checked against the categories of the video (null = whole video). */
+function checkedHighlights(choice: unknown, categories: Category[] | null): { highlights: Highlights | null } | { error: string } {
+  const h = validHighlights(choice, categories ?? CATEGORIES);
+  return h === undefined ? { error: msg("renders.errors.invalidHighlights") } : { highlights: h };
+}
+
 /**
  * Final video with one or more jobs, in the given order; the counter adds
  * across them. Project rule: only after the complete human review of each.
  * `error`: a stored message — show it with formatStored and the root translator.
  */
-export async function createFinalVideo(jobIds: string[], chosenCategories: Category[] | null = null): Promise<{ error?: string }> {
+export async function createFinalVideo(
+  jobIds: string[],
+  chosenCategories: Category[] | null = null,
+  chosenHighlights: Highlights | null = null,
+): Promise<{ error?: string }> {
   const ids = [...new Set(jobIds.map(String))].filter((id) => /^[\w-]{1,40}$/.test(id));
   if (!ids.length) return { error: msg("renders.errors.noVideo") };
   const cats = validCategories(chosenCategories);
   if ("error" in cats) return { error: cats.error };
+  const hl = checkedHighlights(chosenHighlights, cats.categories);
+  if ("error" in hl) return { error: hl.error };
   for (const id of ids) {
     const why = blocker(id);
     if (why) return { error: why };
   }
   const id = randomUUID().slice(0, 8);
   const name = ids.map((j) => getJob(j)?.file_name ?? j).join(" + ").slice(0, 300);
-  createRender(id, name, ids, cats.categories);
+  createRender(id, name, ids, cats.categories, hl.highlights);
   startRender(id);
   refresh(); // exports counter in the side library
   redirect(`/renders/${id}`);
 }
 
-/** Generates again with the current review decisions (same videos, same order). */
-export async function renderAgain(renderId: string, chosenCategories?: Category[] | null): Promise<{ error?: string }> {
+/** Generates again with the current review decisions (same videos, same order); the options can change first. */
+export async function renderAgain(
+  renderId: string,
+  chosenCategories?: Category[] | null,
+  chosenHighlights?: Highlights | null,
+): Promise<{ error?: string }> {
   const render = getRender(renderId);
   if (!render || render.status === "queued" || render.status === "rendering") return {};
   if (chosenCategories !== undefined) {
     const cats = validCategories(chosenCategories);
     if ("error" in cats) return { error: cats.error };
-    updateRender(renderId, { categories: cats.categories ? JSON.stringify(cats.categories) : null });
+    const hl = checkedHighlights(chosenHighlights ?? null, cats.categories);
+    if ("error" in hl) return { error: hl.error };
+    updateRender(renderId, {
+      categories: cats.categories ? JSON.stringify(cats.categories) : null,
+      highlights: hl.highlights ? JSON.stringify(hl.highlights) : null,
+    });
   }
   for (const id of JSON.parse(render.jobs) as string[]) {
     const why = blocker(id);

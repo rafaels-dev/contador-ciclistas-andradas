@@ -77,6 +77,7 @@ CREATE TABLE IF NOT EXISTS renders (
   name        TEXT NOT NULL,
   jobs        TEXT NOT NULL,              -- JSON: job ids, in video order
   categories  TEXT,                       -- JSON of Category[]; NULL = all
+  highlights  TEXT,                       -- JSON of Highlights (lib/highlights.ts); NULL = whole video
   status      TEXT NOT NULL DEFAULT 'queued', -- queued | rendering | ready | error
   progress    REAL NOT NULL DEFAULT 0,
   message     TEXT,

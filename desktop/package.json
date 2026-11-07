@@ -2,7 +2,7 @@
   "name": "contador-trafego",
   "productName": "Traffic Counter",
   "desktopName": "contador-trafego.desktop",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Counting cyclists, pedestrians and vehicles with human review",
   "homepage": "https://github.com/rafaels-dev/contador-ciclistas-andradas",
   "author": "Rafael Schettino <rcschettino@gmail.com>",

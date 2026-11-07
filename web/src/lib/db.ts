@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrateLegacy } from "./legacy";
+import type { Highlights } from "./highlights";
 import { SCHEMA } from "./schema";
 import { DATA_DIR, DB_FILE } from "./paths";
 
@@ -103,6 +104,7 @@ export function db(): DatabaseSync {
     // values and the files of the processed videos move to the English names
     migrateLegacy(d, DATA_DIR);
     d.exec(SCHEMA);
+    addColumns(d);
     // new process: no worker survived the server restart
     d.prepare(
       `UPDATE jobs SET status = 'error', error = ?, updated_at = datetime('now')
@@ -115,6 +117,13 @@ export function db(): DatabaseSync {
     g.__tcDb = d;
   }
   return g.__tcDb;
+}
+
+/** Columns added after 0.0.8 (CREATE TABLE IF NOT EXISTS leaves an existing table as it was). */
+function addColumns(d: DatabaseSync): void {
+  const has = (table: string, column: string) =>
+    (d.prepare(`SELECT name FROM pragma_table_info('${table}')`).all() as { name: string }[]).some((r) => r.name === column);
+  if (!has("renders", "highlights")) d.exec("ALTER TABLE renders ADD COLUMN highlights TEXT");
 }
 
 // node:sqlite returns null-prototype objects, which React does not serialize
@@ -378,6 +387,8 @@ export type Render = {
   jobs: string; // JSON of string[]
   /** JSON of Category[] included in the video and the count; null = all */
   categories: string | null;
+  /** JSON of Highlights (lib/highlights.ts): only the passages; null = the whole video */
+  highlights: string | null;
   status: RenderStatus;
   progress: number;
   message: string | null;
@@ -386,8 +397,10 @@ export type Render = {
   updated_at: string;
 };
 
-export function createRender(id: string, name: string, jobs: string[], categories: Category[] | null = null): void {
-  db().prepare("INSERT INTO renders (id, name, jobs, categories) VALUES (?, ?, ?, ?)").run(id, name, JSON.stringify(jobs), categories ? JSON.stringify(categories) : null);
+export function createRender(id: string, name: string, jobs: string[], categories: Category[] | null = null, highlights: Highlights | null = null): void {
+  db()
+    .prepare("INSERT INTO renders (id, name, jobs, categories, highlights) VALUES (?, ?, ?, ?, ?)")
+    .run(id, name, JSON.stringify(jobs), categories ? JSON.stringify(categories) : null, highlights ? JSON.stringify(highlights) : null);
 }
 
 export function getRender(id: string): Render | undefined {
@@ -399,7 +412,7 @@ export function listRenders(): Render[] {
   return db().prepare("SELECT * FROM renders ORDER BY created_at DESC").all().map(plain) as Render[];
 }
 
-export function updateRender(id: string, fields: Partial<Pick<Render, "status" | "progress" | "message" | "error" | "categories">>): void {
+export function updateRender(id: string, fields: Partial<Pick<Render, "status" | "progress" | "message" | "error" | "categories" | "highlights">>): void {
   const keys = Object.keys(fields) as (keyof typeof fields)[];
   if (!keys.length) return;
   db()

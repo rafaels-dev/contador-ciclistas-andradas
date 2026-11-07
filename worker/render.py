@@ -11,11 +11,18 @@ gets a box with the category name (trajectory from the detection tracks).
 
 Usage:
   python worker/render.py --plan plan.json --output DIR [--end S]
-plan.json: {"labels": {...}, "categories": [...] | null,
+plan.json: {"labels": {...}, "categories": [...] | null, "highlights": {...} | null,
             "videos": [{"title", "video", "tracks", "lines": [...],
                         "events": [{"id", "frame", "line_id", "category", "direction", "track"}]}]}
 `labels` carries the texts in the app language (panel, boxes, CSV); English
 is the fallback.
+
+`highlights` ({"before_s", "after_s", "categories": [...] | null}): instead of
+the whole video, only the passages — from before_s ahead of each event of
+those categories (null = all) to after_s after it, nearby passages merged
+into one cut, a short fade between cuts and the time of day in the video on
+screen. The counter still adds every event, also the ones between cuts (the
+cars of a busy street go on counting when only the bicycles are shown).
 Output: DIR/final_video.mp4, DIR/report.json, DIR/events.csv and, on stdout,
 one JSON line per event ({"type": "progress"|"done"|"error"}).
 
@@ -25,6 +32,7 @@ the same indices the detector recorded.
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
 import gzip
 import json
@@ -71,6 +79,8 @@ LINE_COLOR = (250, 204, 21)
 BEFORE_S, AFTER_S = 1.5, 1.0  # object box around the event
 FLASH_S = 0.6                 # line in the category color after the event
 OUTPUT_WIDTH = 1920
+JOIN_S = 1.0                  # passages closer than this become one cut
+FADE_S = 0.2                  # fade from/to black at each cut
 
 
 def emit(**data) -> None:
@@ -240,23 +250,52 @@ def load_boxes(tracks_file: str | None, tracks: set[str]) -> dict[str, dict[int,
     return out
 
 
-def frames_of(reader: VideoReader, limit: int | None):
-    """Reads ahead in a thread (ffmpeg/YUV→BGR release the GIL)."""
+def frames_of(reader: VideoReader, limit: int | None, keep=None):
+    """Reads ahead in a thread (ffmpeg/YUV→BGR release the GIL). Frames that
+    `keep(index)` refuses are only decoded (sequential reading keeps the frame
+    indices of the detection) and come as None."""
     q: queue.Queue = queue.Queue(maxsize=16)
+    end = object()
 
     def read() -> None:
         n = 0
         while limit is None or n < limit:
-            f = reader.read()
-            if f is None:
+            if keep is None or keep(n):
+                f = reader.read()
+                if f is None:
+                    break
+            elif reader.skip():
+                f = None
+            else:
                 break
             q.put(f)
             n += 1
-        q.put(None)
+        q.put(end)
 
     threading.Thread(target=read, daemon=True).start()
-    while (f := q.get()) is not None:
+    while (f := q.get()) is not end:
         yield f
+
+
+def passages(events: list[dict], categories, before: int, after: int, join: int) -> list[tuple[int, int]]:
+    """Frame ranges (inclusive) from `before` frames ahead of each event of
+    `categories` (None = all) to `after` frames past it; ranges closer than
+    `join` frames merge into one."""
+    spans = sorted((max(0, e["frame"] - before), e["frame"] + after)
+                   for e in events if categories is None or e["category"] in categories)
+    out: list[tuple[int, int]] = []
+    for a, b in spans:
+        if out and a <= out[-1][1] + join:
+            out[-1] = (out[-1][0], max(out[-1][1], b))
+        else:
+            out.append((a, b))
+    return out
+
+
+def span_of(spans: list[tuple[int, int]], idx: int) -> tuple[int, int] | None:
+    """The range containing idx (spans sorted, disjoint)."""
+    i = bisect.bisect_right(spans, (idx, float("inf"))) - 1
+    return spans[i] if i >= 0 and spans[i][0] <= idx <= spans[i][1] else None
 
 
 def hms(s: float) -> str:
@@ -277,6 +316,8 @@ def main() -> None:
     if not videos:
         raise ValueError("no videos in the plan")
     labels = {**DEFAULT_LABELS, **(plan.get("labels") or {})}
+    for k in ("plural", "singular"):  # a category missing from the plan falls back to English
+        labels[k] = {**DEFAULT_LABELS[k], **labels[k]}
 
     # lines with the same name add up; categories shown = the ones the line
     # counts (if configured) plus the ones with a confirmed event
@@ -308,6 +349,11 @@ def main() -> None:
     scale = height / 1080
     total_f = sum(min(r.info["frames"], int(args.end * fps) if args.end else 10**12) for r in readers)
 
+    hl = plan.get("highlights")
+    hl_cats = set(hl["categories"]) if hl and hl.get("categories") else None
+    if hl and not any(hl_cats is None or e["category"] in hl_cats for v in videos for e in v["events"]):
+        raise ValueError("no passages of the chosen categories")
+
     target = output / "final_video.mp4"
     enc = Encoder(target, width, height, fps)
     emit(type="progress", stage="rendering", p=0, codec=enc.codec)
@@ -318,6 +364,7 @@ def main() -> None:
     report_rows = []
     video_summary = []
     done, t0, last_emit, final_start = 0, time.time(), 0.0, 0.0
+    cuts = []
 
     for iv, v in enumerate(videos):
         reader = VideoReader(v["video"])
@@ -335,19 +382,19 @@ def main() -> None:
         for e in events:
             by_frame.setdefault(e["frame"], []).append(e)
         limit = int(args.end * fv) if args.end else None
+        spans = (passages(events, hl_cats, int(hl["before_s"] * fv), int(hl["after_s"] * fv), int(JOIN_S * fv))
+                 if hl else None)
+        keep = (lambda i, sp=spans: span_of(sp, i) is not None) if spans is not None else None
+        fade = max(1, int(FADE_S * fv))
+        written = 0  # frames of this video in the final video
         footer = (labels["video_n"].format(n=iv + 1, total=len(videos)) + f" · {v['title']}"
                   if len(videos) > 1 else v["title"])
         video_counts: dict[str, dict[str, int]] = {}
         next_i = 0
         idx = -1
-        for frame in frames_of(reader, limit):
+        for frame in frames_of(reader, limit, keep):
             idx += 1
-            if s != 1.0 or ox or oy:
-                canvas = np.zeros((height, width, 3), np.uint8)
-                r = cv2.resize(frame, (int(reader.width * s), int(reader.height * s)), interpolation=cv2.INTER_AREA)
-                canvas[oy:oy + r.shape[0], ox:ox + r.shape[1]] = r
-                frame = canvas
-
+            here = final_start + written / fv  # position in the final video
             for e in by_frame.get(idx, ()):
                 name = line_name.get(e["line_id"], no_line)
                 totals.setdefault(name, {}).setdefault(e["category"], 0)
@@ -360,7 +407,25 @@ def main() -> None:
                 report_rows.append({"video": v["title"], "candidate": e["id"], "line": name,
                                     "category": e["category"], "direction": direction,
                                     "time_in_video_s": round(idx / fv, 2),
-                                    "time_in_final_s": round(final_start + idx / fv, 2)})
+                                    # between cuts the event counts but is not in the final video
+                                    "time_in_final_s": round(here, 2) if frame is not None else None})
+            if frame is None:
+                done += 1
+                if done % 256 == 0 and time.time() - last_emit >= 1.0:
+                    last_emit = time.time()
+                    emit(type="progress", stage="rendering", p=min(done / max(total_f, 1), 1.0),
+                         fps=round(done / (last_emit - t0), 1), video=iv + 1, videos=len(videos))
+                continue
+            span = span_of(spans, idx) if spans is not None else None
+            if span and idx == span[0]:
+                cuts.append({"video": v["title"], "start_in_final_s": round(here, 2),
+                             "from_video_s": round(span[0] / fv, 2), "to_video_s": round(span[1] / fv, 2)})
+            if s != 1.0 or ox or oy:
+                canvas = np.zeros((height, width, 3), np.uint8)
+                r = cv2.resize(frame, (int(reader.width * s), int(reader.height * s)), interpolation=cv2.INTER_AREA)
+                canvas[oy:oy + r.shape[0], ox:ox + r.shape[1]] = r
+                frame = canvas
+
 
             # events around this frame: object box, flashing line
             while next_i < len(events) and events[next_i]["frame"] + after < idx:
@@ -390,7 +455,16 @@ def main() -> None:
                 paste(frame, tag, a[0] + 6, a[1] + 6)
             m = int(16 * scale)
             paste(frame, panel.draw(totals, footer, highlight), m, m)
+            if span:
+                # passages: when it happened (time in the video) and a fade at each cut
+                clock = tags.img(f"{v['title']} · {hms(idx / fv)}", (15, 15, 20))
+                # bottom right: the top corners hold the panel and, on DVRs, the burned-in clock
+                paste(frame, clock, width - clock.shape[1] - m, height - clock.shape[0] - m)
+                k = min(idx - span[0], span[1] - idx)
+                if k < fade:
+                    frame = (frame.astype(np.float32) * ((k + 1) / (fade + 1))).astype(np.uint8)
             enc.write(frame)
+            written += 1
             done += 1
 
             now = time.time()
@@ -399,20 +473,22 @@ def main() -> None:
                 emit(type="progress", stage="rendering", p=min(done / max(total_f, 1), 1.0),
                      fps=round(done / (now - t0), 1), video=iv + 1, videos=len(videos))
         reader.close()
-        dur = (idx + 1) / fv
+        dur = written / fv
         video_summary.append({"title": v["title"], "start_in_final_s": round(final_start, 2),
                               "duration_s": round(dur, 2), "totals": video_counts})
         final_start += dur
     enc.close()
 
     report = {"generated_at": datetime.now().isoformat(timespec="seconds"), "codec": enc.codec,
-              "totals": totals, "by_direction": directions, "videos": video_summary, "events": report_rows}
+              "totals": totals, "by_direction": directions, "videos": video_summary, "events": report_rows,
+              "highlights": hl, "cuts": cuts if hl else None}
     (output / "report.json").write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
     with open(output / "events.csv", "w", newline="", encoding="utf-8-sig") as f:  # BOM: Excel opens accents right
         w = csv.writer(f, delimiter=";")
         w.writerow(labels["csv"])
         for r in report_rows:
-            w.writerow([r["video"], hms(r["time_in_video_s"]), hms(r["time_in_final_s"]), r["line"],
+            final = "" if r["time_in_final_s"] is None else hms(r["time_in_final_s"])
+            w.writerow([r["video"], hms(r["time_in_video_s"]), final, r["line"],
                         labels["singular"][r["category"]], r["direction"], r["candidate"]])
     emit(type="done", events=len(report_rows), duration_s=round(final_start, 1), codec=enc.codec)
 

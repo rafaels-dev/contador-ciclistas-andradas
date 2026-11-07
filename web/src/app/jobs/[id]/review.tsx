@@ -10,7 +10,7 @@ import {
 import { BUTTON, FIELD, LABEL_COLOR, PANEL_TITLE, sideLabels, timecode } from "@/lib/ui";
 import { formatStored, parseMessage } from "@/i18n/message";
 import { createFinalVideo } from "../../renders/actions";
-import { CategoryPicker } from "../../renders/category-picker";
+import { choiceArgs, choiceReady, FinalVideoOptions, initialChoice } from "../../renders/final-options";
 import { addManualCount, decide, removeManualCount, updateManualCount } from "./actions";
 import { createClock, frameTimecode, useTime, type Clock } from "./clock";
 import { Timeline } from "./timeline";
@@ -136,7 +136,7 @@ export function Review({ jobId, base, candidates: initial, lines, duration, fps,
   const [error, setError] = useState<string | null>(null);
   const [, start] = useTransition();
   const [sending, startRender] = useTransition();
-  const [finalCategories, setFinalCategories] = useState<Category[]>([...COUNTED_CATEGORIES]);
+  const [finalChoice, setFinalChoice] = useState(initialChoice);
   const [choosingFinal, setChoosingFinal] = useState(false);
   const [tab, setTab] = useState<Tab>("clip");
   const end = Math.max(duration, ...candidates.map((c) => c.time_s), 1);
@@ -494,17 +494,17 @@ export function Review({ jobId, base, candidates: initial, lines, duration, fps,
               </button>
               {choosingFinal && (
                 <div className="absolute right-0 top-full z-20 mt-1 flex w-96 max-w-[calc(100vw-2rem)] flex-col gap-3 rounded-lg border border-line bg-panel p-3 shadow-xl" data-testid="final-video-menu">
-                  <CategoryPicker value={finalCategories} onChange={setFinalCategories} />
+                  <FinalVideoOptions value={finalChoice} onChange={setFinalChoice} />
                   <div className="flex items-center justify-end gap-2">
                     <button type="button" onClick={() => setChoosingFinal(false)} className={BUTTON.ghost}>
                       {t("cancel")}
                     </button>
                     <button
                       type="button"
-                      disabled={!finalCategories.length || sending}
+                      disabled={!choiceReady(finalChoice) || sending}
                       onClick={() =>
                         startRender(async () => {
-                          const r = await createFinalVideo([jobId], finalCategories);
+                          const r = await createFinalVideo([jobId], ...choiceArgs(finalChoice));
                           if (r.error) setError(actionError(tr, r.error));
                           else setChoosingFinal(false);
                         })
