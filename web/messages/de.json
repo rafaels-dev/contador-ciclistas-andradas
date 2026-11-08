@@ -74,7 +74,8 @@
     "suggestionsDone": "{total} Kandidaten mit Vorschlag · Kosten US$ {cost}",
     "renderStarting": "Wird gestartet…",
     "renderProgress": "Wird gerendert{videos, plural, =1 {} other { – Video {video} von {videos}}}…{fps, select, none {} other { ({fps} fps)}}",
-    "renderDone": "{events, plural, one {# Zählung} other {# Zählungen}} · {minutes} Min. Video"
+    "renderDone": "{events, plural, one {# Zählung} other {# Zählungen}} · {minutes} Min. Video",
+    "downloadingAgain": "Erneuter Download von Google Drive: {name}…"
   },
   "review": {
     "noConsultationReason": "Vom Detektor erkanntes Fahrzeug auf einer Linie, die keine Autos zählt – nicht an das Bildmodell gesendet.",
@@ -248,7 +249,8 @@
     "newGroup": "Neue Gruppe",
     "groupPlaceholder": "Name (z. B. Hauptstraße)",
     "groupNameLabel": "Name der neuen Gruppe",
-    "groupHint": "Enter erstellt · Esc bricht ab"
+    "groupHint": "Enter erstellt · Esc bricht ab",
+    "projects": "Projekte"
   },
   "theme": {
     "theme": "Design",
@@ -298,6 +300,19 @@
       "invalidArea": "Ungültiger Analysebereich.",
       "areaTooSmall": "Der Analysebereich ist zu klein.",
       "invalidManual": "Ungültige manuelle Zählung."
+    },
+    "deleted": {
+      "media": "Die Bilder dieser Prüfung sind nicht auf diesem Computer (sie wurden gelöscht oder das Projekt kommt von einem anderen Computer). Die Entscheidungen bleiben gespeichert.",
+      "driveVideo": "Das von Drive heruntergeladene Video wurde gelöscht, um Speicherplatz freizugeben. Beim Erstellen eines fertigen Videos lädt die App es erneut herunter.",
+      "localVideo": "Das Originalvideo wurde unter {path} nicht gefunden.",
+      "locate": "Video suchen…",
+      "locatePlaceholder": "Pfad des Videos",
+      "notFound": "Diese Datei wurde nicht gefunden.",
+      "rebuild": "Bilder neu erstellen",
+      "rebuilding": "Die Prüfbilder werden neu erstellt…",
+      "wrongVideo": "Dieses Video ist nicht das verarbeitete (andere Auflösung oder Länge). Wähle das Originalvideo.",
+      "rebuildFailed": "Die Bilder konnten nicht neu erstellt werden. Siehe das Protokoll unter Diagnose speichern.",
+      "checkFailed": "Das Video konnte nicht geprüft werden (die Erkennungs-Engine hat nicht geantwortet). Siehe Einstellungen → Erkennungs-Engine."
     }
   },
   "lineEditor": {
@@ -367,7 +382,8 @@
       "log": "Protokoll",
       "data": "App-Daten",
       "config": "Konfiguration",
-      "python": "Python der Engine"
+      "python": "Python der Engine",
+      "work": "Temporäre Dateien"
     },
     "gpu": {
       "title": "Grafikkarte",
@@ -425,6 +441,77 @@
         "badResponse": "OpenRouter hat nicht richtig geantwortet (Fehler {status}). Versuchen Sie es erneut.",
         "offline": "Keine Verbindung zu OpenRouter. Prüfen Sie die Internetverbindung."
       }
+    },
+    "storage": {
+      "title": "Speicher",
+      "measuring": "Belegter Speicher wird gemessen…",
+      "folders": {
+        "temp": {
+          "title": "Temporäre Dateien",
+          "hint": "Bilder und Clips der Prüfung, von Drive heruntergeladene Kopien. Alles hier kann die App neu erstellen."
+        },
+        "finals": {
+          "title": "Fertige Videos",
+          "hint": "Jedes fertige Video in einem Unterordner, mit Video, Tabelle und Bericht."
+        },
+        "project": {
+          "title": "Projektdateien",
+          "hint": "Enthält die Ordner Projekte (die Projektdateien) und Originalvideos. Videos in diesem Ordner kommen mit relativem Pfad ins Projekt: Der ganze Ordner kann auf ein anderes Laufwerk oder einen anderen Computer verschoben oder kopiert werden."
+        }
+      },
+      "used": "{size} belegt",
+      "free": "{size} frei auf dem Laufwerk",
+      "default": "Standard",
+      "chosen": "von dir gewählt",
+      "open": "Ordner öffnen",
+      "choose": "Anderen Ordner wählen…",
+      "placeholder": "z. B. D:\\Zaehler",
+      "use": "Diesen Ordner verwenden",
+      "backToDefault": "Zurück zum Standard",
+      "errors": {
+        "notAbsolute": "Gib den vollständigen Pfad des Ordners ein (z. B. D:\\Zaehler).",
+        "notWritable": "In diesen Ordner kann nicht geschrieben werden. Wähle einen anderen."
+      },
+      "nextOnly": "Ein geänderter Ordner gilt für die nächsten Videos; die Videos, die schon in der App sind, bleiben, wo sie sind. Die Datenbank der App und die Trajektorien jedes Videos ({size}) liegen in {path}.",
+      "oldFinals": "{n, plural, one {# fertiges Video} other {# fertige Videos}} aus früheren Versionen {n, plural, one {liegt} other {liegen}} noch im App-Ordner ({size}).",
+      "moveOldFinals": "In den Ordner für fertige Videos verschieben",
+      "moved": "{size} verschoben. Jede Kopie wurde geprüft, bevor das Original gelöscht wurde.",
+      "movedSome": "Verschoben, was ging; {n, plural, one {# Eintrag konnte nicht verschoben werden und bleibt} other {# Einträge konnten nicht verschoben werden und bleiben}} am alten Ort und {n, plural, one {funktioniert} other {funktionieren}} weiter.",
+      "freeTitle": "Speicherplatz freigeben",
+      "items": "{n, plural, one {# Eintrag} other {# Einträge}}",
+      "nothing": "nichts zu löschen",
+      "kinds": {
+        "finalVideos": {
+          "title": "Bereits erstellte fertige Videos",
+          "hint": "Die Zählung und die Tabelle bleiben in der App. Lade vorher das Video herunter, das du behalten willst; es lässt sich neu erstellen."
+        },
+        "reviewMedia": {
+          "title": "Prüfbilder der bereits geprüften Videos",
+          "hint": "Die Entscheidungen der Prüfung bleiben gespeichert und das fertige Video funktioniert weiter; nur die Bilder und Clips verschwinden (sie lassen sich neu erstellen)."
+        },
+        "driveVideos": {
+          "title": "Von Google Drive heruntergeladene Videos",
+          "hint": "Beim Erstellen eines fertigen Videos lädt die App das Video erneut herunter."
+        },
+        "leftovers": {
+          "title": "Reste von Videos, die nicht mehr in der App sind",
+          "hint": "Dateien von Videos und fertigen Videos, die aus der Bibliothek gelöscht wurden."
+        }
+      },
+      "delete": "Auswahl löschen ({size})",
+      "deleteNone": "Auswahl löschen",
+      "confirm": "Bestätigen: {size} löschen",
+      "deleting": "Wird gelöscht…",
+      "cancel": "Abbrechen",
+      "freed": "{size} freigegeben.",
+      "askMove": "Der aktuelle Ordner enthält {size} ({n, plural, one {# Eintrag} other {# Einträge}}). Alles nach {path} verschieben?",
+      "moveBusy": "Warte, bis das Laufende (Erkennung, Vorschläge, fertiges Video oder Bilder) fertig ist, bevor du verschiebst.",
+      "moveNoSpace": "Am Ziel ist nicht genug Platz ({free} frei).",
+      "moveAll": "Alles dorthin verschieben",
+      "moveNone": "Nicht verschieben: nur für Neues verwenden",
+      "moveHow": "Jeder Eintrag wird kopiert, geprüft und erst dann im aktuellen Ordner gelöscht. Wenn etwas fehlschlägt, bleibt dieser Eintrag, wo er war, und funktioniert weiter.",
+      "movingItem": "{name} wird verschoben… {done} von {total}",
+      "movingHint": "Du kannst die App weiter benutzen. Schließe sie nicht, bevor es fertig ist."
     }
   },
   "welcome": {
@@ -644,7 +731,9 @@
     },
     "passagesBadge": "Nur Durchfahrten von {list} · {before} s vorher, {after} s nachher",
     "passagesBadgeAll": "Nur Durchfahrten · {before} s vorher, {after} s nachher",
-    "betweenCuts": "Zwischen den Schnitten: gezählt, aber nicht im Video"
+    "betweenCuts": "Zwischen den Schnitten: gezählt, aber nicht im Video",
+    "videoDeleted": "Das Video wurde gelöscht, um Speicherplatz freizugeben. Die Zählung und die Tabelle sind noch hier; mit „Neu erstellen“ entsteht das Video wieder.",
+    "openFolder": "Ordner öffnen"
   },
   "categoryPicker": {
     "legend": "Was in das Endvideo und die Zählung einfließt",
@@ -662,5 +751,31 @@
     "cutOn": "Schneiden bei Durchfahrten von:",
     "noCut": "Mindestens eine Kategorie zum Schneiden wählen.",
     "uncheckAll": "alle abwählen"
+  },
+  "project": {
+    "title": "Projekte",
+    "intro": "Ein Projekt ist eine Gruppe der Bibliothek, in einer Datei gespeichert: die Videos, die Linien, die Trajektorien und alle Entscheidungen der Prüfung. Damit bleibt die Arbeit außerhalb der App erhalten oder kommt auf einen anderen Computer.",
+    "save": "Projekt speichern",
+    "saveAs": "Speichern unter…",
+    "saving": "Wird gespeichert…",
+    "savedTo": "Projekt gespeichert in {file} ({when})",
+    "openFolder": "Ordner öffnen",
+    "notSaved": "Diese Gruppe wurde noch nicht als Projekt gespeichert.",
+    "errors": {
+      "notFound": "Die Projektdatei wurde nicht gefunden.",
+      "invalid": "Diese Datei ist kein Traffic-Counter-Projekt.",
+      "newer": "Dieses Projekt wurde von einer neueren Version der App gespeichert. Aktualisiere die App, um es zu öffnen.",
+      "empty": "Das Projekt hat keine Videos.",
+      "notWritable": "Das Projekt konnte in diesem Ordner nicht gespeichert werden. Wähle einen anderen.",
+      "exists": "In dieser Datei ist schon ein anderes Projekt gespeichert. Wähle einen anderen Namen, damit seine Arbeit nicht gelöscht wird."
+    },
+    "videos": "{n, plural, one {# Video} other {# Videos}}",
+    "savedAt": "gespeichert am {when}",
+    "alreadyOpen": "Schon geöffnet",
+    "open": "Öffnen",
+    "none": "Noch keine Projekte in {folder}. Um eines anzulegen, öffne eine Gruppe der Bibliothek und klicke auf „Projekt speichern“.",
+    "openOther": "Andere Datei öffnen…",
+    "pathPlaceholder": "Pfad der .tcproj-Datei",
+    "openHint": "Ein Projekt zu öffnen löscht nie etwas: Die Videos, die schon in der Bibliothek sind, bleiben, wie sie sind, und die anderen kommen mit ihren gespeicherten Entscheidungen dazu."
   }
 }

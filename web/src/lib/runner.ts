@@ -2,7 +2,7 @@ import "./env";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { EOL } from "node:os";
+import os, { EOL } from "node:os";
 import readline from "node:readline";
 import type { Locale } from "@/i18n/locales";
 import { msg } from "@/i18n/message";
@@ -12,9 +12,14 @@ import {
   deleteJob,
   getJob,
   getRender,
+  jobDir,
+  jobFile,
+  jobTempDir,
   listCandidates,
   recordSuggestion,
+  renderDir,
   replaceCandidates,
+  updateCandidateMedia,
   suggestionSummary,
   updateJob,
   updateRender,
@@ -25,10 +30,12 @@ import {
 } from "./db";
 import { downloadFromDrive } from "./drive";
 import { adjustEngine, enginePython, workerEnv } from "./engine";
+import { escapeRegExp } from "./fsutil";
+import { moveFinished } from "./move-state";
 import { OpenRouterError, suggestCategory, suggestionModels } from "./openrouter";
 import { movedVideo } from "./legacy";
 import { parseHighlights } from "./highlights";
-import { REPO_ROOT, jobDir, renderDir } from "./paths";
+import { REPO_ROOT } from "./paths";
 import { NO_CONSULTATION, countsOnLine } from "./review";
 
 /**
@@ -57,6 +64,8 @@ const g = globalThis as {
   __tcDownloads?: Map<string, AbortController>;
   __tcCancelled?: Set<string>;
   __tcSuggesting?: Set<string>;
+  __tcRebuilding?: Map<string, number>;
+  __tcRebuildFailures?: Map<string, "wrongVideo" | "failed">;
   __tcProcesses?: Map<string, Set<ChildProcess>>;
   __tcExitHook?: boolean;
 };
@@ -93,7 +102,8 @@ function killProcesses(owner: string): void {
 
 function onGpuQueue<T>(task: () => Promise<T>): Promise<T> {
   const previous = g.__tcGpuQueue ?? Promise.resolve();
-  const next = previous.catch(() => undefined).then(task);
+  // a folder move in progress (lib/move.ts) first: the task would write into a folder being copied and deleted
+  const next = previous.catch(() => undefined).then(moveFinished).then(task);
   g.__tcGpuQueue = next;
   return next;
 }
@@ -154,7 +164,7 @@ export function cancelJob(jobId: string): void {
   downloads.get(jobId)?.abort();
   killProcesses(jobId);
   // processes from before a `next dev` hot reload (not in the map)
-  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/.*${jobDir(jobId)}(/| |$)`]);
+  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/.*${escapeRegExp(jobDir(jobId))}(/| |$)`]);
   // in the GPU queue (no process yet): the task checks the status when it starts
   updateJob(jobId, { status: "error", error: msg("errors.cancelled"), message: null });
 }
@@ -168,13 +178,16 @@ export function cancelJob(jobId: string): void {
 export function deleteJobs(ids: string[]): void {
   for (const id of ids) {
     if (!getJob(id)) continue;
+    const dirs = [...new Set([jobDir(id), jobTempDir(id)])]; // the temporary one is recorded in the row that goes away
     cancelJob(id);
     deleteJob(id); // a suggestion batch in progress sees the job is gone and stops
     // Windows: a worker just killed may still hold files for a moment
-    try {
-      fs.rmSync(jobDir(id), { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
-    } catch (e) {
-      console.error(`[delete] ${jobDir(id)}: ${e instanceof Error ? e.message : e}`);
+    for (const dir of dirs) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
+      } catch (e) {
+        console.error(`[delete] ${dir}: ${e instanceof Error ? e.message : e}`);
+      }
     }
   }
 }
@@ -225,11 +238,14 @@ function transferMeter(locale: Locale): (done: number, total: number | null) => 
 /** Step 1: download + metadata + first frame → awaiting_lines. */
 export function startDownload(jobId: string): void {
   void (async () => {
+    await moveFinished();
     const job = getJob(jobId);
     if (!job) return;
     const dir = jobDir(jobId);
     fs.mkdirSync(dir, { recursive: true });
-    const target = path.join(dir, "video.mp4");
+    // the copy from the Drive can be downloaded again: temporary folder
+    fs.mkdirSync(jobTempDir(jobId), { recursive: true });
+    const target = path.join(jobTempDir(jobId), "video.mp4");
 
     if (job.drive_id === "local") {
       // video from the computer itself: used in place, no copy
@@ -257,7 +273,7 @@ export function startDownload(jobId: string): void {
 export function videoPath(jobId: string): string {
   const file = getJob(jobId)?.video_file ?? "video.mp4";
   // movedVideo: a video used in place from the repository's old avaliacao/ folder
-  return path.isAbsolute(file) ? (movedVideo(file) as string) : path.join(/* turbopackIgnore: true */ jobDir(jobId), file);
+  return path.isAbsolute(file) ? (movedVideo(file) as string) : jobFile(jobId, file);
 }
 
 /** Metadata + first frame of the video already on disk → awaiting_lines. */
@@ -304,7 +320,7 @@ export function hasTracks(jobId: string): boolean {
 /** When the worker wrote the detection preview (the current frame), or null if there is none. */
 export function detectionPreview(jobId: string): number | null {
   try {
-    return fs.statSync(path.join(jobDir(jobId), "preview.jpg")).mtimeMs;
+    return fs.statSync(path.join(jobTempDir(jobId), "preview.jpg")).mtimeMs;
   } catch {
     return null;
   }
@@ -332,7 +348,6 @@ export function startDetection(jobId: string, lines: Line[], area: Area | null, 
   const candidatesOnly = hasTracks(jobId) && tracksArea(jobId) === areaArg;
   const linesFile = path.join(dir, "lines.json");
   fs.writeFileSync(linesFile, JSON.stringify(lines));
-  fs.rmSync(path.join(dir, "candidates"), { recursive: true, force: true });
   updateJob(jobId, {
     status: "detecting",
     lines: JSON.stringify(lines),
@@ -345,7 +360,11 @@ export function startDetection(jobId: string, lines: Line[], area: Area | null, 
   cancelled.delete(jobId);
   void onGpuQueue(async () => {
     if (cancelled.has(jobId) || getJob(jobId)?.status !== "detecting") return;
-    const output = path.join(dir, "candidates");
+    await ensureDriveVideo(jobId, jobId, locale, (message, progress) => updateJob(jobId, { message, progress }));
+    // review images of the previous detection (before 0.0.10 they were in the job folder)
+    for (const d of new Set([dir, jobTempDir(jobId)])) fs.rmSync(path.join(d, "candidates"), { recursive: true, force: true });
+    // review images and clips: temporary (the preview goes next to them)
+    const output = path.join(jobTempDir(jobId), "candidates");
     const args = ["--video", videoPath(jobId), "--output", output, "--lines", linesFile,
       "--tracks", path.join(dir, "tracks.json.gz"), "--stage", candidatesOnly ? "candidates" : "all"];
     if (areaArg) args.push("--area", areaArg);
@@ -387,6 +406,101 @@ export function startDetection(jobId: string, lines: Line[], area: Area | null, 
   }).catch((e) => fail(jobId, e));
 }
 
+/**
+ * Is `file` the video that was processed? Same resolution and the same
+ * duration (±1%, at least 2 s). Images or a final video made from another
+ * video would come out wrong without any error — two hours of a DVR look
+ * alike.
+ */
+export async function videoMatches(jobId: string, file: string): Promise<boolean | null> {
+  const job = getJob(jobId);
+  if (!job?.duration_s || !job.width || !job.height) return true; // nothing to compare with yet
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "traffic-counter-check-"));
+  let info: { width?: number; height?: number; duration_s?: number } | null = null;
+  try {
+    await runWorker("info.py", [file, dir], (ev) => {
+      if (ev.type === "info") info = ev;
+    });
+  } catch (e) {
+    console.error(`[media] checking ${file}: ${e instanceof Error ? e.message : e}`);
+    return null; // could not check (engine missing, Python error): not the same as another video
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  const i = info as { width?: number; height?: number; duration_s?: number } | null;
+  if (!i) return null;
+  return i.width === job.width && i.height === job.height && Math.abs((i.duration_s ?? 0) - job.duration_s) <= Math.max(2, job.duration_s * 0.01);
+}
+
+/** Why the last "make the images again" did not run (shown on the video page). */
+const rebuildFailures = (g.__tcRebuildFailures ??= new Map<string, "wrongVideo" | "failed">());
+export function mediaRebuildFailure(jobId: string): "wrongVideo" | "failed" | null {
+  return rebuildFailures.get(jobId) ?? null;
+}
+
+/** Review images being made again: job → progress 0–1 (shown on the video page). */
+const rebuilding = (g.__tcRebuilding ??= new Map<string, number>());
+export function mediaRebuilding(jobId: string): number | null {
+  return rebuilding.get(jobId) ?? null;
+}
+
+/**
+ * Makes the review images and clips again (deleted to free space, cleaned
+ * by the system from the temporary folder, or a project opened on another
+ * computer) WITHOUT touching the candidates or the decisions: the worker
+ * redoes the candidates from the same trajectories and lines into a separate
+ * folder, and each existing candidate takes the media of the one at the same
+ * track, line and frame. Nothing changes in the job status.
+ */
+export function rebuildMedia(jobId: string): void {
+  const job = getJob(jobId);
+  if (!job || rebuilding.has(jobId) || !hasTracks(jobId)) return;
+  if (job.drive_id === "local" && !fs.existsSync(videoPath(jobId))) return; // "Locate the video…" first
+  rebuilding.set(jobId, 0);
+  rebuildFailures.delete(jobId);
+  const area = job.area ? (JSON.parse(job.area) as Area) : null;
+  void onGpuQueue(async () => {
+    // the lines changed or a new detection started after the click: that detection makes the images
+    const now = getJob(jobId);
+    if (!now || now.status === "detecting" || now.lines !== job.lines || now.area !== job.area) return;
+    await ensureDriveVideo(jobId, jobId, appLocale(), (_m, p) => rebuilding.set(jobId, p * 0.1));
+    const same = await videoMatches(jobId, videoPath(jobId));
+    if (same !== true) {
+      rebuildFailures.set(jobId, same === false ? "wrongVideo" : "failed");
+      return;
+    }
+    const temp = jobTempDir(jobId);
+    const output = path.join(temp, "candidates.new");
+    fs.rmSync(output, { recursive: true, force: true });
+    const linesFile = path.join(temp, "lines.json");
+    fs.mkdirSync(temp, { recursive: true });
+    fs.writeFileSync(linesFile, job.lines);
+    const args = ["--video", videoPath(jobId), "--output", output, "--lines", linesFile, "--tracks", path.join(jobDir(jobId), "tracks.json.gz"), "--stage", "candidates"];
+    if (area) args.push("--area", [area.x, area.y, area.w, area.h].map((v) => v.toFixed(4)).join(","));
+    await runWorker("detect.py", args, (ev) => {
+      if (ev.type === "progress") rebuilding.set(jobId, ev.p);
+    }, jobId);
+    const items = JSON.parse(fs.readFileSync(path.join(output, "candidates.json"), "utf8")) as WorkerCandidate[];
+    const final = path.join(temp, "candidates");
+    fs.rmSync(final, { recursive: true, force: true });
+    fs.renameSync(output, final);
+    const byKey = new Map(items.map((c) => [`${c.track}|${c.line_id}|${c.frame}`, c]));
+    let matched = 0;
+    for (const c of listCandidates(jobId)) {
+      const m = byKey.get(`${c.track}|${c.line_id}|${c.frame}`);
+      if (!m) continue;
+      updateCandidateMedia(c.id, `candidates/${m.filmstrip}`, m.context ? `candidates/${m.context}` : null, `candidates/${m.clip}`);
+      matched += 1;
+    }
+    console.log(`[media] ${jobId}: images made again for ${matched} of ${listCandidates(jobId).filter((c) => c.origin !== "manual").length} candidates`);
+  })
+    .catch((e) => {
+      rebuildFailures.set(jobId, "failed");
+      console.error(`[media] ${jobId}: ${e instanceof Error ? e.message : e}`);
+    })
+    .finally(() => rebuilding.delete(jobId));
+}
+
 // ----------------------------------------------------------------------
 // Step 3: OpenRouter suggestion for EVERY candidate (project rule: the
 // human review only starts when every one has a suggestion).
@@ -422,7 +536,7 @@ function logSuggestionError(jobId: string, c: Candidate, error: OpenRouterError,
   const dir = jobDir(jobId);
   const size = (rel: string | null) => {
     try {
-      return rel ? fs.statSync(path.join(dir, rel)).size : null;
+      return rel ? fs.statSync(jobFile(jobId, rel)).size : null;
     } catch {
       return null;
     }
@@ -455,7 +569,7 @@ export function startSuggestions(jobId: string, locale: Locale = appLocale()): v
   if (suggesting.has(jobId)) return;
   suggesting.add(jobId);
   void (async () => {
-    const dir = jobDir(jobId);
+    await moveFinished();
     // A YOLO car on a line that does not count cars (bike lane, sidewalk):
     // the proposal is already to discard and the vision model always agreed
     // (Augusto de Lima: 236 of 236) — the call is not paid for. A motion blob
@@ -501,8 +615,8 @@ export function startSuggestions(jobId: string, locale: Locale = appLocale()): v
           try {
             const r = await suggestCategory(
               {
-                filmstrip: path.join(dir, c.filmstrip ?? ""),
-                context: c.context ? path.join(dir, c.context) : null,
+                filmstrip: jobFile(jobId, c.filmstrip ?? ""),
+                context: c.context ? jobFile(jobId, c.context) : null,
                 detectorHint: YOLO_HINT ? c.yolo_class : null,
               },
               { locale },
@@ -581,6 +695,10 @@ export function startRender(renderId: string, locale: Locale = appLocale()): voi
     if (!render) return;
     const dir = renderDir(renderId);
     fs.mkdirSync(dir, { recursive: true });
+    // a copy from the Drive deleted to free space (Settings → Storage) is downloaded again
+    for (const jobId of JSON.parse(render.jobs) as string[]) {
+      await ensureDriveVideo(jobId, renderId, locale, (message, progress) => updateRender(renderId, { status: "queued", message, progress }));
+    }
     // categories chosen for this final video (null = all): events of the
     // others stay out of the video, the count and the panel
     const chosen = render.categories ? new Set(JSON.parse(render.categories) as Category[]) : null;
@@ -646,9 +764,36 @@ export function startRender(renderId: string, locale: Locale = appLocale()): voi
   });
 }
 
+/**
+ * The Drive video of a job whose copy was deleted to free space (Settings →
+ * Storage), downloaded again before a step that reads it: a final video, a
+ * new detection, the review images made again. `owner` (job or final video)
+ * is what Cancel aborts; `report` shows the progress.
+ */
+async function ensureDriveVideo(jobId: string, owner: string, locale: Locale, report: (message: string, progress: number) => void): Promise<void> {
+  const job = getJob(jobId);
+  if (!job || job.drive_id === "local" || fs.existsSync(videoPath(jobId))) return;
+  const target = videoPath(jobId);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  const control = new AbortController();
+  downloads.set(owner, control);
+  const meter = transferMeter(locale);
+  report(msg("runner.downloadingAgain", { name: job.file_name ?? jobId }), 0);
+  // .part: a download stopped halfway must not look like the video
+  const part = `${target}.part`;
+  try {
+    await downloadFromDrive(job.drive_id, part, control.signal, (done, total) => report(meter(done, total), total ? done / total : 0));
+    fs.renameSync(part, target);
+  } finally {
+    downloads.delete(owner);
+    fs.rmSync(part, { force: true });
+  }
+}
+
 export function cancelRender(renderId: string): void {
   cancelled.add(renderId);
+  downloads.get(renderId)?.abort();
   killProcesses(renderId);
-  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/render.py --plan ${path.join(renderDir(renderId), "plan.json")}`]);
+  if (process.platform !== "win32") spawnSync("pkill", ["-f", `worker/render\\.py --plan ${escapeRegExp(path.join(renderDir(renderId), "plan.json"))}`]);
   updateRender(renderId, { status: "error", error: msg("errors.cancelled"), message: null });
 }

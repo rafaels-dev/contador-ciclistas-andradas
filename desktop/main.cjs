@@ -107,6 +107,8 @@ async function startServer() {
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
       TRAFFIC_COUNTER_DATA: dataPath("data", "dados"),
+      // default home of the final videos and the projects (Settings → Storage)
+      TRAFFIC_COUNTER_DOCUMENTS: app.getPath("documents"),
       TRAFFIC_COUNTER_ENV: path.join(DATA, "config.env"),
       // engines installed up to 0.0.7 stay in motor/ (see useDataFolder)
       TRAFFIC_COUNTER_ENGINE: dataPath("engine", "motor"),
@@ -243,6 +245,37 @@ ipcMain.handle("pick-videos", async (e) => {
     filters: [{ name: "Video", extensions: ["mp4", "mkv", "avi", "mov", "m4v", "ts", "webm"] }],
   });
   return r.canceled ? [] : r.filePaths;
+});
+
+// Settings → Storage: where the processing files go
+ipcMain.handle("pick-folder", async (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(w, { properties: ["openDirectory", "createDirectory"] });
+  return r.canceled ? null : r.filePaths[0];
+});
+
+// project files (lib/project.ts): "Save as…" and "Open another file…"
+const PROJECT_FILTER = [{ name: "Traffic Counter", extensions: ["tcproj"] }];
+ipcMain.handle("save-project-file", async (e, defaultPath) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showSaveDialog(w, { defaultPath: typeof defaultPath === "string" ? defaultPath : undefined, filters: PROJECT_FILTER });
+  return r.canceled || !r.filePath ? null : r.filePath;
+});
+ipcMain.handle("open-project-file", async (e, defaultPath) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  const r = await dialog.showOpenDialog(w, { defaultPath: typeof defaultPath === "string" ? defaultPath : undefined, properties: ["openFile"], filters: PROJECT_FILTER });
+  return r.canceled ? null : (r.filePaths[0] ?? null);
+});
+
+// opens a folder in the system file manager (only folders, never runs a file)
+ipcMain.handle("open-folder", async (_e, folder) => {
+  if (typeof folder !== "string" || !path.isAbsolute(folder)) return false;
+  try {
+    if (!fs.statSync(folder).isDirectory()) return false;
+  } catch {
+    return false;
+  }
+  return (await shell.openPath(folder)) === "";
 });
 
 app.on("second-instance", () => {

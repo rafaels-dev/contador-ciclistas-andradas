@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld("trafficCounterDesktop", {
   version: ipcRenderer.sendSync("version"),
   theme: (t) => ipcRenderer.send("theme", t),
   pickVideos: () => ipcRenderer.invoke("pick-videos"),
+  pickFolder: () => ipcRenderer.invoke("pick-folder"),
+  openFolder: (folder) => ipcRenderer.invoke("open-folder", folder),
+  saveProjectFile: (defaultPath) => ipcRenderer.invoke("save-project-file", defaultPath),
+  openProjectFile: (defaultPath) => ipcRenderer.invoke("open-project-file", defaultPath),
   // update downloaded in the background ("Restart and update" banner)
   update: {
     state: () => ipcRenderer.invoke("update-state"),

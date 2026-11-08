@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS cameras (
 CREATE TABLE IF NOT EXISTS groups (
   id          TEXT PRIMARY KEY,
   name        TEXT NOT NULL,
+  project_file TEXT,                      -- the project file (.tcproj) this group was saved to / opened from
+  project_saved_at TEXT,
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   lines       TEXT NOT NULL DEFAULT '[]',
   area        TEXT,
   video_file  TEXT,
+  temp_folder TEXT,             -- the job's temporary files (review images, Drive copy); NULL = all in DATA_DIR/jobs/<id> (before 0.0.10)
   group_id    TEXT REFERENCES groups(id) ON DELETE SET NULL,
   fps         REAL,
   width       INTEGER,
@@ -78,6 +81,7 @@ CREATE TABLE IF NOT EXISTS renders (
   jobs        TEXT NOT NULL,              -- JSON: job ids, in video order
   categories  TEXT,                       -- JSON of Category[]; NULL = all
   highlights  TEXT,                       -- JSON of Highlights (lib/highlights.ts); NULL = whole video
+  folder      TEXT,                       -- the final video's files (final videos folder); NULL = DATA_DIR/renders/<id> (before 0.0.10)
   status      TEXT NOT NULL DEFAULT 'queued', -- queued | rendering | ready | error
   progress    REAL NOT NULL DEFAULT 0,
   message     TEXT,

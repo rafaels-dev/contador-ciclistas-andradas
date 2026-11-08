@@ -74,7 +74,8 @@
     "suggestionsDone": "{total} candidates with a suggestion · cost US$ {cost}",
     "renderStarting": "Starting…",
     "renderProgress": "Rendering{videos, plural, =1 {} other { video {video} of {videos}}}…{fps, select, none {} other { ({fps} fps)}}",
-    "renderDone": "{events, plural, one {# count} other {# counts}} · {minutes} min of video"
+    "renderDone": "{events, plural, one {# count} other {# counts}} · {minutes} min of video",
+    "downloadingAgain": "Downloading again from Google Drive: {name}…"
   },
   "review": {
     "noConsultationReason": "Vehicle recognized by the detector on a line that does not count cars — not sent to the vision model.",
@@ -248,7 +249,8 @@
     "newGroup": "New group",
     "groupPlaceholder": "Name (e.g. Main Street)",
     "groupNameLabel": "Name of the new group",
-    "groupHint": "Enter creates · Esc cancels"
+    "groupHint": "Enter creates · Esc cancels",
+    "projects": "Projects"
   },
   "theme": {
     "theme": "Theme",
@@ -298,6 +300,19 @@
       "invalidArea": "Invalid analysis area.",
       "areaTooSmall": "The analysis area is too small.",
       "invalidManual": "Invalid manual count."
+    },
+    "deleted": {
+      "media": "This review's images are not on this computer (they were deleted, or the project came from another computer). The decisions stay saved.",
+      "driveVideo": "The video downloaded from the Drive was deleted to free up space. Generating a final video downloads it again.",
+      "localVideo": "The original video was not found at {path}.",
+      "locate": "Locate the video…",
+      "locatePlaceholder": "Path of the video",
+      "notFound": "That file was not found.",
+      "rebuild": "Make the images again",
+      "rebuilding": "Making the review images again…",
+      "wrongVideo": "That video is not the one that was processed (different resolution or length). Choose the original video.",
+      "rebuildFailed": "The images could not be made again. See the log in Save diagnostics.",
+      "checkFailed": "The video could not be checked (the detection engine did not answer). See Settings → Detection engine."
     }
   },
   "lineEditor": {
@@ -367,7 +382,8 @@
       "log": "Log",
       "data": "App data",
       "config": "Configuration",
-      "python": "Engine Python"
+      "python": "Engine Python",
+      "work": "Temporary files"
     },
     "gpu": {
       "title": "Graphics card",
@@ -425,6 +441,77 @@
         "badResponse": "OpenRouter did not answer properly (error {status}). Try again.",
         "offline": "No connection to OpenRouter. Check the internet."
       }
+    },
+    "storage": {
+      "title": "Storage",
+      "measuring": "Measuring the space used…",
+      "folders": {
+        "temp": {
+          "title": "Temporary files",
+          "hint": "Review images and clips, copies downloaded from the Drive. Everything here can be made again by the app."
+        },
+        "finals": {
+          "title": "Final videos",
+          "hint": "Each final video in a subfolder, with the video, the spreadsheet and the report."
+        },
+        "project": {
+          "title": "Project files",
+          "hint": "Holds the Projects folder (the project files) and Original Videos. Videos inside this folder go into a project with a relative path: the whole folder can be moved or copied to another disk or computer."
+        }
+      },
+      "used": "{size} used",
+      "free": "{size} free on the disk",
+      "default": "default",
+      "chosen": "chosen by you",
+      "open": "Open folder",
+      "choose": "Choose another folder…",
+      "placeholder": "E.g. D:\\Counter",
+      "use": "Use this folder",
+      "backToDefault": "Back to the default",
+      "errors": {
+        "notAbsolute": "Type the folder's full path (e.g. D:\\Counter).",
+        "notWritable": "Could not write to that folder. Choose another one."
+      },
+      "nextOnly": "Changing a folder applies to the next videos; the ones already in the app stay where they are. The app database and each video's trajectories ({size}) are in {path}.",
+      "oldFinals": "{n, plural, one {# final video} other {# final videos}} made before this version {n, plural, one {is} other {are}} still in the app folder ({size}).",
+      "moveOldFinals": "Move to the final videos folder",
+      "moved": "{size} moved. Each copy was checked before deleting the original.",
+      "movedSome": "Moved what could be moved; {n, plural, one {# item could not be moved and stays} other {# items could not be moved and stay}} where {n, plural, one {it was} other {they were}}, working.",
+      "freeTitle": "Free up space",
+      "items": "{n, plural, one {# item} other {# items}}",
+      "nothing": "nothing to delete",
+      "kinds": {
+        "finalVideos": {
+          "title": "Final videos already generated",
+          "hint": "The count and the spreadsheet stay in the app. Download first any video you want to keep; it can be generated again."
+        },
+        "reviewMedia": {
+          "title": "Review images of videos already reviewed",
+          "hint": "The review decisions stay saved and the final video still works; only the images and clips go away (they can be made again)."
+        },
+        "driveVideos": {
+          "title": "Videos downloaded from Google Drive",
+          "hint": "When you generate a final video, the app downloads the video again."
+        },
+        "leftovers": {
+          "title": "Leftovers of videos no longer in the app",
+          "hint": "Files of videos and final videos deleted from the library."
+        }
+      },
+      "delete": "Delete selected ({size})",
+      "deleteNone": "Delete selected",
+      "confirm": "Confirm: delete {size}",
+      "deleting": "Deleting…",
+      "cancel": "Cancel",
+      "freed": "{size} freed.",
+      "askMove": "The current folder holds {size} ({n, plural, one {# item} other {# items}}). Move everything to {path}?",
+      "moveBusy": "Wait for what is running (detection, suggestions, final video or images) to finish before moving.",
+      "moveNoSpace": "There is not enough space at the destination ({free} free).",
+      "moveAll": "Move everything there",
+      "moveNone": "Don't move: use it only for what comes next",
+      "moveHow": "Each item is copied, checked and only then deleted from the current folder. If something fails, that item stays where it was, working.",
+      "movingItem": "Moving {name}… {done} of {total}",
+      "movingHint": "You can keep using the app. Don't close it until it finishes."
     }
   },
   "welcome": {
@@ -644,7 +731,9 @@
     },
     "passagesBadge": "Passages of {list} only · {before} s before, {after} s after",
     "passagesBadgeAll": "Passages only · {before} s before, {after} s after",
-    "betweenCuts": "Between the cuts: counted, but not shown in the video"
+    "betweenCuts": "Between the cuts: counted, but not shown in the video",
+    "videoDeleted": "The video was deleted to free up space. The count and the spreadsheet are still here; use \"Generate again\" to make the video again.",
+    "openFolder": "Open folder"
   },
   "categoryPicker": {
     "legend": "What goes into the final video and the count",
@@ -662,5 +751,31 @@
     "cutOn": "Cut on passages of:",
     "noCut": "Pick at least one category to cut on.",
     "uncheckAll": "uncheck all"
+  },
+  "project": {
+    "title": "Projects",
+    "intro": "A project is a library group saved to a file: the videos, the lines, the trajectories and every review decision. Use it to keep the work outside the app or take it to another computer.",
+    "save": "Save project",
+    "saveAs": "Save as…",
+    "saving": "Saving…",
+    "savedTo": "Project saved to {file} ({when})",
+    "openFolder": "Open folder",
+    "notSaved": "This group has not been saved as a project yet.",
+    "errors": {
+      "notFound": "The project file was not found.",
+      "invalid": "That file is not a Traffic Counter project.",
+      "newer": "This project was saved by a newer version of the app. Update the app to open it.",
+      "empty": "The project has no videos.",
+      "notWritable": "Could not save the project in that folder. Choose another one.",
+      "exists": "Another project is already saved in that file. Choose another name so its saved work is not deleted."
+    },
+    "videos": "{n, plural, one {# video} other {# videos}}",
+    "savedAt": "saved on {when}",
+    "alreadyOpen": "Already open",
+    "open": "Open",
+    "none": "No projects in {folder} yet. To make one, open a library group and click \"Save project\".",
+    "openOther": "Open another file…",
+    "pathPlaceholder": "Path of the .tcproj file",
+    "openHint": "Opening a project never deletes anything: the videos already in the library stay as they are, and the others come in with their saved decisions."
   }
 }

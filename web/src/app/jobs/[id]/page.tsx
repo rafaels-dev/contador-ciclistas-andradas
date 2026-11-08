@@ -1,15 +1,17 @@
+import fs from "node:fs";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 import { formatStored, parseMessage } from "@/i18n/message";
-import { listCameras, listCandidates, getGroup, getJob, suggestionSummary, type Area, type Job, type Line } from "@/lib/db";
-import { detectionPreview, hasTracks, suggestionsRunning } from "@/lib/runner";
+import { jobFile, listCameras, listCandidates, getGroup, getJob, suggestionSummary, type Area, type Job, type Line } from "@/lib/db";
+import { detectionPreview, hasTracks, mediaRebuildFailure, mediaRebuilding, suggestionsRunning, videoPath } from "@/lib/runner";
 import { STEPS, currentStep, statusKey } from "@/lib/status";
 import { BUTTON, timecode } from "@/lib/ui";
 import { cancel, resumeSuggestions, reviewWithoutSuggestions, retryJob } from "./actions";
 import { AutoRefresh } from "./auto-refresh";
 import { EditLinesButton } from "./edit-lines-button";
+import { FilesNotice } from "./files-notice";
 import { LineCategories } from "./line-categories";
 import { LineEditor } from "./line-editor";
 import { Review } from "./review";
@@ -168,6 +170,8 @@ async function JobDetail({ params }: { params: Promise<{ id: string }> }) {
         />
       )}
 
+      {inReview && <DeletedFiles job={job} />}
+
       {inReview && (
         <>
           {job.status === "suggesting" && !suggestingNow && <PendingSuggestionsBar job={job} />}
@@ -212,5 +216,37 @@ async function DetectionPreview({ base, version }: { base: string; version: numb
         <img src={`${base}/frame0.jpg`} alt={t("firstFrameAlt")} className="max-h-full max-w-full opacity-60" />
       )}
     </div>
+  );
+}
+
+/**
+ * Files missing: review images (deleted to free space, cleaned by the system
+ * from the temporary folder, or a project opened on another computer), the
+ * Drive copy, or the original video that moved. The decisions are in the
+ * database: the images are made again from the trajectories.
+ */
+async function DeletedFiles({ job }: { job: Job }) {
+  const media = listCandidates(job.id).find((c) => c.filmstrip && c.origin !== "manual");
+  const mediaGone = !!media?.filmstrip && !fs.existsSync(jobFile(job.id, media.filmstrip));
+  const video = videoPath(job.id);
+  const videoHere = fs.existsSync(video);
+  const driveGone = job.drive_id !== "local" && !videoHere;
+  const localGone = job.drive_id === "local" && !videoHere;
+  const progress = mediaRebuilding(job.id);
+  const failure = mediaRebuildFailure(job.id);
+  if (!mediaGone && !driveGone && !localGone && progress === null) return null;
+  return (
+    <>
+      {progress !== null && <AutoRefresh />}
+      <FilesNotice
+        jobId={job.id}
+        mediaGone={mediaGone}
+        driveGone={driveGone}
+        localGone={localGone ? video : null}
+        canRebuild={hasTracks(job.id) && videoHere}
+        progress={progress}
+        failure={failure}
+      />
+    </>
   );
 }

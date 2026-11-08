@@ -8,6 +8,7 @@ import {
   updateJob,
   listCameras,
   getJob,
+  jobDir,
   suggestionSummary,
   reviewCandidates,
   saveCamera,
@@ -21,8 +22,7 @@ import {
 } from "@/lib/db";
 import { msg } from "@/i18n/message";
 import { DIRECTIONS, LABELS, type Label } from "@/lib/review";
-import { jobDir } from "@/lib/paths";
-import { cancelJob, startDetection, startDownload, startSuggestions, suggestionsRunning } from "@/lib/runner";
+import { cancelJob, rebuildMedia, videoMatches, startDetection, startDownload, startSuggestions, suggestionsRunning } from "@/lib/runner";
 
 /** Errors come back as message keys (root namespace), translated on screen. */
 export type ActionResult = { error?: string };
@@ -259,5 +259,26 @@ export async function removeManualCount(jobId: string, id: number): Promise<Acti
   if (!job) return { error: "job.errors.notFound" };
   if (job.status !== "awaiting_review") return { error: "job.errors.reviewClosed" };
   if (!Number.isInteger(id) || !deleteManualCandidate(jobId, id)) return { error: "job.errors.invalidManual" };
+  return {};
+}
+
+/** Makes the review images again from the trajectories (deleted, cleaned by the system, or a project from another computer). */
+export async function rebuildImages(jobId: string): Promise<void> {
+  if (!getJob(jobId)) return;
+  rebuildMedia(jobId);
+  refresh();
+}
+
+/** The original video moved (or a project from another computer): points the job at the file where it is now. */
+export async function relocateVideo(jobId: string, file: string): Promise<{ error?: "notFound" | "wrongVideo" | "checkFailed" }> {
+  const job = getJob(jobId);
+  const target = String(file ?? "").trim();
+  if (!job || job.drive_id !== "local") return { error: "notFound" };
+  if (!path.isAbsolute(target) || !fs.existsSync(target) || !fs.statSync(target).isFile()) return { error: "notFound" };
+  const same = await videoMatches(jobId, target);
+  if (same === false) return { error: "wrongVideo" };
+  if (same === null) return { error: "checkFailed" };
+  updateJob(jobId, { drive_link: target, video_file: target });
+  refresh();
   return {};
 }

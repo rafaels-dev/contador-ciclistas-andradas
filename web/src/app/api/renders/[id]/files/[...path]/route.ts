@@ -1,6 +1,6 @@
 import { getRender } from "@/lib/db";
 import { serveFile } from "@/lib/files";
-import { renderDir } from "@/lib/paths";
+import { renderDir } from "@/lib/db";
 
 /** A render's final video, report and CSV, with Range. */
 export async function GET(request: Request, ctx: RouteContext<"/api/renders/[id]/files/[...path]">) {

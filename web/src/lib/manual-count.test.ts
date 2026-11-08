@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // the database goes to a temporary data folder
 const data = fs.mkdtempSync(path.join(os.tmpdir(), "tc-manual-"));
 process.env.TRAFFIC_COUNTER_DATA = data;
+process.env.TRAFFIC_COUNTER_TEMP = path.join(data, "temp");
 
 describe("manual counts", () => {
   let lib: typeof import("./db");

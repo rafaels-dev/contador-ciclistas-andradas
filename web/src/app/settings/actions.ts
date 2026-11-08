@@ -10,6 +10,8 @@ import { writeSetting } from "@/lib/db";
 import { detectGpu, engineDir, engineStatus, installEngine, installState, gpuPreferred, type EngineStatus, type Gpu, type Installation } from "@/lib/engine";
 import { writeVariable } from "@/lib/env";
 import { checkKey, type KeyCheck } from "@/lib/openrouter";
+import { changeFolder, moveOldFinals as startOldFinals, moveState, planFolderMove, type MovePlan, type MoveState } from "@/lib/move";
+import { FOLDERS, KINDS, freeSpace, storageUsage, type FolderError, type FolderKind, type Kind, type Usage } from "@/lib/storage";
 
 export type SettingsState = {
   gpu: Gpu;
@@ -98,4 +100,45 @@ export async function redoFirstRun(): Promise<void> {
   await requireAccess();
   writeSetting("first_run", null);
   redirect("/welcome");
+}
+
+/** Space used by each folder and by each kind of file (walks the folders: called after the page opens). */
+export async function readStorage(): Promise<Usage> {
+  await requireAccess();
+  return storageUsage();
+}
+
+/** Deletes the chosen kinds of files; returns the new usage and the bytes freed. */
+export async function deleteFiles(kinds: string[]): Promise<{ freed: number; usage: Usage }> {
+  await requireAccess();
+  const freed = freeSpace(kinds.filter((k): k is Kind => (KINDS as readonly string[]).includes(k)));
+  return { freed, usage: storageUsage() };
+}
+
+/** What would move if a folder changed (asked before changing it). */
+export async function planFolder(kind: string, folder: string | null): Promise<MovePlan | { error: FolderError }> {
+  await requireAccess();
+  if (!(FOLDERS as readonly string[]).includes(kind)) return { error: "notAbsolute" };
+  return planFolderMove(kind as FolderKind, folder === null ? null : String(folder));
+}
+
+/** New place for one of the folders (null = back to the default); `move` also moves what is already there. */
+export async function setFolder(kind: string, folder: string | null, move = false): Promise<{ error: FolderError | "busy" | null; usage: Usage }> {
+  await requireAccess();
+  if (!(FOLDERS as readonly string[]).includes(kind)) return { error: "notAbsolute", usage: storageUsage() };
+  const error = changeFolder(kind as FolderKind, folder === null ? null : String(folder), !!move);
+  return { error, usage: storageUsage() };
+}
+
+/** Moves the final videos from before 0.0.10 to the final videos folder (in the background). */
+export async function moveOldFinals(): Promise<{ error: "busy" | null }> {
+  await requireAccess();
+  return { error: startOldFinals() };
+}
+
+/** Progress of a move; with `measure`, the usage again once it has finished. */
+export async function moveProgress(measure = true): Promise<{ state: MoveState; usage: Usage | null }> {
+  await requireAccess();
+  const state = moveState();
+  return { state, usage: state.running || !measure ? null : storageUsage() };
 }

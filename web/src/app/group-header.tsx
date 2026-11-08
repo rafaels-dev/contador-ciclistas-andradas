@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import type { Group } from "@/lib/db";
 import { BUTTON, FIELD } from "@/lib/ui";
 import { removeGroup, renameGroup } from "./_shell/actions";
+import { ProjectButtons } from "./project-buttons";
 
 export function GroupHeader({ group, title, videos }: { group: Group | null; title: string; videos: number }) {
   const t = useTranslations("group");
@@ -46,6 +47,7 @@ export function GroupHeader({ group, title, videos }: { group: Group | null; tit
           </button>
         </>
       )}
+      {group && !editing && <ProjectButtons group={group} />}
       {group && (
         <Link href={`/import?group=${group.id}`} className={BUTTON.secondary}>
           {t("importHere")}

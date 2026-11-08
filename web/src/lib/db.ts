@@ -1,5 +1,8 @@
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { inside } from "./fsutil";
 import { migrateLegacy } from "./legacy";
 import type { Highlights } from "./highlights";
 import { SCHEMA } from "./schema";
@@ -69,6 +72,7 @@ export type Job = {
   lines: string; // JSON of Line[] — frozen copy at detection time
   area: string | null; // JSON of Area (null = whole frame)
   video_file: string | null; // relative to the job dir, or absolute (local video used in place)
+  temp_folder: string | null; // the job's temporary files (jobTempDir); NULL = before 0.0.10, all in jobDir
   group_id: string | null; // library group (null = no group)
   fps: number | null;
   width: number | null;
@@ -84,7 +88,14 @@ export type Job = {
 };
 
 /** Library group (a place, a collection day…): only organizes and eases the final video. */
-export type Group = { id: string; name: string; created_at: string };
+export type Group = {
+  id: string;
+  name: string;
+  /** the project file (.tcproj) it was saved to or opened from (lib/project.ts) */
+  project_file: string | null;
+  project_saved_at: string | null;
+  created_at: string;
+};
 
 
 
@@ -123,7 +134,79 @@ export function db(): DatabaseSync {
 function addColumns(d: DatabaseSync): void {
   const has = (table: string, column: string) =>
     (d.prepare(`SELECT name FROM pragma_table_info('${table}')`).all() as { name: string }[]).some((r) => r.name === column);
-  if (!has("renders", "highlights")) d.exec("ALTER TABLE renders ADD COLUMN highlights TEXT");
+  const missing = [
+    ["renders", "highlights"],
+    ["jobs", "temp_folder"],
+    ["renders", "folder"],
+    ["groups", "project_file"],
+    ["groups", "project_saved_at"],
+  ].filter(([table, column]) => !has(table, column));
+  if (!missing.length) return;
+  // a copy of the database as it was, before changing its structure (the
+  // review decisions are the work of days)
+  backup(d);
+  for (const [table, column] of missing) d.exec(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT`);
+}
+
+/** app.db.<date>.bak next to the database (VACUUM INTO: a consistent copy even in WAL mode). */
+function backup(d: DatabaseSync): void {
+  const target = path.join(DATA_DIR, `app.db.${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.bak`);
+  try {
+    d.exec(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
+  } catch (e) {
+    console.error(`[db] backup ${target}: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+/**
+ * Default home of the temporary processing files — what can be made again:
+ * review images and clips, the copy downloaded from the Drive, the detection
+ * preview. The system temporary folder, which the system's own cleanup tools
+ * know about. Changed in Settings → Storage (lib/storage.ts).
+ */
+export const SYSTEM_TEMP_DIR = path.join(os.tmpdir(), "Traffic Counter");
+
+/** Temporary folder for NEW videos (each job records its own). */
+export function tempRoot(): string {
+  return readSetting("temp_dir") || process.env.TRAFFIC_COUNTER_TEMP || SYSTEM_TEMP_DIR;
+}
+
+/**
+ * A job's lasting files, which cannot be made again without processing the
+ * video again: trajectories (tracks.json.gz, minutes to hours of GPU), first
+ * frame, manual-count thumbnails. In the data folder, as up to 0.0.9.
+ */
+export function jobDir(jobId: string): string {
+  return path.join(DATA_DIR, "jobs", jobId);
+}
+
+/**
+ * A job's temporary files (review images and clips, Drive copy, preview).
+ * Jobs from before 0.0.10 have everything in jobDir.
+ */
+export function jobTempDir(jobId: string): string {
+  const row = db().prepare("SELECT temp_folder FROM jobs WHERE id = ?").get(jobId) as { temp_folder: string | null } | undefined;
+  return row?.temp_folder ?? jobDir(jobId);
+}
+
+/**
+ * A file of the job by its stored relative path ("candidates/filmstrips/3.jpg",
+ * "manual/…", "video.mp4"): in the temporary folder or, for older jobs and
+ * the lasting files, in jobDir. Missing everywhere: where it would be made.
+ */
+export function jobFile(jobId: string, rel: string): string {
+  // a path from the database (e.g. a project file someone edited) never leaves the job's folders
+  if (path.isAbsolute(rel) || !inside(path.join(jobDir(jobId), rel), jobDir(jobId), { self: true })) throw new Error(`invalid job file: ${rel}`);
+  const temp = path.join(jobTempDir(jobId), rel);
+  if (fs.existsSync(temp)) return temp;
+  const lasting = path.join(jobDir(jobId), rel);
+  return fs.existsSync(lasting) ? lasting : temp;
+}
+
+/** A final video's folder: in the final videos folder (Settings → Storage), or in the data folder before 0.0.10. */
+export function renderDir(renderId: string): string {
+  const row = db().prepare("SELECT folder FROM renders WHERE id = ?").get(renderId) as { folder: string | null } | undefined;
+  return row?.folder ?? path.join(DATA_DIR, "renders", renderId);
 }
 
 // node:sqlite returns null-prototype objects, which React does not serialize
@@ -263,8 +346,8 @@ export function getJob(id: string): Job | undefined {
 
 export function createJob(data: { id: string; drive_link: string; drive_id: string; group_id?: string | null }): void {
   db()
-    .prepare("INSERT INTO jobs (id, drive_link, drive_id, group_id) VALUES (?, ?, ?, ?)")
-    .run(data.id, data.drive_link, data.drive_id, data.group_id ?? null);
+    .prepare("INSERT INTO jobs (id, drive_link, drive_id, group_id, temp_folder) VALUES (?, ?, ?, ?, ?)")
+    .run(data.id, data.drive_link, data.drive_id, data.group_id ?? null, path.join(tempRoot(), "jobs", data.id));
 }
 
 export function listGroups(): (Group & { n: number })[] {
@@ -389,6 +472,8 @@ export type Render = {
   categories: string | null;
   /** JSON of Highlights (lib/highlights.ts): only the passages; null = the whole video */
   highlights: string | null;
+  /** its files (renderDir); null = before 0.0.10, in the data folder */
+  folder: string | null;
   status: RenderStatus;
   progress: number;
   message: string | null;
@@ -397,10 +482,25 @@ export type Render = {
   updated_at: string;
 };
 
-export function createRender(id: string, name: string, jobs: string[], categories: Category[] | null = null, highlights: Highlights | null = null): void {
+/** `folder`: where its files go (lib/storage.ts `finalVideoFolder`); null = the data folder (tests). */
+export function createRender(
+  id: string,
+  name: string,
+  jobs: string[],
+  categories: Category[] | null = null,
+  highlights: Highlights | null = null,
+  folder: string | null = null,
+): void {
   db()
-    .prepare("INSERT INTO renders (id, name, jobs, categories, highlights) VALUES (?, ?, ?, ?, ?)")
-    .run(id, name, JSON.stringify(jobs), categories ? JSON.stringify(categories) : null, highlights ? JSON.stringify(highlights) : null);
+    .prepare("INSERT INTO renders (id, name, jobs, categories, highlights, folder) VALUES (?, ?, ?, ?, ?, ?)")
+    .run(
+      id,
+      name,
+      JSON.stringify(jobs),
+      categories ? JSON.stringify(categories) : null,
+      highlights ? JSON.stringify(highlights) : null,
+      folder,
+    );
 }
 
 export function getRender(id: string): Render | undefined {
@@ -418,6 +518,59 @@ export function updateRender(id: string, fields: Partial<Pick<Render, "status" |
   db()
     .prepare(`UPDATE renders SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = datetime('now') WHERE id = ?`)
     .run(...keys.map((k) => fields[k] ?? null), id);
+}
+
+/** New review images of a candidate (runner.ts rebuildMedia): nothing else changes. */
+export function updateCandidateMedia(id: number, filmstrip: string, context: string | null, clip: string): void {
+  db().prepare("UPDATE candidates SET filmstrip = ?, context = ?, clip = ? WHERE id = ?").run(filmstrip, context, clip, id);
+}
+
+// ---------------------------------------------------------------- projects (lib/project.ts)
+
+/** Candidate columns copied to and from a project file (everything but id and job_id). */
+export const CANDIDATE_FIELDS = [
+  "track", "line_id", "frame", "time_s", "direction", "bbox", "yolo_class", "yolo_conf", "alternative", "origin", "n_obs",
+  "filmstrip", "context", "clip", "llm_suggestion", "llm_cost", "llm_conf", "llm_reason", "llm_model", "llm_status",
+  "llm_error", "label", "reviewed_at",
+] as const;
+export type CandidateData = Pick<Candidate, (typeof CANDIDATE_FIELDS)[number]>;
+
+/** A video coming from a project file, with its saved state (same id as on the computer that saved it). */
+export function insertProjectJob(job: Omit<Job, "created_at" | "updated_at" | "progress" | "message">, candidates: CandidateData[]): void {
+  const d = db();
+  const fields = ["id", "drive_link", "drive_id", "file_name", "camera_id", "lines", "area", "video_file", "temp_folder", "group_id",
+    "fps", "width", "height", "duration_s", "status", "error"] as const;
+  const insertCandidate = d.prepare(
+    `INSERT INTO candidates (job_id, ${CANDIDATE_FIELDS.join(", ")}) VALUES (?, ${CANDIDATE_FIELDS.map(() => "?").join(", ")})`,
+  );
+  d.exec("BEGIN");
+  try {
+    d.prepare(`INSERT INTO jobs (${fields.join(", ")}) VALUES (${fields.map(() => "?").join(", ")})`).run(...fields.map((f) => job[f] ?? null));
+    for (const c of candidates) insertCandidate.run(job.id, ...CANDIDATE_FIELDS.map((f) => c[f] ?? null));
+    d.exec("COMMIT");
+  } catch (e) {
+    d.exec("ROLLBACK");
+    throw e;
+  }
+}
+
+/** A group's videos in the order they were added. */
+export function listGroupJobs(groupId: string): Job[] {
+  return db().prepare("SELECT * FROM jobs WHERE group_id = ? ORDER BY created_at, rowid").all(groupId).map(plain) as Job[];
+}
+
+export function groupByProjectFile(file: string): Group | undefined {
+  const row = db().prepare("SELECT * FROM groups WHERE project_file = ?").get(file);
+  return row ? (plain(row) as Group) : undefined;
+}
+
+export function setGroupProject(id: string, file: string | null, savedAt: string | null): void {
+  db().prepare("UPDATE groups SET project_file = ?, project_saved_at = ? WHERE id = ?").run(file, savedAt, id);
+}
+
+/** The final video's files moved (lib/storage.ts moveOldFinalVideos). */
+export function updateRenderFolder(id: string, folder: string): void {
+  db().prepare("UPDATE renders SET folder = ? WHERE id = ?").run(folder, id);
 }
 
 export function readSetting(key: string): string | null {

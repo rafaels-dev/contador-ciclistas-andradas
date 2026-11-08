@@ -4,10 +4,11 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { appLocale } from "@/i18n/server";
 import { ENV_FILE } from "./env";
-import { candidateSummary, listFailedCandidates, listJobs, listRenders, suggestionSummary } from "./db";
+import { candidateSummary, jobDir, jobFile, listFailedCandidates, listJobs, listRenders, suggestionSummary } from "./db";
 import { detectGpu, engineDir, enginePython, engineStatus, installState, gpuPreferred } from "./engine";
 import { suggestionModels } from "./openrouter";
-import { DATA_DIR, REPO_ROOT, jobDir } from "./paths";
+import { DATA_DIR, REPO_ROOT } from "./paths";
+import { storageUsage } from "./storage";
 
 /**
  * Diagnostics report: a .zip the user saves and sends to whoever supports
@@ -135,6 +136,13 @@ export async function buildDiagnostics(): Promise<{ name: string; zip: Buffer }>
     gpu: { detected: gpu, use: gpuPreferred() },
     engine: { ...engine, folder: engineDir(), install: installState() },
     ai: { key_configured: !!process.env.OPENROUTER_API_KEY, models: suggestionModels() },
+    storage: (() => {
+      try {
+        return storageUsage();
+      } catch (e) {
+        return { error: String(e) };
+      }
+    })(),
     folders: { data: DATA_DIR, root: REPO_ROOT, config: ENV_FILE, log: LOG_FILE, bicycle_weights: exists(path.join(REPO_ROOT, "runs", "ft_blur", "weights", "best.pt")) },
   };
   json("summary.json", summary);
@@ -174,7 +182,7 @@ export async function buildDiagnostics(): Promise<{ name: string; zip: Buffer }>
     for (const rel of [c.filmstrip, c.context]) {
       if (!rel) continue;
       try {
-        entries.push({ name: `jobs/${c.job_id}/${rel.replaceAll("\\", "/")}`, data: fs.readFileSync(path.join(jobDir(c.job_id), rel)) });
+        entries.push({ name: `jobs/${c.job_id}/${rel.replaceAll("\\", "/")}`, data: fs.readFileSync(jobFile(c.job_id, rel)) });
         images++;
       } catch {}
     }

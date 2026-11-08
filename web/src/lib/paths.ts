@@ -11,15 +11,9 @@ import "./legacy-env";
  */
 export const REPO_ROOT = process.env.TRAFFIC_COUNTER_ROOT ?? path.resolve(/* turbopackIgnore: true */ process.cwd(), "..");
 
-/** Local app data (database + per-job files). Ignored by git. */
+/** Local app data: the database (and, before 0.0.10, the per-job files). Ignored by git. */
 export const DATA_DIR = process.env.TRAFFIC_COUNTER_DATA ?? path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 
 export const DB_FILE = path.join(DATA_DIR, "app.db");
 
-export function jobDir(jobId: string): string {
-  return path.join(DATA_DIR, "jobs", jobId);
-}
-
-export function renderDir(renderId: string): string {
-  return path.join(DATA_DIR, "renders", renderId);
-}
+// jobDir/renderDir: in db.ts (each job and final video records its folder)

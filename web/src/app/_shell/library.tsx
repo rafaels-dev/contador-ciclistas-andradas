@@ -41,6 +41,9 @@ export async function Library() {
           </NavItem>
         )}
         <NewGroup />
+        <NavItem href="/projects" group={undefined} n={null} icon="project">
+          {t("projects")}
+        </NavItem>
       </nav>
 
       <nav className="flex flex-col gap-0.5">
