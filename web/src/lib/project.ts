@@ -220,12 +220,24 @@ const INTERRUPTED: Partial<Record<JobStatus, JobStatus>> = { downloading: "error
  * Opens a project file as a library group (the group that already came from
  * it, or a new one). Returns the group id and how many videos came in.
  */
+/** `child` inside `parent` after following links (a junction in the .tcdata folder could point anywhere). */
+function insideReal(child: string, parent: string): boolean {
+  if (!inside(child, parent)) return false;
+  if (!fs.existsSync(child)) return true; // no data folder (moved without it): nothing is read from it
+  try {
+    return inside(fs.realpathSync(child), fs.realpathSync(parent));
+  } catch {
+    return false;
+  }
+}
+
 /** A review image/clip path from a project file: relative, inside candidates/ or manual/ (null otherwise). */
 function mediaPath(p: unknown): string | null {
   if (typeof p !== "string" || !p) return null;
-  const parts = p.split(/[\/]/);
-  if (!["candidates", "manual"].includes(parts[0]) || parts.some((s) => s === ".." || s === "") || path.isAbsolute(p)) return null;
-  return parts.join("/");
+  // plain names only: no "..", no backslash or drive letter (a path in any spelling the OS would follow)
+  const parts = p.split("/");
+  if (!["candidates", "manual"].includes(parts[0]) || !parts.every((s) => /^[\w.-]+$/.test(s) && s !== "." && s !== "..")) return null;
+  return p;
 }
 
 export function openProject(file: string): { groupId: string; added: number; existing: number } {
@@ -245,7 +257,7 @@ export function openProject(file: string): { groupId: string; added: number; exi
     }
     // what comes from the file is checked: its data folder next to it, media paths inside the job folder
     const data = path.resolve(path.dirname(target), ...String(v.data).split("/"));
-    if (!inside(data, path.dirname(target))) continue;
+    if (!insideReal(data, path.dirname(target))) continue;
     let candidates: CandidateData[] = [];
     try {
       candidates = (JSON.parse(fs.readFileSync(path.join(data, "candidates.json"), "utf8")) as CandidateData[]).map((c) => ({
