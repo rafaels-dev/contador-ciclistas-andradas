@@ -141,6 +141,30 @@ describe("project files", () => {
     expect(fs.readFileSync(other, "utf8")).toBe("{}");
   });
 
+  it("an edited project file cannot point outside the job folder", () => {
+    const dir = path.join(root, "evil");
+    const file = path.join(dir, "evil.tcproj");
+    write(path.join(dir, "evil.tcdata", "e0000001", "candidates.json"), JSON.stringify([
+      { track: "1", line_id: "l1", frame: 1, time_s: 0, direction: "A->B", bbox: "[0,0,1,1]", yolo_class: "cyclists",
+        filmstrip: "../../../../secret.jpg", context: "candidates/contexts/0.jpg", clip: "C:/Windows/win.ini", llm_status: "ok", origin: "track", label: "cyclists" },
+    ]));
+    write(file, JSON.stringify({
+      format: "traffic-counter-project", version: 1, name: "Evil", saved_at: null,
+      videos: [
+        { id: "e0000001", name: "a.mp4", source: { type: "file", path: "a.mp4", relative: true }, lines: [], status: "pwned", data: "evil.tcdata/e0000001" },
+        { id: "e0000002", name: "b.mp4", source: { type: "file", path: "b.mp4", relative: true }, lines: [], status: "reviewing", data: "../../outside" },
+      ],
+    }));
+    const r = lib.openProject(file);
+    expect(r.added).toBe(1); // the one whose data folder is outside the project is left out
+    expect(lib.getJob("e0000001")!.status).toBe("error");
+    const [c] = lib.listCandidates("e0000001");
+    expect(c.filmstrip).toBeNull();
+    expect(c.clip).toBeNull();
+    expect(c.context).toBe("candidates/contexts/0.jpg");
+    expect(() => lib.jobFile("e0000001", "../../secret.jpg")).toThrow();
+  });
+
   it("refuses what is not a project, or one from a newer version", () => {
     const bad = path.join(root, "bad.tcproj");
     write(bad, "not json");

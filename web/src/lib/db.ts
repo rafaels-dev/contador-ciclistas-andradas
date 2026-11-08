@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { inside } from "./fsutil";
 import { migrateLegacy } from "./legacy";
 import type { Highlights } from "./highlights";
 import { SCHEMA } from "./schema";
@@ -194,6 +195,8 @@ export function jobTempDir(jobId: string): string {
  * the lasting files, in jobDir. Missing everywhere: where it would be made.
  */
 export function jobFile(jobId: string, rel: string): string {
+  // a path from the database (e.g. a project file someone edited) never leaves the job's folders
+  if (path.isAbsolute(rel) || !inside(path.join(jobDir(jobId), rel), jobDir(jobId), { self: true })) throw new Error(`invalid job file: ${rel}`);
   const temp = path.join(jobTempDir(jobId), rel);
   if (fs.existsSync(temp)) return temp;
   const lasting = path.join(jobDir(jobId), rel);

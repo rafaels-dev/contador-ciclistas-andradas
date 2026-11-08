@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   CANDIDATE_FIELDS,
+  JOB_STATUSES,
   getGroup,
   getJob,
   groupByProjectFile,
@@ -219,6 +220,14 @@ const INTERRUPTED: Partial<Record<JobStatus, JobStatus>> = { downloading: "error
  * Opens a project file as a library group (the group that already came from
  * it, or a new one). Returns the group id and how many videos came in.
  */
+/** A review image/clip path from a project file: relative, inside candidates/ or manual/ (null otherwise). */
+function mediaPath(p: unknown): string | null {
+  if (typeof p !== "string" || !p) return null;
+  const parts = p.split(/[\/]/);
+  if (!["candidates", "manual"].includes(parts[0]) || parts.some((s) => s === ".." || s === "") || path.isAbsolute(p)) return null;
+  return parts.join("/");
+}
+
 export function openProject(file: string): { groupId: string; added: number; existing: number } {
   const target = path.resolve(file);
   const p = readProject(target);
@@ -234,16 +243,24 @@ export function openProject(file: string): { groupId: string; added: number; exi
       moveJobs([v.id], groupId);
       continue;
     }
+    // what comes from the file is checked: its data folder next to it, media paths inside the job folder
     const data = path.resolve(path.dirname(target), ...String(v.data).split("/"));
+    if (!inside(data, path.dirname(target))) continue;
     let candidates: CandidateData[] = [];
     try {
-      candidates = JSON.parse(fs.readFileSync(path.join(data, "candidates.json"), "utf8")) as CandidateData[];
+      candidates = (JSON.parse(fs.readFileSync(path.join(data, "candidates.json"), "utf8")) as CandidateData[]).map((c) => ({
+        ...c,
+        filmstrip: mediaPath(c.filmstrip),
+        context: mediaPath(c.context),
+        clip: mediaPath(c.clip),
+      }));
     } catch {
       // a project saved before the detection: no candidates yet
     }
     const local = v.source.type === "file";
     const video = local ? resolveVideo(v.source as Extract<Source, { type: "file" }>, target) : null;
-    const status = INTERRUPTED[v.status] ?? v.status;
+    const saved = INTERRUPTED[v.status] ?? v.status;
+    const status = (JOB_STATUSES as readonly string[]).includes(saved) ? saved : "error";
     copyLasting(data, jobDir(v.id));
     insertProjectJob(
       {
