@@ -147,6 +147,8 @@ describe("project files", () => {
     write(path.join(dir, "evil.tcdata", "e0000001", "candidates.json"), JSON.stringify([
       { track: "1", line_id: "l1", frame: 1, time_s: 0, direction: "A->B", bbox: "[0,0,1,1]", yolo_class: "cyclists",
         filmstrip: "../../../../secret.jpg", context: "candidates/contexts/0.jpg", clip: "C:/Windows/win.ini", llm_status: "ok", origin: "track", label: "cyclists" },
+      { track: "2", line_id: "l1", frame: 2, time_s: 0, direction: "A->B", bbox: "[0,0,1,1]", yolo_class: "cyclists",
+        filmstrip: "candidates\..\..\secret.jpg", context: "candidates/x/../../secret.jpg", clip: "manual/C:x.mp4", llm_status: "ok", origin: "track", label: "cyclists" },
     ]));
     write(file, JSON.stringify({
       format: "traffic-counter-project", version: 1, name: "Evil", saved_at: null,
@@ -155,13 +157,25 @@ describe("project files", () => {
         { id: "e0000002", name: "b.mp4", source: { type: "file", path: "b.mp4", relative: true }, lines: [], status: "reviewing", data: "../../outside" },
       ],
     }));
+    // a junction inside the data folder pointing at another folder of the disk: not followed
+    const outside = path.join(root, "outside-secret");
+    write(path.join(outside, "secret.txt"), "secret");
+    fs.symlinkSync(outside, path.join(dir, "evil.tcdata", "e0000001", "manual"), "junction");
+    // and a data folder that is itself a junction to elsewhere: left out
+    fs.symlinkSync(outside, path.join(dir, "evil.tcdata", "e0000003"), "junction");
+    const p = JSON.parse(fs.readFileSync(file, "utf8"));
+    p.videos.push({ ...p.videos[0], id: "e0000003", data: "evil.tcdata/e0000003" });
+    write(file, JSON.stringify(p));
     const r = lib.openProject(file);
     expect(r.added).toBe(1); // the one whose data folder is outside the project is left out
     expect(lib.getJob("e0000001")!.status).toBe("error");
-    const [c] = lib.listCandidates("e0000001");
+    const [c, d] = lib.listCandidates("e0000001");
     expect(c.filmstrip).toBeNull();
     expect(c.clip).toBeNull();
     expect(c.context).toBe("candidates/contexts/0.jpg");
+    expect([d.filmstrip, d.context, d.clip]).toEqual([null, null, null]);
+    expect(fs.existsSync(path.join(lib.jobDir("e0000001"), "manual", "secret.txt"))).toBe(false);
+    expect(lib.getJob("e0000003")).toBeUndefined();
     expect(() => lib.jobFile("e0000001", "../../secret.jpg")).toThrow();
   });
 
