@@ -1,6 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { connection } from "next/server";
 import { Suspense } from "react";
+import { tempRoot } from "@/lib/db";
 import { LOG_FILE } from "@/lib/diagnostics";
 import { enginePython } from "@/lib/engine";
 import { ENV_FILE } from "@/lib/env";
@@ -48,6 +49,8 @@ async function Content() {
           <dd className="break-all font-mono">{LOG_FILE}</dd>
           <dt className="text-muted">{t("tech.data")}</dt>
           <dd className="break-all font-mono">{DATA_DIR}</dd>
+          <dt className="text-muted">{t("tech.work")}</dt>
+          <dd className="break-all font-mono">{tempRoot()}</dd>
           <dt className="text-muted">{t("tech.config")}</dt>
           <dd className="break-all font-mono">{ENV_FILE}</dd>
           <dt className="text-muted">{t("tech.python")}</dt>

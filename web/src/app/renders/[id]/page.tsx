@@ -5,13 +5,13 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Suspense } from "react";
 import { formatStored } from "@/i18n/message";
-import { CATEGORIES, getJob, getRender, listCandidates, type Category } from "@/lib/db";
+import { CATEGORIES, getJob, getRender, listCandidates, renderDir, type Category } from "@/lib/db";
 import { parseHighlights } from "@/lib/highlights";
-import { renderDir } from "@/lib/paths";
 import { BUTTON, LABEL_COLOR, PANEL_TITLE, timecode } from "@/lib/ui";
 import { AutoRefresh } from "../../jobs/[id]/auto-refresh";
 import { cancel } from "../actions";
 import { JumpTo, RenderAgainButton } from "./controls";
+import { OpenFolderButton } from "@/app/_shell/open-folder-button";
 import { PageLoading } from "@/app/_shell/page-loading";
 
 // renders made before the English version had Portuguese keys:
@@ -59,6 +59,8 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
   const renderCategories = render.categories ? (JSON.parse(render.categories) as Category[]) : null;
   const highlights = parseHighlights(render.highlights);
   const rep = render.status === "ready" ? readJson<Report>(path.join(dir, "report.json")) : null;
+  // deleted in Settings → Storage: the count and the spreadsheet stay
+  const videoGone = render.status === "ready" && !fs.existsSync(path.join(dir, "final_video.mp4"));
   const version = encodeURIComponent(render.updated_at);
   const statusText = t(`status.${render.status}`);
   const catName = (c: Category) => tRoot(`categories.singular.${c}`);
@@ -148,7 +150,11 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
 
       <div className="grid grid-cols-1 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="flex min-w-0 flex-col bg-viewer lg:min-h-0" aria-label={t("monitor")}>
-          {render.status === "ready" ? (
+          {videoGone ? (
+            <div className="grid min-h-64 flex-1 place-items-center p-6 text-center text-sm text-white/60" data-testid="video-deleted">
+              {t("videoDeleted")}
+            </div>
+          ) : render.status === "ready" ? (
             <video data-final controls preload="metadata" className="min-h-0 w-full flex-1 bg-black" src={`${base}/final_video.mp4?v=${version}`} />
           ) : (
             <div className="grid min-h-64 flex-1 place-items-center text-sm text-white/50">{working ? t("generating") : t("noVideo")}</div>
@@ -159,9 +165,11 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
           {render.status === "ready" && (
             <section className="flex flex-col gap-2">
               <h2 className={PANEL_TITLE}>{t("download")}</h2>
-              <a className={BUTTON.primary} href={`${base}/final_video.mp4?download=${t("fileName")}_${render.id}.mp4`}>
-                {t("videoMp4")}
-              </a>
+              {!videoGone && (
+                <a className={BUTTON.primary} href={`${base}/final_video.mp4?download=${t("fileName")}_${render.id}.mp4`}>
+                  {t("videoMp4")}
+                </a>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <a className={BUTTON.secondary} href={`${base}/events.csv?download=${t("fileName")}_${render.id}.csv`}>
                   {t("spreadsheet")}
@@ -170,6 +178,7 @@ async function RenderDetail({ params }: { params: Promise<{ id: string }> }) {
                   {t("reportJson")}
                 </a>
               </div>
+              <OpenFolderButton folder={dir} label={t("openFolder")} />
               {!outdated && <RenderAgainButton renderId={render.id} categories={renderCategories} highlights={highlights} label={t("renderAgain")} />}
             </section>
           )}

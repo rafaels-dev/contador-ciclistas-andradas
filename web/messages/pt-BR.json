@@ -74,7 +74,8 @@
     "suggestionsDone": "{total} candidatos com sugestão · custo US$ {cost}",
     "renderStarting": "Começando…",
     "renderProgress": "Gerando{videos, plural, =1 {} other { vídeo {video} de {videos}}}…{fps, select, none {} other { ({fps} fps)}}",
-    "renderDone": "{events, plural, one {# contagem} other {# contagens}} · {minutes} min de vídeo"
+    "renderDone": "{events, plural, one {# contagem} other {# contagens}} · {minutes} min de vídeo",
+    "downloadingAgain": "Baixando de novo do Google Drive: {name}…"
   },
   "review": {
     "noConsultationReason": "Veículo reconhecido pelo detector numa linha que não conta automóveis — não foi enviado ao modelo de visão.",
@@ -248,7 +249,8 @@
     "newGroup": "Novo grupo",
     "groupPlaceholder": "Nome (ex.: Augusto de Lima)",
     "groupNameLabel": "Nome do novo grupo",
-    "groupHint": "Enter cria · Esc cancela"
+    "groupHint": "Enter cria · Esc cancela",
+    "projects": "Projetos"
   },
   "theme": {
     "theme": "Tema",
@@ -298,6 +300,19 @@
       "invalidArea": "Área de análise inválida.",
       "areaTooSmall": "A área de análise é pequena demais.",
       "invalidManual": "Contagem manual inválida."
+    },
+    "deleted": {
+      "media": "As imagens desta revisão não estão no computador (foram apagadas ou o projeto veio de outro computador). As decisões continuam salvas.",
+      "driveVideo": "O vídeo baixado do Drive foi apagado para liberar espaço. Ao gerar um vídeo final, o app baixa de novo.",
+      "localVideo": "O vídeo original não foi encontrado em {path}.",
+      "locate": "Localizar o vídeo…",
+      "locatePlaceholder": "Caminho do vídeo",
+      "notFound": "Esse arquivo não foi encontrado.",
+      "rebuild": "Refazer as imagens",
+      "rebuilding": "Refazendo as imagens da revisão…",
+      "wrongVideo": "Esse vídeo não é o que foi processado (resolução ou duração diferentes). Escolha o vídeo original.",
+      "rebuildFailed": "Não foi possível refazer as imagens. Veja o registro em Salvar diagnóstico.",
+      "checkFailed": "Não foi possível conferir o vídeo (o motor de detecção não respondeu). Veja Configurações → Motor de detecção."
     }
   },
   "lineEditor": {
@@ -367,7 +382,8 @@
       "log": "Registro (log)",
       "data": "Dados do app",
       "config": "Configuração",
-      "python": "Python do motor"
+      "python": "Python do motor",
+      "work": "Arquivos temporários"
     },
     "gpu": {
       "title": "Placa de vídeo",
@@ -425,6 +441,77 @@
         "badResponse": "O OpenRouter não respondeu direito (erro {status}). Tente de novo.",
         "offline": "Sem conexão com o OpenRouter. Confira a internet."
       }
+    },
+    "storage": {
+      "title": "Armazenamento",
+      "measuring": "Medindo o espaço usado…",
+      "folders": {
+        "temp": {
+          "title": "Arquivos temporários",
+          "hint": "Imagens e clipes da revisão, cópias baixadas do Drive. Tudo aqui pode ser refeito pelo app."
+        },
+        "finals": {
+          "title": "Vídeos finais",
+          "hint": "Cada vídeo final numa subpasta, com o vídeo, a planilha e o relatório."
+        },
+        "project": {
+          "title": "Arquivos do projeto",
+          "hint": "Aqui ficam as pastas Projetos (os arquivos de projeto) e Vídeos Originais. Vídeos dentro desta pasta entram no projeto com caminho relativo: dá para mover ou copiar a pasta inteira para outro disco ou computador."
+        }
+      },
+      "used": "{size} usados",
+      "free": "{size} livres no disco",
+      "default": "padrão",
+      "chosen": "escolhida por você",
+      "open": "Abrir a pasta",
+      "choose": "Escolher outra pasta…",
+      "placeholder": "Ex.: D:\\Contador",
+      "use": "Usar esta pasta",
+      "backToDefault": "Voltar para a padrão",
+      "errors": {
+        "notAbsolute": "Escreva o caminho completo da pasta (ex.: D:\\Contador).",
+        "notWritable": "Não foi possível gravar nessa pasta. Escolha outra."
+      },
+      "nextOnly": "Trocar uma pasta vale para os próximos vídeos; os que já estão no app continuam onde estão. O banco do app e as trajetórias de cada vídeo ({size}) ficam em {path}.",
+      "oldFinals": "{n, plural, one {# vídeo final feito} other {# vídeos finais feitos}} antes desta versão ainda {n, plural, one {está} other {estão}} na pasta do app ({size}).",
+      "moveOldFinals": "Mover para a pasta de vídeos finais",
+      "moved": "{size} movidos. Cada cópia foi conferida antes de apagar o original.",
+      "movedSome": "Movido o que deu; {n, plural, one {# item não pôde ser movido e continua} other {# itens não puderam ser movidos e continuam}} no lugar de antes, funcionando.",
+      "freeTitle": "Liberar espaço",
+      "items": "{n, plural, one {# item} other {# itens}}",
+      "nothing": "nada para apagar",
+      "kinds": {
+        "finalVideos": {
+          "title": "Vídeos finais já gerados",
+          "hint": "A contagem e a planilha continuam no app. Baixe antes o vídeo que quiser guardar; dá para gerar de novo."
+        },
+        "reviewMedia": {
+          "title": "Imagens da revisão dos vídeos já revisados",
+          "hint": "As decisões da revisão continuam salvas e o vídeo final continua saindo; só as imagens e os clipes somem (dá para refazer)."
+        },
+        "driveVideos": {
+          "title": "Vídeos baixados do Google Drive",
+          "hint": "Ao gerar um vídeo final, o app baixa o vídeo de novo."
+        },
+        "leftovers": {
+          "title": "Sobras de vídeos que já saíram do app",
+          "hint": "Arquivos de vídeos e de vídeos finais apagados da biblioteca."
+        }
+      },
+      "delete": "Apagar os selecionados ({size})",
+      "deleteNone": "Apagar os selecionados",
+      "confirm": "Confirmar: apagar {size}",
+      "deleting": "Apagando…",
+      "cancel": "Cancelar",
+      "freed": "{size} liberados.",
+      "askMove": "A pasta atual tem {size} ({n, plural, one {# item} other {# itens}}). Mover tudo para {path}?",
+      "moveBusy": "Espere terminar o que está rodando (detecção, sugestões, vídeo final ou imagens) para mover.",
+      "moveNoSpace": "Não há espaço suficiente no destino ({free} livres).",
+      "moveAll": "Mover tudo para lá",
+      "moveNone": "Não mover: usar só para os próximos",
+      "moveHow": "Cada item é copiado, conferido e só depois apagado da pasta atual. Se algo falhar, aquele item continua onde estava, funcionando.",
+      "movingItem": "Movendo {name}… {done} de {total}",
+      "movingHint": "Pode continuar usando o app. Não feche o app até terminar."
     }
   },
   "welcome": {
@@ -644,7 +731,9 @@
     },
     "passagesBadge": "Só as passagens de {list} · {before} s antes, {after} s depois",
     "passagesBadgeAll": "Só as passagens · {before} s antes, {after} s depois",
-    "betweenCuts": "Entre os cortes: conta, mas não aparece no vídeo"
+    "betweenCuts": "Entre os cortes: conta, mas não aparece no vídeo",
+    "videoDeleted": "O vídeo foi apagado para liberar espaço. A contagem e a planilha continuam aqui; use \"Gerar de novo\" para refazer o vídeo.",
+    "openFolder": "Abrir a pasta"
   },
   "categoryPicker": {
     "legend": "O que entra no vídeo final e na contagem",
@@ -662,5 +751,31 @@
     "cutOn": "Cortar nas passagens de:",
     "noCut": "Marque pelo menos uma categoria para cortar.",
     "uncheckAll": "desmarcar todas"
+  },
+  "project": {
+    "title": "Projetos",
+    "intro": "Um projeto é um grupo da biblioteca salvo num arquivo: os vídeos, as linhas, as trajetórias e todas as decisões da revisão. Serve para guardar o trabalho fora do app ou levar para outro computador.",
+    "save": "Salvar projeto",
+    "saveAs": "Salvar como…",
+    "saving": "Salvando…",
+    "savedTo": "Projeto salvo em {file} ({when})",
+    "openFolder": "Abrir a pasta",
+    "notSaved": "Este grupo ainda não foi salvo como projeto.",
+    "errors": {
+      "notFound": "O arquivo de projeto não foi encontrado.",
+      "invalid": "Esse arquivo não é um projeto do Traffic Counter.",
+      "newer": "Este projeto foi salvo por uma versão mais nova do app. Atualize o app para abrir.",
+      "empty": "O projeto não tem vídeos.",
+      "notWritable": "Não foi possível gravar o projeto nessa pasta. Escolha outra.",
+      "exists": "Já existe outro projeto nesse arquivo. Escolha outro nome para não apagar o trabalho salvo nele."
+    },
+    "videos": "{n, plural, one {# vídeo} other {# vídeos}}",
+    "savedAt": "salvo em {when}",
+    "alreadyOpen": "Já está aberto",
+    "open": "Abrir",
+    "none": "Nenhum projeto em {folder} ainda. Para criar um, abra um grupo da biblioteca e clique em \"Salvar projeto\".",
+    "openOther": "Abrir outro arquivo…",
+    "pathPlaceholder": "Caminho do arquivo .tcproj",
+    "openHint": "Abrir um projeto nunca apaga nada: os vídeos que já estão na biblioteca continuam como estão, e os outros entram com as decisões salvas."
   }
 }

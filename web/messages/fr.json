@@ -74,7 +74,8 @@
     "suggestionsDone": "{total} candidats avec une suggestion · coût US$ {cost}",
     "renderStarting": "Démarrage…",
     "renderProgress": "Rendu{videos, plural, =1 {} other { de la vidéo {video} sur {videos}}}…{fps, select, none {} other { ({fps} fps)}}",
-    "renderDone": "{events, plural, one {# passage compté} other {# passages comptés}} · {minutes} min de vidéo"
+    "renderDone": "{events, plural, one {# passage compté} other {# passages comptés}} · {minutes} min de vidéo",
+    "downloadingAgain": "Nouveau téléchargement depuis Google Drive : {name}…"
   },
   "review": {
     "noConsultationReason": "Véhicule reconnu par le détecteur sur une ligne qui ne compte pas les automobiles — non envoyé au modèle de vision.",
@@ -248,7 +249,8 @@
     "newGroup": "Nouveau groupe",
     "groupPlaceholder": "Nom (ex. : rue Principale)",
     "groupNameLabel": "Nom du nouveau groupe",
-    "groupHint": "Entrée pour créer · Échap pour annuler"
+    "groupHint": "Entrée pour créer · Échap pour annuler",
+    "projects": "Projets"
   },
   "theme": {
     "theme": "Thème",
@@ -298,6 +300,19 @@
       "invalidArea": "Zone d’analyse non valide.",
       "areaTooSmall": "La zone d’analyse est trop petite.",
       "invalidManual": "Comptage manuel non valide."
+    },
+    "deleted": {
+      "media": "Les images de cette révision ne sont pas sur cet ordinateur (elles ont été supprimées ou le projet vient d'un autre ordinateur). Les décisions restent enregistrées.",
+      "driveVideo": "La vidéo téléchargée depuis Drive a été supprimée pour libérer de l'espace. En générant une vidéo finale, l'app la télécharge de nouveau.",
+      "localVideo": "La vidéo originale est introuvable à {path}.",
+      "locate": "Localiser la vidéo…",
+      "locatePlaceholder": "Chemin de la vidéo",
+      "notFound": "Ce fichier est introuvable.",
+      "rebuild": "Refaire les images",
+      "rebuilding": "Les images de la révision sont refaites…",
+      "wrongVideo": "Cette vidéo n'est pas celle qui a été traitée (résolution ou durée différente). Choisissez la vidéo originale.",
+      "rebuildFailed": "Impossible de refaire les images. Voir le journal dans Enregistrer le diagnostic.",
+      "checkFailed": "Impossible de vérifier la vidéo (le moteur de détection n'a pas répondu). Voir Paramètres → Moteur de détection."
     }
   },
   "lineEditor": {
@@ -367,7 +382,8 @@
       "log": "Journal",
       "data": "Données de l’application",
       "config": "Configuration",
-      "python": "Python du moteur"
+      "python": "Python du moteur",
+      "work": "Fichiers temporaires"
     },
     "gpu": {
       "title": "Carte graphique",
@@ -425,6 +441,77 @@
         "badResponse": "OpenRouter n’a pas répondu correctement (erreur {status}). Réessayez.",
         "offline": "Pas de connexion à OpenRouter. Vérifiez la connexion Internet."
       }
+    },
+    "storage": {
+      "title": "Stockage",
+      "measuring": "Mesure de l'espace utilisé…",
+      "folders": {
+        "temp": {
+          "title": "Fichiers temporaires",
+          "hint": "Images et extraits de la révision, copies téléchargées depuis Drive. Tout ce qui est ici peut être refait par l'app."
+        },
+        "finals": {
+          "title": "Vidéos finales",
+          "hint": "Chaque vidéo finale dans un sous-dossier, avec la vidéo, le tableau et le rapport."
+        },
+        "project": {
+          "title": "Fichiers du projet",
+          "hint": "Contient les dossiers Projets (les fichiers de projet) et Vidéos originales. Les vidéos dans ce dossier entrent dans le projet avec un chemin relatif : le dossier entier peut être déplacé ou copié sur un autre disque ou ordinateur."
+        }
+      },
+      "used": "{size} utilisés",
+      "free": "{size} libres sur le disque",
+      "default": "par défaut",
+      "chosen": "choisi par vous",
+      "open": "Ouvrir le dossier",
+      "choose": "Choisir un autre dossier…",
+      "placeholder": "Ex. : D:\\Compteur",
+      "use": "Utiliser ce dossier",
+      "backToDefault": "Revenir au dossier par défaut",
+      "errors": {
+        "notAbsolute": "Écrivez le chemin complet du dossier (ex. : D:\\Compteur).",
+        "notWritable": "Impossible d'écrire dans ce dossier. Choisissez-en un autre."
+      },
+      "nextOnly": "Changer un dossier s'applique aux prochaines vidéos ; celles déjà dans l'app restent où elles sont. La base de données de l'app et les trajectoires de chaque vidéo ({size}) sont dans {path}.",
+      "oldFinals": "{n, plural, one {# vidéo finale faite} other {# vidéos finales faites}} avant cette version {n, plural, one {est} other {sont}} encore dans le dossier de l'app ({size}).",
+      "moveOldFinals": "Déplacer vers le dossier des vidéos finales",
+      "moved": "{size} déplacés. Chaque copie a été vérifiée avant de supprimer l'original.",
+      "movedSome": "Déplacé ce qui pouvait l'être ; {n, plural, one {# élément n'a pas pu être déplacé et reste} other {# éléments n'ont pas pu être déplacés et restent}} à l'endroit d'origine, en fonctionnant.",
+      "freeTitle": "Libérer de l'espace",
+      "items": "{n, plural, one {# élément} other {# éléments}}",
+      "nothing": "rien à supprimer",
+      "kinds": {
+        "finalVideos": {
+          "title": "Vidéos finales déjà générées",
+          "hint": "Le comptage et le tableau restent dans l'app. Téléchargez d'abord la vidéo à garder ; elle peut être générée de nouveau."
+        },
+        "reviewMedia": {
+          "title": "Images de la révision des vidéos déjà révisées",
+          "hint": "Les décisions de la révision restent enregistrées et la vidéo finale fonctionne toujours ; seules les images et les extraits disparaissent (ils peuvent être refaits)."
+        },
+        "driveVideos": {
+          "title": "Vidéos téléchargées depuis Google Drive",
+          "hint": "En générant une vidéo finale, l'app télécharge de nouveau la vidéo."
+        },
+        "leftovers": {
+          "title": "Restes de vidéos qui ne sont plus dans l'app",
+          "hint": "Fichiers de vidéos et de vidéos finales supprimées de la bibliothèque."
+        }
+      },
+      "delete": "Supprimer la sélection ({size})",
+      "deleteNone": "Supprimer la sélection",
+      "confirm": "Confirmer : supprimer {size}",
+      "deleting": "Suppression…",
+      "cancel": "Annuler",
+      "freed": "{size} libérés.",
+      "askMove": "Le dossier actuel contient {size} ({n, plural, one {# élément} other {# éléments}}). Tout déplacer vers {path} ?",
+      "moveBusy": "Attendez la fin de ce qui est en cours (détection, suggestions, vidéo finale ou images) pour déplacer.",
+      "moveNoSpace": "Pas assez d'espace à la destination ({free} libres).",
+      "moveAll": "Tout déplacer là-bas",
+      "moveNone": "Ne pas déplacer : seulement pour la suite",
+      "moveHow": "Chaque élément est copié, vérifié, puis seulement supprimé du dossier actuel. En cas d'échec, cet élément reste où il était et fonctionne.",
+      "movingItem": "Déplacement de {name}… {done} sur {total}",
+      "movingHint": "Vous pouvez continuer à utiliser l'app. Ne la fermez pas avant la fin."
     }
   },
   "welcome": {
@@ -644,7 +731,9 @@
     },
     "passagesBadge": "Passages de {list} seulement · {before} s avant, {after} s après",
     "passagesBadgeAll": "Passages seulement · {before} s avant, {after} s après",
-    "betweenCuts": "Entre les coupes : compté, mais absent de la vidéo"
+    "betweenCuts": "Entre les coupes : compté, mais absent de la vidéo",
+    "videoDeleted": "La vidéo a été supprimée pour libérer de l'espace. Le comptage et le tableau sont toujours ici ; utilisez « Générer à nouveau » pour refaire la vidéo.",
+    "openFolder": "Ouvrir le dossier"
   },
   "categoryPicker": {
     "legend": "Ce qui entre dans la vidéo finale et le comptage",
@@ -662,5 +751,31 @@
     "cutOn": "Couper sur les passages de :",
     "noCut": "Choisissez au moins une catégorie pour couper.",
     "uncheckAll": "tout décocher"
+  },
+  "project": {
+    "title": "Projets",
+    "intro": "Un projet est un groupe de la bibliothèque enregistré dans un fichier : les vidéos, les lignes, les trajectoires et toutes les décisions de la révision. Il sert à garder le travail hors de l'app ou à l'emporter sur un autre ordinateur.",
+    "save": "Enregistrer le projet",
+    "saveAs": "Enregistrer sous…",
+    "saving": "Enregistrement…",
+    "savedTo": "Projet enregistré dans {file} ({when})",
+    "openFolder": "Ouvrir le dossier",
+    "notSaved": "Ce groupe n'a pas encore été enregistré comme projet.",
+    "errors": {
+      "notFound": "Le fichier de projet est introuvable.",
+      "invalid": "Ce fichier n'est pas un projet Traffic Counter.",
+      "newer": "Ce projet a été enregistré par une version plus récente de l'app. Mettez l'app à jour pour l'ouvrir.",
+      "empty": "Le projet n'a pas de vidéos.",
+      "notWritable": "Impossible d'enregistrer le projet dans ce dossier. Choisissez-en un autre.",
+      "exists": "Un autre projet est déjà enregistré dans ce fichier. Choisissez un autre nom pour ne pas effacer son travail."
+    },
+    "videos": "{n, plural, one {# vidéo} other {# vidéos}}",
+    "savedAt": "enregistré le {when}",
+    "alreadyOpen": "Déjà ouvert",
+    "open": "Ouvrir",
+    "none": "Aucun projet dans {folder} pour l'instant. Pour en créer un, ouvrez un groupe de la bibliothèque et cliquez sur « Enregistrer le projet ».",
+    "openOther": "Ouvrir un autre fichier…",
+    "pathPlaceholder": "Chemin du fichier .tcproj",
+    "openHint": "Ouvrir un projet ne supprime jamais rien : les vidéos déjà dans la bibliothèque restent telles quelles, et les autres arrivent avec leurs décisions enregistrées."
   }
 }

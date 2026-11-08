@@ -74,7 +74,8 @@
     "suggestionsDone": "{total} kandidater med forslag · pris US$ {cost}",
     "renderStarting": "Starter…",
     "renderProgress": "Laver video{videos, plural, =1 {} other { {video} af {videos}}}…{fps, select, none {} other { ({fps} fps)}}",
-    "renderDone": "{events, plural, one {# tælling} other {# tællinger}} · {minutes} min video"
+    "renderDone": "{events, plural, one {# tælling} other {# tællinger}} · {minutes} min video",
+    "downloadingAgain": "Henter igen fra Google Drive: {name}…"
   },
   "review": {
     "noConsultationReason": "Køretøj genkendt af detektoren på en linje, der ikke tæller biler – ikke sendt til billedmodellen.",
@@ -248,7 +249,8 @@
     "newGroup": "Ny gruppe",
     "groupPlaceholder": "Navn (f.eks. Storegade)",
     "groupNameLabel": "Navn på den nye gruppe",
-    "groupHint": "Enter opretter · Esc annullerer"
+    "groupHint": "Enter opretter · Esc annullerer",
+    "projects": "Projekter"
   },
   "theme": {
     "theme": "Tema",
@@ -298,6 +300,19 @@
       "invalidArea": "Ugyldigt analyseområde.",
       "areaTooSmall": "Analyseområdet er for lille.",
       "invalidManual": "Ugyldig manuel optælling."
+    },
+    "deleted": {
+      "media": "Billederne fra denne gennemgang er ikke på denne computer (de blev slettet, eller projektet kom fra en anden computer). Beslutningerne forbliver gemt.",
+      "driveVideo": "Videoen hentet fra Drive blev slettet for at frigøre plads. Når du laver en færdig video, henter appen den igen.",
+      "localVideo": "Den originale video blev ikke fundet i {path}.",
+      "locate": "Find videoen…",
+      "locatePlaceholder": "Videoens sti",
+      "notFound": "Den fil blev ikke fundet.",
+      "rebuild": "Lav billederne igen",
+      "rebuilding": "Gennemgangsbillederne laves igen…",
+      "wrongVideo": "Den video er ikke den, der blev behandlet (anden opløsning eller længde). Vælg den originale video.",
+      "rebuildFailed": "Billederne kunne ikke laves igen. Se loggen under Gem diagnose.",
+      "checkFailed": "Videoen kunne ikke kontrolleres (genkendelsesmotoren svarede ikke). Se Indstillinger → Genkendelsesmotor."
     }
   },
   "lineEditor": {
@@ -367,7 +382,8 @@
       "log": "Log",
       "data": "Appdata",
       "config": "Konfiguration",
-      "python": "Motorens Python"
+      "python": "Motorens Python",
+      "work": "Midlertidige filer"
     },
     "gpu": {
       "title": "Grafikkort",
@@ -425,6 +441,77 @@
         "badResponse": "OpenRouter svarede ikke korrekt (fejl {status}). Prøv igen.",
         "offline": "Ingen forbindelse til OpenRouter. Tjek internettet."
       }
+    },
+    "storage": {
+      "title": "Lagring",
+      "measuring": "Måler den brugte plads…",
+      "folders": {
+        "temp": {
+          "title": "Midlertidige filer",
+          "hint": "Billeder og klip fra gennemgangen, kopier hentet fra Drive. Alt her kan appen lave igen."
+        },
+        "finals": {
+          "title": "Færdige videoer",
+          "hint": "Hver færdig video i en undermappe med videoen, regnearket og rapporten."
+        },
+        "project": {
+          "title": "Projektfiler",
+          "hint": "Her ligger mapperne Projekter (projektfilerne) og Originale videoer. Videoer i denne mappe kommer med i projektet med en relativ sti: hele mappen kan flyttes eller kopieres til en anden disk eller computer."
+        }
+      },
+      "used": "{size} brugt",
+      "free": "{size} ledigt på disken",
+      "default": "standard",
+      "chosen": "valgt af dig",
+      "open": "Åbn mappen",
+      "choose": "Vælg en anden mappe…",
+      "placeholder": "F.eks. D:\\Taeller",
+      "use": "Brug denne mappe",
+      "backToDefault": "Tilbage til standard",
+      "errors": {
+        "notAbsolute": "Skriv mappens fulde sti (f.eks. D:\\Taeller).",
+        "notWritable": "Kunne ikke skrive i den mappe. Vælg en anden."
+      },
+      "nextOnly": "En ændret mappe gælder for de næste videoer; de videoer, der allerede er i appen, bliver, hvor de er. Appens database og hver videos baner ({size}) ligger i {path}.",
+      "oldFinals": "{n, plural, one {# færdig video} other {# færdige videoer}} fra før denne version ligger stadig i appens mappe ({size}).",
+      "moveOldFinals": "Flyt til mappen med færdige videoer",
+      "moved": "{size} flyttet. Hver kopi blev kontrolleret, før originalen blev slettet.",
+      "movedSome": "Flyttede det, der kunne flyttes; {n, plural, one {# element kunne ikke flyttes og bliver} other {# elementer kunne ikke flyttes og bliver}}, hvor {n, plural, one {det var} other {de var}}, og virker stadig.",
+      "freeTitle": "Frigør plads",
+      "items": "{n, plural, one {# element} other {# elementer}}",
+      "nothing": "intet at slette",
+      "kinds": {
+        "finalVideos": {
+          "title": "Færdige videoer, der allerede er lavet",
+          "hint": "Optællingen og regnearket bliver i appen. Hent først den video, du vil gemme; den kan laves igen."
+        },
+        "reviewMedia": {
+          "title": "Gennemgangsbilleder af videoer, der allerede er gennemgået",
+          "hint": "Beslutningerne fra gennemgangen forbliver gemt, og den færdige video virker stadig; kun billederne og klippene forsvinder (de kan laves igen)."
+        },
+        "driveVideos": {
+          "title": "Videoer hentet fra Google Drive",
+          "hint": "Når du laver en færdig video, henter appen videoen igen."
+        },
+        "leftovers": {
+          "title": "Rester af videoer, der ikke længere er i appen",
+          "hint": "Filer fra videoer og færdige videoer, der er slettet fra biblioteket."
+        }
+      },
+      "delete": "Slet de valgte ({size})",
+      "deleteNone": "Slet de valgte",
+      "confirm": "Bekræft: slet {size}",
+      "deleting": "Sletter…",
+      "cancel": "Annuller",
+      "freed": "{size} frigjort.",
+      "askMove": "Den nuværende mappe indeholder {size} ({n, plural, one {# element} other {# elementer}}). Flyt det hele til {path}?",
+      "moveBusy": "Vent til det, der kører (genkendelse, forslag, færdig video eller billeder), er færdigt, før du flytter.",
+      "moveNoSpace": "Der er ikke plads nok på destinationen ({free} ledigt).",
+      "moveAll": "Flyt det hele derhen",
+      "moveNone": "Flyt ikke: brug kun til det næste",
+      "moveHow": "Hvert element kopieres, kontrolleres og slettes først derefter fra den nuværende mappe. Hvis noget fejler, bliver elementet, hvor det var, og virker stadig.",
+      "movingItem": "Flytter {name}… {done} af {total}",
+      "movingHint": "Du kan blive ved med at bruge appen. Luk den ikke, før det er færdigt."
     }
   },
   "welcome": {
@@ -644,7 +731,9 @@
     },
     "passagesBadge": "Kun passager af {list} · {before} s før, {after} s efter",
     "passagesBadgeAll": "Kun passager · {before} s før, {after} s efter",
-    "betweenCuts": "Mellem klippene: talt med, men ikke i videoen"
+    "betweenCuts": "Mellem klippene: talt med, men ikke i videoen",
+    "videoDeleted": "Videoen blev slettet for at frigøre plads. Optællingen og regnearket er her stadig; brug \"Lav igen\" for at lave videoen igen.",
+    "openFolder": "Åbn mappen"
   },
   "categoryPicker": {
     "legend": "Hvad der kommer med i den færdige video og tællingen",
@@ -662,5 +751,31 @@
     "cutOn": "Klip ved passager af:",
     "noCut": "Vælg mindst én kategori at klippe ved.",
     "uncheckAll": "fravælg alle"
+  },
+  "project": {
+    "title": "Projekter",
+    "intro": "Et projekt er en gruppe fra biblioteket gemt i en fil: videoerne, linjerne, banerne og alle beslutninger fra gennemgangen. Brug det til at gemme arbejdet uden for appen eller tage det med til en anden computer.",
+    "save": "Gem projekt",
+    "saveAs": "Gem som…",
+    "saving": "Gemmer…",
+    "savedTo": "Projekt gemt i {file} ({when})",
+    "openFolder": "Åbn mappen",
+    "notSaved": "Denne gruppe er endnu ikke gemt som projekt.",
+    "errors": {
+      "notFound": "Projektfilen blev ikke fundet.",
+      "invalid": "Den fil er ikke et Traffic Counter-projekt.",
+      "newer": "Dette projekt blev gemt af en nyere version af appen. Opdater appen for at åbne det.",
+      "empty": "Projektet har ingen videoer.",
+      "notWritable": "Kunne ikke gemme projektet i den mappe. Vælg en anden.",
+      "exists": "Der er allerede gemt et andet projekt i den fil. Vælg et andet navn, så dets arbejde ikke slettes."
+    },
+    "videos": "{n, plural, one {# video} other {# videoer}}",
+    "savedAt": "gemt {when}",
+    "alreadyOpen": "Allerede åben",
+    "open": "Åbn",
+    "none": "Endnu ingen projekter i {folder}. For at lave et, åbn en gruppe fra biblioteket og klik på \"Gem projekt\".",
+    "openOther": "Åbn en anden fil…",
+    "pathPlaceholder": "Sti til .tcproj-filen",
+    "openHint": "At åbne et projekt sletter aldrig noget: de videoer, der allerede er i biblioteket, forbliver som de er, og de andre kommer ind med deres gemte beslutninger."
   }
 }

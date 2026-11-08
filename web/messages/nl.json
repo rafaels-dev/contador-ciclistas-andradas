@@ -74,7 +74,8 @@
     "suggestionsDone": "{total} kandidaten met een suggestie · kosten US$ {cost}",
     "renderStarting": "Starten…",
     "renderProgress": "Video maken{videos, plural, =1 {} other { {video} van {videos}}}…{fps, select, none {} other { ({fps} fps)}}",
-    "renderDone": "{events, plural, one {# telling} other {# tellingen}} · {minutes} min video"
+    "renderDone": "{events, plural, one {# telling} other {# tellingen}} · {minutes} min video",
+    "downloadingAgain": "Opnieuw downloaden van Google Drive: {name}…"
   },
   "review": {
     "noConsultationReason": "Voertuig herkend door de detector op een lijn die geen auto's telt — niet naar het beeldmodel gestuurd.",
@@ -248,7 +249,8 @@
     "newGroup": "Nieuwe groep",
     "groupPlaceholder": "Naam (bijv. Hoofdstraat)",
     "groupNameLabel": "Naam van de nieuwe groep",
-    "groupHint": "Enter maakt aan · Esc annuleert"
+    "groupHint": "Enter maakt aan · Esc annuleert",
+    "projects": "Projecten"
   },
   "theme": {
     "theme": "Thema",
@@ -298,6 +300,19 @@
       "invalidArea": "Ongeldig analysegebied.",
       "areaTooSmall": "Het analysegebied is te klein.",
       "invalidManual": "Ongeldige handmatige telling."
+    },
+    "deleted": {
+      "media": "De beelden van deze controle staan niet op deze computer (ze zijn verwijderd of het project komt van een andere computer). De beslissingen blijven bewaard.",
+      "driveVideo": "De van Drive gedownloade video is verwijderd om ruimte vrij te maken. Bij het maken van een eindvideo downloadt de app hem opnieuw.",
+      "localVideo": "De originele video is niet gevonden op {path}.",
+      "locate": "Video zoeken…",
+      "locatePlaceholder": "Pad van de video",
+      "notFound": "Dat bestand is niet gevonden.",
+      "rebuild": "Beelden opnieuw maken",
+      "rebuilding": "De controlebeelden worden opnieuw gemaakt…",
+      "wrongVideo": "Die video is niet de video die is verwerkt (andere resolutie of lengte). Kies de originele video.",
+      "rebuildFailed": "De beelden konden niet opnieuw worden gemaakt. Zie het logboek bij Diagnose opslaan.",
+      "checkFailed": "De video kon niet worden gecontroleerd (de detectie-engine reageerde niet). Zie Instellingen → Detectie-engine."
     }
   },
   "lineEditor": {
@@ -367,7 +382,8 @@
       "log": "Logboek",
       "data": "Gegevens van de app",
       "config": "Configuratie",
-      "python": "Python van de motor"
+      "python": "Python van de motor",
+      "work": "Tijdelijke bestanden"
     },
     "gpu": {
       "title": "Videokaart",
@@ -425,6 +441,77 @@
         "badResponse": "OpenRouter gaf geen goed antwoord (fout {status}). Probeer het opnieuw.",
         "offline": "Geen verbinding met OpenRouter. Controleer het internet."
       }
+    },
+    "storage": {
+      "title": "Opslag",
+      "measuring": "Gebruikte ruimte meten…",
+      "folders": {
+        "temp": {
+          "title": "Tijdelijke bestanden",
+          "hint": "Beelden en clips van de controle, kopieën gedownload van Drive. Alles hier kan de app opnieuw maken."
+        },
+        "finals": {
+          "title": "Eindvideo's",
+          "hint": "Elke eindvideo in een submap, met de video, de spreadsheet en het rapport."
+        },
+        "project": {
+          "title": "Projectbestanden",
+          "hint": "Bevat de mappen Projecten (de projectbestanden) en Originele video's. Video's in deze map komen met een relatief pad in het project: de hele map kan naar een andere schijf of computer worden verplaatst of gekopieerd."
+        }
+      },
+      "used": "{size} gebruikt",
+      "free": "{size} vrij op de schijf",
+      "default": "standaard",
+      "chosen": "door jou gekozen",
+      "open": "Map openen",
+      "choose": "Andere map kiezen…",
+      "placeholder": "Bijv. D:\\Teller",
+      "use": "Deze map gebruiken",
+      "backToDefault": "Terug naar de standaard",
+      "errors": {
+        "notAbsolute": "Typ het volledige pad van de map (bijv. D:\\Teller).",
+        "notWritable": "Kan niet naar die map schrijven. Kies een andere."
+      },
+      "nextOnly": "Een andere map geldt voor de volgende video's; de video's die al in de app staan, blijven waar ze zijn. De database van de app en de trajecten van elke video ({size}) staan in {path}.",
+      "oldFinals": "{n, plural, one {# eindvideo} other {# eindvideo's}} van vóór deze versie {n, plural, one {staat} other {staan}} nog in de map van de app ({size}).",
+      "moveOldFinals": "Naar de map met eindvideo's verplaatsen",
+      "moved": "{size} verplaatst. Elke kopie is gecontroleerd voordat het origineel werd verwijderd.",
+      "movedSome": "Verplaatst wat kon; {n, plural, one {# item kon niet worden verplaatst en blijft} other {# items konden niet worden verplaatst en blijven}} op de oude plek, werkend.",
+      "freeTitle": "Ruimte vrijmaken",
+      "items": "{n, plural, one {# item} other {# items}}",
+      "nothing": "niets te verwijderen",
+      "kinds": {
+        "finalVideos": {
+          "title": "Al gemaakte eindvideo's",
+          "hint": "De telling en de spreadsheet blijven in de app. Download eerst de video die je wilt bewaren; hij kan opnieuw worden gemaakt."
+        },
+        "reviewMedia": {
+          "title": "Controlebeelden van al gecontroleerde video's",
+          "hint": "De beslissingen van de controle blijven bewaard en de eindvideo werkt nog; alleen de beelden en clips verdwijnen (ze kunnen opnieuw worden gemaakt)."
+        },
+        "driveVideos": {
+          "title": "Video's gedownload van Google Drive",
+          "hint": "Bij het maken van een eindvideo downloadt de app de video opnieuw."
+        },
+        "leftovers": {
+          "title": "Restanten van video's die niet meer in de app staan",
+          "hint": "Bestanden van video's en eindvideo's die uit de bibliotheek zijn verwijderd."
+        }
+      },
+      "delete": "Selectie verwijderen ({size})",
+      "deleteNone": "Selectie verwijderen",
+      "confirm": "Bevestigen: {size} verwijderen",
+      "deleting": "Verwijderen…",
+      "cancel": "Annuleren",
+      "freed": "{size} vrijgemaakt.",
+      "askMove": "De huidige map bevat {size} ({n, plural, one {# item} other {# items}}). Alles naar {path} verplaatsen?",
+      "moveBusy": "Wacht tot wat bezig is (detectie, suggesties, eindvideo of beelden) klaar is voordat je verplaatst.",
+      "moveNoSpace": "Er is niet genoeg ruimte op de bestemming ({free} vrij).",
+      "moveAll": "Alles daarheen verplaatsen",
+      "moveNone": "Niet verplaatsen: alleen voor wat komt",
+      "moveHow": "Elk item wordt gekopieerd, gecontroleerd en pas daarna uit de huidige map verwijderd. Als er iets misgaat, blijft dat item waar het was en werkt het nog.",
+      "movingItem": "{name} verplaatsen… {done} van {total}",
+      "movingHint": "Je kunt de app blijven gebruiken. Sluit hem niet voordat het klaar is."
     }
   },
   "welcome": {
@@ -644,7 +731,9 @@
     },
     "passagesBadge": "Alleen passages van {list} · {before} s voor, {after} s na",
     "passagesBadgeAll": "Alleen passages · {before} s voor, {after} s na",
-    "betweenCuts": "Tussen de knippen: geteld, maar niet in de video"
+    "betweenCuts": "Tussen de knippen: geteld, maar niet in de video",
+    "videoDeleted": "De video is verwijderd om ruimte vrij te maken. De telling en de spreadsheet staan hier nog; gebruik \"Opnieuw maken\" om de video opnieuw te maken.",
+    "openFolder": "Map openen"
   },
   "categoryPicker": {
     "legend": "Wat in de eindvideo en de telling komt",
@@ -662,5 +751,31 @@
     "cutOn": "Knippen bij passages van:",
     "noCut": "Kies minstens één categorie om op te knippen.",
     "uncheckAll": "alles uitvinken"
+  },
+  "project": {
+    "title": "Projecten",
+    "intro": "Een project is een groep uit de bibliotheek, opgeslagen in een bestand: de video's, de lijnen, de trajecten en alle beslissingen van de controle. Zo bewaar je het werk buiten de app of neem je het mee naar een andere computer.",
+    "save": "Project opslaan",
+    "saveAs": "Opslaan als…",
+    "saving": "Opslaan…",
+    "savedTo": "Project opgeslagen in {file} ({when})",
+    "openFolder": "Map openen",
+    "notSaved": "Deze groep is nog niet als project opgeslagen.",
+    "errors": {
+      "notFound": "Het projectbestand is niet gevonden.",
+      "invalid": "Dat bestand is geen Traffic Counter-project.",
+      "newer": "Dit project is opgeslagen door een nieuwere versie van de app. Werk de app bij om het te openen.",
+      "empty": "Het project heeft geen video's.",
+      "notWritable": "Kan het project niet in die map opslaan. Kies een andere.",
+      "exists": "In dat bestand is al een ander project opgeslagen. Kies een andere naam zodat het werk erin niet wordt verwijderd."
+    },
+    "videos": "{n, plural, one {# video} other {# video's}}",
+    "savedAt": "opgeslagen op {when}",
+    "alreadyOpen": "Al geopend",
+    "open": "Openen",
+    "none": "Nog geen projecten in {folder}. Open een groep uit de bibliotheek en klik op \"Project opslaan\" om er een te maken.",
+    "openOther": "Ander bestand openen…",
+    "pathPlaceholder": "Pad van het .tcproj-bestand",
+    "openHint": "Een project openen verwijdert nooit iets: de video's die al in de bibliotheek staan, blijven zoals ze zijn, en de andere komen erbij met hun opgeslagen beslissingen."
   }
 }

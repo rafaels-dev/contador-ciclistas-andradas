@@ -5,6 +5,7 @@ import { useState } from "react";
 import { PANEL_TITLE } from "@/lib/ui";
 import type { SettingsState } from "./actions";
 import { EnginePanel, GpuPanel, KeyPanel, LanguagePanel } from "./panels";
+import { StoragePanel } from "./storage-panel";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -31,6 +32,9 @@ export function Panels({ initial }: { initial: SettingsState }) {
       </Section>
       <Section title={t("key.title")}>
         <KeyPanel hasKey={state.hasKey} />
+      </Section>
+      <Section title={t("storage.title")}>
+        <StoragePanel />
       </Section>
     </>
   );

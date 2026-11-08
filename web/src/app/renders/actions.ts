@@ -1,5 +1,6 @@
 "use server";
 
+import { finalVideoFolder } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
@@ -59,7 +60,7 @@ export async function createFinalVideo(
   }
   const id = randomUUID().slice(0, 8);
   const name = ids.map((j) => getJob(j)?.file_name ?? j).join(" + ").slice(0, 300);
-  createRender(id, name, ids, cats.categories, hl.highlights);
+  createRender(id, name, ids, cats.categories, hl.highlights, finalVideoFolder(id, name));
   startRender(id);
   refresh(); // exports counter in the side library
   redirect(`/renders/${id}`);
