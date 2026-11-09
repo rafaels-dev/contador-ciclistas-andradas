@@ -20,7 +20,7 @@ is the fallback.
 `highlights` ({"before_s", "after_s", "categories": [...] | null}): instead of
 the whole video, only the passages — from before_s ahead of each event of
 those categories (null = all) to after_s after it, nearby passages merged
-into one cut, a short fade between cuts and the time of day in the video on
+into one cut (hard cuts, no fade: it got in the way) and the time of day in the video on
 screen. The counter still adds every event, also the ones between cuts (the
 cars of a busy street go on counting when only the bicycles are shown).
 Output: DIR/final_video.mp4, DIR/report.json, DIR/events.csv and, on stdout,
@@ -80,7 +80,6 @@ BEFORE_S, AFTER_S = 1.5, 1.0  # object box around the event
 FLASH_S = 0.6                 # line in the category color after the event
 OUTPUT_WIDTH = 1920
 JOIN_S = 1.0                  # passages closer than this become one cut
-FADE_S = 0.2                  # fade from/to black at each cut
 
 
 def emit(**data) -> None:
@@ -385,7 +384,6 @@ def main() -> None:
         spans = (passages(events, hl_cats, int(hl["before_s"] * fv), int(hl["after_s"] * fv), int(JOIN_S * fv))
                  if hl else None)
         keep = (lambda i, sp=spans: span_of(sp, i) is not None) if spans is not None else None
-        fade = max(1, int(FADE_S * fv))
         written = 0  # frames of this video in the final video
         footer = (labels["video_n"].format(n=iv + 1, total=len(videos)) + f" · {v['title']}"
                   if len(videos) > 1 else v["title"])
@@ -456,13 +454,10 @@ def main() -> None:
             m = int(16 * scale)
             paste(frame, panel.draw(totals, footer, highlight), m, m)
             if span:
-                # passages: when it happened (time in the video) and a fade at each cut
+                # passages: when it happened (time in the video)
                 clock = tags.img(f"{v['title']} · {hms(idx / fv)}", (15, 15, 20))
                 # bottom right: the top corners hold the panel and, on DVRs, the burned-in clock
                 paste(frame, clock, width - clock.shape[1] - m, height - clock.shape[0] - m)
-                k = min(idx - span[0], span[1] - idx)
-                if k < fade:
-                    frame = (frame.astype(np.float32) * ((k + 1) / (fade + 1))).astype(np.uint8)
             enc.write(frame)
             written += 1
             done += 1
