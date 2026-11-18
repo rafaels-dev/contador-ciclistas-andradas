@@ -2,7 +2,7 @@
   "name": "contador-trafego",
   "productName": "counter.bike",
   "desktopName": "contador-trafego.desktop",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "Counting cyclists, pedestrians and vehicles with human review",
   "homepage": "https://github.com/rafaels-dev/counter-bike",
   "author": "Rafael Schettino <rcschettino@gmail.com>",
