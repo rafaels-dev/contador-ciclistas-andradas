@@ -6,8 +6,8 @@
       "permanent": false
     },
     {
-      "source": "/pt-br/([^/\\].*)",
-      "destination": "/$1",
+      "source": "/pt-br/:page(download|credits|donate)",
+      "destination": "/:page/",
       "permanent": false
     }
   ]
