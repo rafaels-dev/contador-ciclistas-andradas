@@ -3,9 +3,9 @@ import type en from "@/messages/en.json";
 export type Messages = typeof en;
 
 /** Same languages as the app (web/src/i18n/locales.ts). */
-export const LOCALES = ["en", "pt-BR", "es", "fr", "de", "nl", "it", "da"] as const;
+export const LOCALES = ["pt-BR", "en", "es", "fr", "de", "nl", "it", "da"] as const;
 export type Locale = (typeof LOCALES)[number];
-export const DEFAULT_LOCALE: Locale = "en";
+export const DEFAULT_LOCALE: Locale = "pt-BR";
 
 export const LOCALE_NAMES: Record<Locale, string> = {
   en: "English",
@@ -18,13 +18,13 @@ export const LOCALE_NAMES: Record<Locale, string> = {
   da: "Dansk",
 };
 
-/** English lives at the root; every other language under its lowercase code. */
+/** The default language lives at the root; every other one under its lowercase code. */
 export function localePath(locale: Locale): string {
   return locale === DEFAULT_LOCALE ? "/" : `/${locale.toLowerCase()}/`;
 }
 
 /** The sub-pages every language has. "" is the home page. */
-export const PAGES = ["", "download", "credits", "donate"] as const;
+export const PAGES = ["", "download", "contributors", "credits", "donate"] as const;
 export type PageSlug = (typeof PAGES)[number];
 
 export function pagePath(locale: Locale, page: PageSlug): string {
@@ -40,7 +40,7 @@ export async function loadMessages(locale: Locale): Promise<Messages> {
 }
 
 export const SITE_URL = "https://counter.bike";
-/** The repository keeps its first name until it moves; every link goes through here. */
+/** Every link to the repository goes through here. */
 export const REPO = "https://github.com/rafaels-dev/counter-bike";
 export const LINKS = {
   repo: REPO,

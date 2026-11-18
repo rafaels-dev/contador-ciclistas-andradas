@@ -1,3 +1,4 @@
+import { CONTRIBUTORS } from "@/lib/contributors";
 import { CREDITS } from "@/lib/credits";
 import type { Release } from "@/lib/release";
 import { DONATE, LINKS, type Locale, type Messages, pagePath } from "@/lib/site";
@@ -30,6 +31,46 @@ export function DownloadPage({ locale, t, release }: Props & { release: Release 
         </div>
       </main>
       <Footer locale={locale} t={t} page="download" />
+    </>
+  );
+}
+
+/** Who builds the project: a photo or logo, the name, the role and the group. */
+export function ContributorsPage({ locale, t }: Props) {
+  return (
+    <>
+      <Nav locale={locale} t={t} page="contributors" />
+      <main id="main" className="sub">
+        <div className="container sub__grid">
+          <div className="hero__text">
+            <h1>{t.contributors.title}</h1>
+            <p className="lead">{t.contributors.lead}</p>
+          </div>
+          <ul className="people">
+            {CONTRIBUTORS.map((person) => (
+              <li className="person" key={person.name}>
+                {person.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="person__face" src={person.image} width={413} height={413} alt={t.contributors.portrait.replace("{name}", person.name)} />
+                ) : (
+                  <span className="person__face on-ink" aria-hidden="true">
+                    {person.name.split(" ").map((word) => word[0]).join("")}
+                  </span>
+                )}
+                <h2><a href={person.url}>{person.name}</a></h2>
+                <p>{[person.role && t.contributors.roles[person.role], person.org].filter(Boolean).join(", ")}</p>
+              </li>
+            ))}
+          </ul>
+          <ul className="notes">
+            <li>{t.contributors.join}</li>
+            <li>
+              <a href={`${pagePath(locale, "")}#contribute`}>{t.contributors.joinLink}</a>
+            </li>
+          </ul>
+        </div>
+      </main>
+      <Footer locale={locale} t={t} page="contributors" />
     </>
   );
 }

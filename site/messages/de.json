@@ -12,7 +12,8 @@
     "source": "GitHub",
     "language": "Sprache",
     "download": "Herunterladen",
-    "donate": "Spenden"
+    "donate": "Spenden",
+    "menu": "Menü"
   },
   "hero": {
     "title": "Zählen Sie jedes Rad, das vorbeifährt.",
@@ -151,7 +152,8 @@
     "signature": "Die Mitwirkenden von counter.bike",
     "source": "Quellcode",
     "languages": "Sprachen",
-    "credits": "Lizenz und Danksagungen"
+    "credits": "Lizenz und Danksagungen",
+    "contributors": "Mitwirkende"
   },
   "download": {
     "title": "counter.bike herunterladen",
@@ -234,5 +236,15 @@
       }
     ],
     "other": "Weitere Wege zu helfen"
+  },
+  "contributors": {
+    "title": "Mitwirkende",
+    "lead": "Die Menschen und Gruppen, die counter.bike bauen und auf die Straße bringen.",
+    "roles": {
+      "programmer": "Programmierer"
+    },
+    "join": "Sie haben eine Straße gezählt, einen Fehler behoben oder einen Bildschirm übersetzt? Ihr Name gehört hierher.",
+    "joinLink": "So können Sie mitmachen",
+    "portrait": "Porträt von {name}"
   }
 }

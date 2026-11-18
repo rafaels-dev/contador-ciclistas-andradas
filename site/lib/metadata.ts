@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { LOCALES, type Locale, type Messages, type PageSlug, SITE_URL, pagePath } from "./site";
+import { DEFAULT_LOCALE, LOCALES, type Locale, type Messages, type PageSlug, SITE_URL, pagePath } from "./site";
 
 /** Title, description and the hreflang alternates of one page in one language. */
 export function pageMetadata(locale: Locale, t: Messages, page: PageSlug = ""): Metadata {
@@ -13,7 +13,7 @@ export function pageMetadata(locale: Locale, t: Messages, page: PageSlug = ""): 
       canonical: pagePath(locale, page),
       languages: {
         ...Object.fromEntries(LOCALES.map((l) => [l, pagePath(l, page)])),
-        "x-default": pagePath("en", page),
+        "x-default": pagePath(DEFAULT_LOCALE, page),
       },
     },
     openGraph: {
@@ -23,7 +23,7 @@ export function pageMetadata(locale: Locale, t: Messages, page: PageSlug = ""): 
       siteName: "counter.bike",
       locale: locale.replace("-", "_"),
       type: "website",
-      images: [{ url: "/shots/review-dark.webp" }],
+      images: [{ url: `/shots/${locale.toLowerCase()}/review.webp` }],
     },
   };
 }

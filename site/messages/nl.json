@@ -12,7 +12,8 @@
     "source": "GitHub",
     "language": "Taal",
     "download": "Downloaden",
-    "donate": "Doneren"
+    "donate": "Doneren",
+    "menu": "Menu"
   },
   "hero": {
     "title": "Tel elke fiets die voorbijkomt.",
@@ -151,7 +152,8 @@
     "signature": "De bijdragers van counter.bike",
     "source": "Broncode",
     "languages": "Talen",
-    "credits": "Licentie en credits"
+    "credits": "Licentie en credits",
+    "contributors": "Bijdragers"
   },
   "download": {
     "title": "Download counter.bike",
@@ -234,5 +236,15 @@
       }
     ],
     "other": "Andere manieren om te helpen"
+  },
+  "contributors": {
+    "title": "Bijdragers",
+    "lead": "De mensen en groepen die counter.bike bouwen en de straat op brengen.",
+    "roles": {
+      "programmer": "Programmeur"
+    },
+    "join": "Een straat geteld, een fout opgelost of een scherm vertaald? Jouw naam hoort hier.",
+    "joinLink": "Bekijk hoe je kunt bijdragen",
+    "portrait": "Portret van {name}"
   }
 }

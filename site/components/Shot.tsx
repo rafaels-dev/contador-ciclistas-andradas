@@ -40,7 +40,7 @@ export function Shot({
   const src = shot.shared ? `/shots/${shot.file}` : `/shots/${locale.toLowerCase()}/${shot.file}`;
   return (
     <figure className="frame">
-      <div className={`shot ${shot.kind}`} data-slot={slot} data-kind="product" data-alt={alt}>
+      <div className={`shot shot--${name} ${shot.kind}`} data-slot={slot} data-kind="product" data-alt={alt}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={src}

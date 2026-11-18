@@ -21,6 +21,18 @@ export function Nav({ locale, t, page }: Props) {
             <li><a href={LINKS.repo}>{t.nav.source}</a></li>
             <li><a href={pagePath(locale, "donate")} aria-current={page === "donate" ? "page" : undefined}>{t.nav.donate}</a></li>
           </ul>
+          <details className="lang menu">
+            <summary>{t.nav.menu}</summary>
+            <ul>
+              <li><a href={`${home}#route`}>{t.nav.route}</a></li>
+              <li><a href={`${home}#checked`}>{t.nav.checked}</a></li>
+              <li><a href={`${home}#contribute`}>{t.nav.contribute}</a></li>
+              <li><a href={pagePath(locale, "contributors")} aria-current={page === "contributors" ? "page" : undefined}>{t.footer.contributors}</a></li>
+              <li><a href={pagePath(locale, "download")} aria-current={page === "download" ? "page" : undefined}>{t.nav.download}</a></li>
+              <li><a href={pagePath(locale, "donate")} aria-current={page === "donate" ? "page" : undefined}>{t.nav.donate}</a></li>
+              <li><a href={LINKS.repo}>{t.nav.source}</a></li>
+            </ul>
+          </details>
           <details className="lang">
             <summary aria-label={`${t.nav.language}: ${LOCALE_NAMES[locale]}`}>{LOCALE_NAMES[locale]}</summary>
             <ul>
@@ -49,13 +61,14 @@ export function Footer({ locale, t, page }: Props) {
         <div>
           <p className="foot__signoff">{t.footer.signoff}</p>
           <p className="foot__signature">
-            {t.footer.signature}, <time dateTime="2026-11">{signed}</time>
+            <a href={pagePath(locale, "contributors")}>{t.footer.signature}</a>, <time dateTime="2026-11">{signed}</time>
           </p>
         </div>
         <div className="foot__links">
           <ul>
             <li><a href={pagePath(locale, "download")}>{t.nav.download}</a></li>
             <li><a href={pagePath(locale, "donate")}>{t.nav.donate}</a></li>
+            <li><a href={pagePath(locale, "contributors")}>{t.footer.contributors}</a></li>
             <li><a href={pagePath(locale, "credits")}>{t.footer.credits}</a></li>
             <li><a href={LINKS.repo}>{t.footer.source}</a></li>
           </ul>

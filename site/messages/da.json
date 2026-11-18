@@ -12,7 +12,8 @@
     "source": "GitHub",
     "language": "Sprog",
     "download": "Download",
-    "donate": "Doner"
+    "donate": "Doner",
+    "menu": "Menu"
   },
   "hero": {
     "title": "Tæl hver cykel, der kører forbi.",
@@ -151,7 +152,8 @@
     "signature": "Bidragyderne bag counter.bike",
     "source": "Kildekode",
     "languages": "Sprog",
-    "credits": "Licens og kreditering"
+    "credits": "Licens og kreditering",
+    "contributors": "Bidragydere"
   },
   "download": {
     "title": "Download counter.bike",
@@ -234,5 +236,15 @@
       }
     ],
     "other": "Andre måder at hjælpe på"
+  },
+  "contributors": {
+    "title": "Bidragydere",
+    "lead": "De mennesker og grupper, der bygger counter.bike og tager det med ud på gaden.",
+    "roles": {
+      "programmer": "Programmør"
+    },
+    "join": "Har du talt en gade, rettet en fejl eller oversat en skærm? Dit navn hører til her.",
+    "joinLink": "Se, hvordan du kan bidrage",
+    "portrait": "Portræt af {name}"
   }
 }

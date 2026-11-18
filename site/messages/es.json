@@ -12,7 +12,8 @@
     "source": "GitHub",
     "language": "Idioma",
     "download": "Descargar",
-    "donate": "Donar"
+    "donate": "Donar",
+    "menu": "Menú"
   },
   "hero": {
     "title": "Cuenta cada bici que pasa.",
@@ -151,7 +152,8 @@
     "signature": "Quienes contribuyen a counter.bike",
     "source": "Código fuente",
     "languages": "Idiomas",
-    "credits": "Licencia y créditos"
+    "credits": "Licencia y créditos",
+    "contributors": "Colaboradores"
   },
   "download": {
     "title": "Descargar counter.bike",
@@ -234,5 +236,15 @@
       }
     ],
     "other": "Otras formas de ayudar"
+  },
+  "contributors": {
+    "title": "Colaboradores",
+    "lead": "Las personas y los grupos que construyen counter.bike y lo llevan a la calle.",
+    "roles": {
+      "programmer": "Programador"
+    },
+    "join": "¿Contaste una calle, corregiste un error o tradujiste una pantalla? Tu nombre va aquí.",
+    "joinLink": "Mira cómo contribuir",
+    "portrait": "Retrato de {name}"
   }
 }
