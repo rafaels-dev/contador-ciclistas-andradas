@@ -1,6 +1,14 @@
 {
   "redirects": [
-    { "source": "/pt-br", "destination": "/", "permanent": false },
-    { "source": "/pt-br/(.*)", "destination": "/$1", "permanent": false }
+    {
+      "source": "/pt-br",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/pt-br/([^/\\].*)",
+      "destination": "/$1",
+      "permanent": false
+    }
   ]
 }
