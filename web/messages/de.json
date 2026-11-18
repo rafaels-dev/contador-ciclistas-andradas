@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Erkennung, Vorschlag und Prüfung von Verkehrszählungen durch Menschen"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Design: System → Dunkel → Hell"
   },
   "update": {
-    "ready": "Eine neue Version von Traffic Counter ist bereit.",
-    "readyVersion": "Version {version} von Traffic Counter ist bereit.",
+    "ready": "Eine neue Version von counter.bike ist bereit.",
+    "readyVersion": "Version {version} von counter.bike ist bereit.",
     "busy": "{n, plural, one {Eine Aufgabe läuft gerade – ein Neustart jetzt unterbricht sie.} other {Es laufen # Aufgaben – ein Neustart jetzt unterbricht sie alle.}} Sie können auch warten, bis sie fertig sind: Das Update wird installiert, wenn Sie die App schließen.",
     "installerHint": "Das Installationsprogramm zeigt seinen Fortschritt an, und die App öffnet sich nach etwa einer Minute von selbst wieder.",
     "restarting": "Wird neu gestartet…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Schritte",
-    "title": "Willkommen bei Traffic Counter",
+    "title": "Willkommen bei counter.bike",
     "intro": "Sie wählen die Kameravideos aus und zeichnen die Zähllinien. Die App findet alles, was die Linien überquert, eine künstliche Intelligenz schlägt vor, was es jeweils ist – und Sie bestätigen, bevor das Endvideo mit der Zählung erstellt wird.",
     "prepare": "Bevor es losgeht, richten wir diesen Computer ein. Es sind 3 Schritte und dauert ein paar Minuten.",
     "start": "Los geht’s",

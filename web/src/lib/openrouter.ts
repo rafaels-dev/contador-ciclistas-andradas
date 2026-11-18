@@ -177,7 +177,7 @@ export async function suggestCategory(
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "X-Title": "Traffic Counter",
+        "X-Title": "counter.bike",
       },
       body: JSON.stringify({
         // `models` = OpenRouter fallback; the answer says in `model` who answered

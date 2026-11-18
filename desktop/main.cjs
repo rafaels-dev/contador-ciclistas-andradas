@@ -1,4 +1,4 @@
-// Traffic Counter desktop app: a frameless window (title bar drawn by the
+// counter.bike desktop app: a frameless window (title bar drawn by the
 // app itself, like Spotify) over the embedded Next server, which runs in a
 // child process and listens only on 127.0.0.1.
 //
@@ -99,7 +99,7 @@ async function startServer() {
   const uv = resources("bin", WIN ? "uv.exe" : "uv");
   const logFile = dataPath("server.log", "servidor.log");
   server = utilityProcess.fork(resources("web", "server.js"), [], {
-    serviceName: "Traffic Counter server",
+    serviceName: "counter.bike server",
     stdio: "pipe",
     env: {
       ...process.env,
@@ -127,7 +127,7 @@ async function startServer() {
   server.on("exit", (code) => {
     server = null;
     if (!app.isQuitting) {
-      dialog.showErrorBox("Traffic Counter", `The app server stopped (code ${code}). See ${logFile}.`);
+      dialog.showErrorBox("counter.bike", `The app server stopped (code ${code}). See ${logFile}.`);
       app.quit();
     }
   });
@@ -178,7 +178,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 640,
     show: false,
-    title: "Traffic Counter",
+    title: "counter.bike",
     backgroundColor: BACKGROUND[theme],
     titleBarStyle: "hidden",
     // Windows/Linux: system buttons over the app's bar; macOS: traffic lights
@@ -255,7 +255,7 @@ ipcMain.handle("pick-folder", async (e) => {
 });
 
 // project files (lib/project.ts): "Save as…" and "Open another file…"
-const PROJECT_FILTER = [{ name: "Traffic Counter", extensions: ["tcproj"] }];
+const PROJECT_FILTER = [{ name: "counter.bike", extensions: ["tcproj"] }];
 ipcMain.handle("save-project-file", async (e, defaultPath) => {
   const w = BrowserWindow.fromWebContents(e.sender);
   const r = await dialog.showSaveDialog(w, { defaultPath: typeof defaultPath === "string" ? defaultPath : undefined, filters: PROJECT_FILTER });
@@ -299,7 +299,7 @@ app.whenReady().then(async () => {
     appOrigin = new URL(url).origin;
     await w.loadURL(url);
   } catch (e) {
-    dialog.showErrorBox("Traffic Counter", String(e?.message ?? e));
+    dialog.showErrorBox("counter.bike", String(e?.message ?? e));
     app.quit();
     return;
   }

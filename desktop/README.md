@@ -16,6 +16,7 @@ Packages the review app (`web/`) as an installable program, in the style of Spot
   - macOS: `~/Library/Application Support/Traffic Counter`.
   - Linux: `~/.config/Traffic Counter`.
   - Contents: `data/` (database and processed videos), `config.env` (OpenRouter key, editable in **Settings**), `engine/` (Python) and `server.log`.
+  - The folder keeps the name "Traffic Counter", which the product had up to 0.0.11 (it is "counter.bike" now): renaming it would mean moving every user's data again.
   - Up to 0.0.7 the folder was `Contador de Tráfego` (with `dados/`, `motor/`, `servidor.log`). The first start of a newer version renames it (`useDataFolder` in `main.cjs`), and the server translates the database and the job files (`web/src/lib/legacy.ts`). The Python environment stays in `motor/`, because moving a venv can break it.
 - **First run:** a wizard asks for the language and the graphics card, installs the engine and asks for the AI key (step by step, tested before saving). All of it stays editable in **Settings**.
 - **Engine (Python + YOLO):** not in the installer, because PyTorch with CUDA is over 2 GB. The wizard (or **Settings → Install**) uses the bundled `uv` to:

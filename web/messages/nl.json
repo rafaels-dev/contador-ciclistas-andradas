@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Detectie, suggestie en menselijke controle van verkeerstellingen"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Thema: Systeem → Donker → Licht"
   },
   "update": {
-    "ready": "Er staat een nieuwe versie van Traffic Counter klaar.",
-    "readyVersion": "Versie {version} van Traffic Counter staat klaar.",
+    "ready": "Er staat een nieuwe versie van counter.bike klaar.",
+    "readyVersion": "Versie {version} van counter.bike staat klaar.",
     "busy": "{n, plural, one {Er loopt een taak — nu opnieuw starten onderbreekt die.} other {Er lopen # taken — nu opnieuw starten onderbreekt ze allemaal.}} Je kunt ook wachten tot ze klaar zijn: de update wordt geïnstalleerd als je de app sluit.",
     "installerHint": "Het installatieprogramma toont de voortgang en de app opent na ongeveer een minuut vanzelf weer.",
     "restarting": "Opnieuw starten…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Stappen",
-    "title": "Welkom bij Traffic Counter",
+    "title": "Welkom bij counter.bike",
     "intro": "Jij kiest de camerabeelden en tekent de tellijnen. De app vindt alles wat de lijnen passeert, een kunstmatige intelligentie stelt voor wat elk object is — en jij bevestigt voordat de eindvideo met de telling wordt gemaakt.",
     "prepare": "Laten we eerst deze computer voorbereiden. Het zijn 3 stappen en het duurt een paar minuten.",
     "start": "Beginnen",
@@ -763,7 +763,7 @@
     "notSaved": "Deze groep is nog niet als project opgeslagen.",
     "errors": {
       "notFound": "Het projectbestand is niet gevonden.",
-      "invalid": "Dat bestand is geen Traffic Counter-project.",
+      "invalid": "Dat bestand is geen counter.bike-project.",
       "newer": "Dit project is opgeslagen door een nieuwere versie van de app. Werk de app bij om het te openen.",
       "empty": "Het project heeft geen video's.",
       "notWritable": "Kan het project niet in die map opslaan. Kies een andere.",

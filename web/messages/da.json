@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Registrering, forslag og manuel gennemgang af trafiktællinger"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Tema: System → Mørkt → Lyst"
   },
   "update": {
-    "ready": "En ny version af Traffic Counter er klar.",
-    "readyVersion": "Version {version} af Traffic Counter er klar.",
+    "ready": "En ny version af counter.bike er klar.",
+    "readyVersion": "Version {version} af counter.bike er klar.",
     "busy": "{n, plural, one {Der kører en opgave – genstarter du nu, bliver den afbrudt.} other {Der kører # opgaver – genstarter du nu, bliver de alle afbrudt.}} Du kan også vente, til den er færdig: opdateringen installeres, når du lukker appen.",
     "installerHint": "Installationsprogrammet viser, hvor langt det er, og appen åbner af sig selv igen efter cirka et minut.",
     "restarting": "Genstarter…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Trin",
-    "title": "Velkommen til Traffic Counter",
+    "title": "Velkommen til counter.bike",
     "intro": "Du vælger kameravideoerne og tegner tællelinjerne. Appen finder alt, der krydser linjerne, en kunstig intelligens foreslår, hvad hver enkelt er – og du bekræfter, før den færdige video med tællingen bliver lavet.",
     "prepare": "Før vi starter, skal denne computer gøres klar. Der er 3 trin, og det tager et par minutter.",
     "start": "Start",
@@ -763,7 +763,7 @@
     "notSaved": "Denne gruppe er endnu ikke gemt som projekt.",
     "errors": {
       "notFound": "Projektfilen blev ikke fundet.",
-      "invalid": "Den fil er ikke et Traffic Counter-projekt.",
+      "invalid": "Den fil er ikke et counter.bike-projekt.",
       "newer": "Dette projekt blev gemt af en nyere version af appen. Opdater appen for at åbne det.",
       "empty": "Projektet har ingen videoer.",
       "notWritable": "Kunne ikke gemme projektet i den mappe. Vælg en anden.",

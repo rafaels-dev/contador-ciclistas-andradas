@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Detección, sugerencia y revisión humana de conteos de tráfico"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Tema: Sistema → Oscuro → Claro"
   },
   "update": {
-    "ready": "Hay una nueva versión de Traffic Counter lista.",
-    "readyVersion": "La versión {version} de Traffic Counter está lista.",
+    "ready": "Hay una nueva versión de counter.bike lista.",
+    "readyVersion": "La versión {version} de counter.bike está lista.",
     "busy": "{n, plural, one {Hay una tarea en ejecución: si reinicias ahora, se interrumpe.} other {Hay # tareas en ejecución: si reinicias ahora, se interrumpen todas.}} Si lo prefieres, espera a que terminen: la actualización se instala cuando cierres la aplicación.",
     "installerHint": "El instalador muestra su progreso y la aplicación se vuelve a abrir sola en un minuto, más o menos.",
     "restarting": "Reiniciando…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Pasos",
-    "title": "Te damos la bienvenida a Traffic Counter",
+    "title": "Te damos la bienvenida a counter.bike",
     "intro": "Tú eliges los videos de la cámara y dibujas las líneas de conteo. La aplicación encuentra todo lo que cruza las líneas, una inteligencia artificial sugiere qué es cada cosa y tú lo confirmas antes de crear el video final con el conteo.",
     "prepare": "Antes de empezar, vamos a preparar este equipo. Son 3 pasos y tarda unos minutos.",
     "start": "Empezar",
@@ -763,7 +763,7 @@
     "notSaved": "Este grupo todavía no se guardó como proyecto.",
     "errors": {
       "notFound": "No se encontró el archivo de proyecto.",
-      "invalid": "Ese archivo no es un proyecto de Traffic Counter.",
+      "invalid": "Ese archivo no es un proyecto de counter.bike.",
       "newer": "Este proyecto lo guardó una versión más nueva de la app. Actualiza la app para abrirlo.",
       "empty": "El proyecto no tiene videos.",
       "notWritable": "No se pudo guardar el proyecto en esa carpeta. Elige otra.",

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Rilevamento, suggerimento e revisione umana dei conteggi del traffico"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Tema: Sistema → Scuro → Chiaro"
   },
   "update": {
-    "ready": "È pronta una nuova versione di Traffic Counter.",
-    "readyVersion": "La versione {version} di Traffic Counter è pronta.",
+    "ready": "È pronta una nuova versione di counter.bike.",
+    "readyVersion": "La versione {version} di counter.bike è pronta.",
     "busy": "{n, plural, one {C'è un'attività in corso: riavviando ora verrà interrotta.} other {Ci sono # attività in corso: riavviando ora verranno interrotte tutte.}} Se preferisci, aspetta che finisca: l'aggiornamento viene installato quando chiudi l'app.",
     "installerHint": "Il programma di installazione mostra l'avanzamento e l'app si riapre da sola in circa un minuto.",
     "restarting": "Riavvio…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Passaggi",
-    "title": "Benvenuto in Traffic Counter",
+    "title": "Benvenuto in counter.bike",
     "intro": "Scegli i video della telecamera e disegna le linee di conteggio. L'app trova tutto ciò che attraversa le linee, un'intelligenza artificiale suggerisce che cos'è ciascun oggetto e tu confermi prima di creare il video finale con il conteggio.",
     "prepare": "Prima di iniziare, prepariamo questo computer. Sono 3 passaggi e servono pochi minuti.",
     "start": "Inizia",
@@ -763,7 +763,7 @@
     "notSaved": "Questo gruppo non è ancora stato salvato come progetto.",
     "errors": {
       "notFound": "Il file di progetto non è stato trovato.",
-      "invalid": "Quel file non è un progetto di Traffic Counter.",
+      "invalid": "Quel file non è un progetto di counter.bike.",
       "newer": "Questo progetto è stato salvato da una versione più recente dell'app. Aggiorna l'app per aprirlo.",
       "empty": "Il progetto non ha video.",
       "notWritable": "Impossibile salvare il progetto in quella cartella. Scegline un'altra.",

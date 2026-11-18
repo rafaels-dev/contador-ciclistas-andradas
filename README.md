@@ -1,4 +1,6 @@
-# Traffic Counter
+# counter.bike
+
+**[counter.bike](https://counter.bike)**
 
 **English** · [Português (Brasil)](README.pt-BR.md) · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Dansk](README.da.md)
 
@@ -17,13 +19,13 @@ It was built for urban mobility research (it started with the bike lane camera i
 
 ## Download and install
 
-Download the installer for the latest version from **[Releases](https://github.com/rafaels-dev/contador-ciclistas-andradas/releases/latest)**:
+Download the installer for the latest version from **[Releases](https://github.com/rafaels-dev/counter-bike/releases/latest)**:
 
 | System | File |
 |---|---|
-| Windows 10/11 (64-bit) | `TrafficCounter-Setup-<version>.exe` |
-| macOS (Apple chip) | `TrafficCounter-<version>-arm64.dmg` |
-| macOS (Intel) | `TrafficCounter-<version>-x64.dmg` |
+| Windows 10/11 (64-bit) | `counter-bike-Setup-<version>.exe` |
+| macOS (Apple chip) | `counter-bike-<version>-arm64.dmg` |
+| macOS (Intel) | `counter-bike-<version>-x64.dmg` |
 | Linux | `.AppImage` or `.deb` |
 
 The installer doesn't ask for administrator rights, and the app updates itself. When a new version is ready, a **Restart and update** banner appears.
@@ -123,6 +125,8 @@ Main third-party components, all open source:
 | [PyTorch](https://pytorch.org) | BSD-3-Clause |
 | [OpenCV](https://opencv.org) | Apache-2.0 |
 | [supervision](https://github.com/roboflow/supervision) | MIT |
+| [NumPy](https://numpy.org) | BSD-3-Clause |
+| [Pillow](https://python-pillow.github.io) | MIT-CMU |
 | [FFmpeg](https://ffmpeg.org) (via imageio-ffmpeg) | LGPL/GPL |
 | [Electron](https://www.electronjs.org), [Next.js](https://nextjs.org), [next-intl](https://next-intl.dev), [React](https://react.dev) | MIT |
 | [uv](https://github.com/astral-sh/uv) | MIT / Apache-2.0 |
