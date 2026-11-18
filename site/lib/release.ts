@@ -20,17 +20,17 @@ const API = `${REPO.replace("https://github.com/", "https://api.github.com/repos
 
 /** The release known when this was written; used when GitHub cannot be reached. */
 const FALLBACK: Release = {
-  version: "0.0.11",
-  date: "2026-11-09",
+  version: "0.0.12",
+  date: "2026-11-18",
   assets: (
     [
-      ["windows", "TrafficCounter-Setup-0.0.11.exe", 151578944],
-      ["macArm", "TrafficCounter-0.0.11-arm64.dmg", 171456397],
-      ["macIntel", "TrafficCounter-0.0.11-x64.dmg", 178295708],
-      ["appimage", "TrafficCounter-0.0.11-x86_64.AppImage", 181003743],
-      ["deb", "TrafficCounter-0.0.11-amd64.deb", 143995424],
+      ["windows", "counter-bike-Setup-0.0.12.exe", 151556501],
+      ["macArm", "counter-bike-0.0.12-arm64.dmg", 171445850],
+      ["macIntel", "counter-bike-0.0.12-x64.dmg", 178298967],
+      ["appimage", "counter-bike-0.0.12-x86_64.AppImage", 180983126],
+      ["deb", "counter-bike-0.0.12-amd64.deb", 145495836],
     ] as const
-  ).map(([id, name, size]) => ({ id, url: `${REPO}/releases/download/v0.0.11/${name}`, size })),
+  ).map(([id, name, size]) => ({ id, url: `${REPO}/releases/download/v0.0.12/${name}`, size })),
 };
 
 type GitHubRelease = {
