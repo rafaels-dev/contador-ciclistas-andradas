@@ -1,0 +1,238 @@
+{
+  "meta": {
+    "title": "counter.bike, open-source fietstelling voor straatbeelden",
+    "description": "Gratis, open-source software die beelden van straatcamera’s omzet in gecontroleerde tellingen van fietsers, voetgangers, auto’s en motoren."
+  },
+  "nav": {
+    "home": "counter.bike startpagina",
+    "skip": "Naar de inhoud",
+    "route": "Zo werkt het",
+    "checked": "Nauwkeurigheid",
+    "contribute": "Meewerken",
+    "source": "GitHub",
+    "language": "Taal",
+    "download": "Downloaden",
+    "donate": "Doneren"
+  },
+  "hero": {
+    "title": "Tel elke fiets die voorbijkomt.",
+    "lead": "Open-source software die straatbeelden omzet in gecontroleerde tellingen van fietsers.",
+    "download": "Download de app",
+    "platforms": "Windows, macOS en Linux",
+    "source": "Bekijk de broncode"
+  },
+  "showcase": {
+    "alt": "Het controlescherm van de app: een lijst met passages, de clip van een fietser die de telijn kruist, de voorgestelde klasse en een tijdlijn van elke kruising.",
+    "caption": "Het controlescherm. Elke passage krijgt een clip, een voorgestelde klasse en een plek op de tijdlijn."
+  },
+  "route": {
+    "title": "Vijf stops van beeld naar telling",
+    "lead": "De software stelt voor. Een mens beslist.",
+    "tablist": "De vijf stops",
+    "stops": [
+      {
+        "name": "Beeld toevoegen",
+        "title": "Elke vaste camera volstaat",
+        "text": "Open een bestand van je computer of plak een Drive-link. Groepeer de uren van één straat.",
+        "alt": "De bibliotheek van de app met groepen straatvideo’s."
+      },
+      {
+        "name": "Lijnen tekenen",
+        "title": "Een lijn waar mensen kruisen",
+        "text": "Teken telijnen onder elke hoek en kies wat elke lijn telt: het fietspad, de stoep, de rijbaan.",
+        "alt": "De lijneneditor met telijnen over een beeld van de straat."
+      },
+      {
+        "name": "Detecteren",
+        "title": "Alles wat beweegt is een kandidaat",
+        "text": "Objectdetectie en bewegingsvolging vinden elke passage. Een beeldmodel stelt de klasse voor, ook bij vage fietsers in het donker.",
+        "alt": "Beelden van één passage, bijgesneden rond een fietser, zoals het beeldmodel ze ontvangt."
+      },
+      {
+        "name": "Controleren",
+        "title": "Accepteer, corrigeer, voeg zelf toe",
+        "text": "Enter accepteert een suggestie en een cijfertoets wijzigt die. Iemand gemist? Shift en een cijfer tellen die persoon mee terwijl de video speelt.",
+        "alt": "De originele video in het controlescherm, met de telijnen erbovenop en de balk voor handmatig tellen."
+      },
+      {
+        "name": "Exporteren",
+        "title": "Een video en een spreadsheet",
+        "text": "Krijg de beelden met een lopende teller erin gebrand, een CSV van elke passage en een JSON-rapport.",
+        "alt": "Een beeld van de eindvideo met het tellerpaneel over de straat."
+      }
+    ]
+  },
+  "checked": {
+    "title": "Gecontroleerd met handmatige tellingen",
+    "lead": "Detectie is de eerste ronde. De controle dicht het gat.",
+    "caption": "Twee straten, elk één avond, vergeleken met handmatige tellingen",
+    "cols": {
+      "what": "Wat",
+      "where": "Straat en tijd",
+      "hand": "Met de hand",
+      "software": "Voor controle"
+    },
+    "rows": [
+      {
+        "what": "Fietsers",
+        "where": "Andradas, 17 tot 18 uur"
+      },
+      {
+        "what": "Voetgangers",
+        "where": "Andradas, 17 tot 18 uur"
+      },
+      {
+        "what": "Auto’s",
+        "where": "Andradas, 17 tot 18 uur"
+      },
+      {
+        "what": "Fietsers",
+        "where": "Fietspad Augusto de Lima, 17 tot 20 uur"
+      }
+    ],
+    "note": "Wat de detector miste, wordt met de hand toegevoegd. Wat dubbel geteld is, wordt weggegooid."
+  },
+  "statement": {
+    "title": "Steden bouwen voor wat ze tellen.",
+    "text": "counter.bike werkt aan één open telling van fietsers, wereldwijd. Het begint bij jouw straat."
+  },
+  "contribute": {
+    "title": "Vier manieren om te helpen",
+    "lead": "De code, de modellen en de methode zijn openbaar.",
+    "rows": [
+      {
+        "title": "Verbeter de modellen",
+        "text": "Vage fietsen in de schemering worden nog gemist.",
+        "link": "Open issues"
+      },
+      {
+        "title": "Deel beelden",
+        "text": "Gelabelde clips leren de detector jouw stad kennen.",
+        "link": "Deel een clip"
+      },
+      {
+        "title": "Vertaal",
+        "text": "De app spreekt acht talen. Voeg de negende toe.",
+        "link": "Naar de taalbestanden"
+      },
+      {
+        "title": "Tel met de hand",
+        "text": "Met de hand toegevoegde tellingen worden grondwaarheid.",
+        "link": "Haal de app"
+      }
+    ]
+  },
+  "close": {
+    "title": "Draait op je eigen computer",
+    "facts": [
+      {
+        "term": "Systemen",
+        "text": "Windows, macOS en Linux"
+      },
+      {
+        "term": "Videokaart",
+        "text": "NVIDIA is sneller. Een processor alleen werkt ook."
+      },
+      {
+        "term": "Beeldmodel",
+        "text": "Je eigen OpenRouter-sleutel, ongeveer 18 Amerikaanse cent per duizend passages"
+      },
+      {
+        "term": "Licentie",
+        "text": "AGPL-3.0, vrij te gebruiken"
+      }
+    ],
+    "download": "Gratis downloaden",
+    "alt": "Een beeld van de eindvideo: de straat met het tellerpaneel dat de totalen per categorie toont.",
+    "caption": "Een beeld van de eindvideo, met de teller erin gebrand."
+  },
+  "footer": {
+    "signoff": "Tel de straat waar je fietst.",
+    "signature": "De bijdragers van counter.bike",
+    "source": "Broncode",
+    "languages": "Talen",
+    "credits": "Licentie en credits"
+  },
+  "download": {
+    "title": "Download counter.bike",
+    "lead": "Gratis voor Windows, macOS en Linux.",
+    "detected": "Download voor {platform}",
+    "choose": "Kies hieronder je systeem",
+    "version": "Versie {version}, uitgebracht op {date}",
+    "all": "Alle installers",
+    "cols": {
+      "system": "Systeem",
+      "file": "Bestand",
+      "size": "Grootte"
+    },
+    "platforms": {
+      "windows": "Windows",
+      "macArm": "macOS, Apple Silicon",
+      "macIntel": "macOS, Intel",
+      "appimage": "Linux, AppImage",
+      "deb": "Linux, Debian en Ubuntu"
+    },
+    "files": {
+      "windows": "Installer (.exe)",
+      "macArm": "Schijfkopie (.dmg)",
+      "macIntel": "Schijfkopie (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Pakket (.deb)"
+    },
+    "get": "Downloaden",
+    "firstRun": "Bij de eerste start installeert de app haar detectiemotor, houd dus het internet aan.",
+    "older": "Oudere versies"
+  },
+  "credits": {
+    "title": "Licentie en credits",
+    "lead": "counter.bike is vrije software, gebouwd op de vrije software van anderen.",
+    "licenceTitle": "De licentie",
+    "copyright": "Copyright © 2026 Rafael Schettino.",
+    "licenceText": "Verspreid onder de GNU Affero General Public License, versie 3. Gebruik, bestudeer, wijzig en deel het. Verspreid je een gewijzigde versie, of bied je die via een netwerk aan anderen aan, publiceer dan de broncode onder dezelfde licentie.",
+    "licenceLink": "Lees de volledige licentie",
+    "creditsTitle": "Gebouwd met",
+    "cols": {
+      "project": "Project",
+      "role": "Wat het hier doet",
+      "licence": "Licentie"
+    },
+    "roles": [
+      "Vindt mensen en voertuigen in elk beeld",
+      "Draait de detectiemodellen",
+      "Leest de video en volgt beweging",
+      "Volgt elk object van beeld naar beeld",
+      "Decodeert beelden en codeert de eindvideo",
+      "Rekent met vakken en paden",
+      "Tekent de tekst op de eindvideo",
+      "Maakt van de app een desktopprogramma",
+      "Levert de interface uit",
+      "Tekent de interface",
+      "Draagt de acht talen",
+      "Installeert de Python-motor bij de eerste start",
+      "Het lettertype van deze site",
+      "Het ontwerpsysteem van deze site"
+    ],
+    "weights": "De detectiegewichten, ook het model afgestemd op vage fietsen, zijn afgeleid van Ultralytics YOLO en dragen dezelfde AGPL-3.0."
+  },
+  "donate": {
+    "title": "Houd de telling open",
+    "lead": "counter.bike is gratis en blijft gratis. Donaties betalen wat vrijwilligers niet kunnen geven.",
+    "soon": "De donatiekanalen worden ingericht. Tot ze open zijn, is het mooiste cadeau een gelabelde clip van jouw straat.",
+    "give": "Doneer met {channel}",
+    "uses": [
+      {
+        "title": "Videokaarten",
+        "text": "Uren rekenwerk om de modellen op nieuwe straten te trainen."
+      },
+      {
+        "title": "Beeldmodel",
+        "text": "Elke kalibratie stuurt duizenden passages naar een betaald model."
+      },
+      {
+        "title": "Gedeelde beelden",
+        "text": "Opslag voor de clips die steden en vrijwilligers publiceren."
+      }
+    ],
+    "other": "Andere manieren om te helpen"
+  }
+}

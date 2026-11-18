@@ -1,0 +1,238 @@
+{
+  "meta": {
+    "title": "counter.bike, Open-Source-Zähler für den Radverkehr",
+    "description": "Freie, kostenlose Software, die Straßenvideos in geprüfte Zählungen von Radfahrern, Fußgängern, Autos und Motorrädern verwandelt."
+  },
+  "nav": {
+    "home": "counter.bike Startseite",
+    "skip": "Zum Inhalt springen",
+    "route": "So funktioniert’s",
+    "checked": "Genauigkeit",
+    "contribute": "Mitmachen",
+    "source": "GitHub",
+    "language": "Sprache",
+    "download": "Herunterladen",
+    "donate": "Spenden"
+  },
+  "hero": {
+    "title": "Zählen Sie jedes Rad, das vorbeifährt.",
+    "lead": "Open-Source-Software, die Straßenvideos in geprüfte Zählungen von Radfahrern verwandelt.",
+    "download": "App herunterladen",
+    "platforms": "Windows, macOS und Linux",
+    "source": "Quellcode ansehen"
+  },
+  "showcase": {
+    "alt": "Der Prüfbildschirm der App: eine Liste der Querungen, der Clip eines Radfahrers, der die Zähllinie quert, die vorgeschlagene Klasse und eine Zeitleiste aller Querungen.",
+    "caption": "Der Prüfbildschirm. Jede Querung bekommt einen Clip, eine vorgeschlagene Klasse und einen Platz auf der Zeitleiste."
+  },
+  "route": {
+    "title": "Fünf Stationen vom Video zur Zählung",
+    "lead": "Die Software schlägt vor. Ein Mensch entscheidet.",
+    "tablist": "Die fünf Stationen",
+    "stops": [
+      {
+        "name": "Video hinzufügen",
+        "title": "Jede feste Kamera genügt",
+        "text": "Öffnen Sie eine Datei von Ihrem Computer oder fügen Sie einen Drive-Link ein. Fassen Sie die Stunden einer Straße zu einer Gruppe zusammen.",
+        "alt": "Die Bibliothek der App mit Gruppen von Straßenvideos."
+      },
+      {
+        "name": "Linien ziehen",
+        "title": "Eine Linie dort, wo Menschen queren",
+        "text": "Ziehen Sie Zähllinien in beliebigem Winkel und legen Sie fest, was jede zählt: den Radweg, den Gehweg, die Fahrbahn.",
+        "alt": "Der Linieneditor mit Zähllinien auf einem Bild der Straße."
+      },
+      {
+        "name": "Erkennen",
+        "title": "Alles, was sich bewegt, ist ein Kandidat",
+        "text": "Objekterkennung und Bewegungsverfolgung finden jede Querung. Ein Bildmodell schlägt die Klasse vor, auch bei verwischten Radfahrern in der Nacht.",
+        "alt": "Bilder einer Querung, um einen Radfahrer zugeschnitten, so wie das Bildmodell sie erhält."
+      },
+      {
+        "name": "Prüfen",
+        "title": "Annehmen, korrigieren oder von Hand ergänzen",
+        "text": "Enter nimmt einen Vorschlag an, eine Zifferntaste ändert ihn. Jemanden übersehen? Shift und eine Ziffer zählen ihn, während das Video läuft.",
+        "alt": "Das Originalvideo im Prüfbildschirm, darüber die Zähllinien und die Leiste für die manuelle Zählung."
+      },
+      {
+        "name": "Exportieren",
+        "title": "Ein Video und eine Tabelle",
+        "text": "Sie erhalten das Video mit eingebranntem Zähler, eine CSV-Datei mit jeder Querung und einen JSON-Bericht.",
+        "alt": "Ein Bild des Endvideos mit der Zählertafel über der Straße."
+      }
+    ]
+  },
+  "checked": {
+    "title": "Mit Handzählungen abgeglichen",
+    "lead": "Die Erkennung ist der erste Durchgang. Die Prüfung schließt die Lücke.",
+    "caption": "Zwei Straßen, je ein Abend, verglichen mit Handzählungen",
+    "cols": {
+      "what": "Was",
+      "where": "Straße und Zeit",
+      "hand": "Von Hand",
+      "software": "Vor der Prüfung"
+    },
+    "rows": [
+      {
+        "what": "Radfahrer",
+        "where": "Andradas, 17 bis 18 Uhr"
+      },
+      {
+        "what": "Fußgänger",
+        "where": "Andradas, 17 bis 18 Uhr"
+      },
+      {
+        "what": "Autos",
+        "where": "Andradas, 17 bis 18 Uhr"
+      },
+      {
+        "what": "Radfahrer",
+        "where": "Radweg Augusto de Lima, 17 bis 20 Uhr"
+      }
+    ],
+    "note": "Was der Detektor übersehen hat, wird von Hand ergänzt. Was er doppelt gezählt hat, wird verworfen."
+  },
+  "statement": {
+    "title": "Städte bauen für das, was sie zählen.",
+    "text": "counter.bike arbeitet an einer offenen Zählung des Radverkehrs, weltweit. Sie beginnt in Ihrer Straße."
+  },
+  "contribute": {
+    "title": "Vier Wege zu helfen",
+    "lead": "Code, Modelle und Methode sind öffentlich.",
+    "rows": [
+      {
+        "title": "Modelle verbessern",
+        "text": "Verwischte Räder in der Dämmerung werden noch übersehen.",
+        "link": "Offene Issues"
+      },
+      {
+        "title": "Videos teilen",
+        "text": "Beschriftete Clips bringen dem Detektor Ihre Stadt bei.",
+        "link": "Clip teilen"
+      },
+      {
+        "title": "Übersetzen",
+        "text": "Die App spricht acht Sprachen. Fügen Sie die neunte hinzu.",
+        "link": "Sprachdateien öffnen"
+      },
+      {
+        "title": "Von Hand zählen",
+        "text": "Von Hand ergänzte Zählungen werden zur Referenz.",
+        "link": "App holen"
+      }
+    ]
+  },
+  "close": {
+    "title": "Läuft auf Ihrem eigenen Computer",
+    "facts": [
+      {
+        "term": "Systeme",
+        "text": "Windows, macOS und Linux"
+      },
+      {
+        "term": "Grafikkarte",
+        "text": "Mit NVIDIA geht es schneller. Ein Prozessor allein reicht."
+      },
+      {
+        "term": "Bildmodell",
+        "text": "Ihr eigener OpenRouter-Schlüssel, etwa 18 US-Cent pro tausend Querungen"
+      },
+      {
+        "term": "Lizenz",
+        "text": "AGPL-3.0, frei nutzbar"
+      }
+    ],
+    "download": "Kostenlos herunterladen",
+    "alt": "Ein Bild des Endvideos: die Straße mit der Zählertafel, die die Summen pro Kategorie zeigt.",
+    "caption": "Ein Bild des Endvideos mit eingebranntem Zähler."
+  },
+  "footer": {
+    "signoff": "Zählen Sie die Straße, auf der Sie fahren.",
+    "signature": "Die Mitwirkenden von counter.bike",
+    "source": "Quellcode",
+    "languages": "Sprachen",
+    "credits": "Lizenz und Danksagungen"
+  },
+  "download": {
+    "title": "counter.bike herunterladen",
+    "lead": "Kostenlos für Windows, macOS und Linux.",
+    "detected": "Für {platform} herunterladen",
+    "choose": "Wählen Sie unten Ihr System",
+    "version": "Version {version}, veröffentlicht am {date}",
+    "all": "Alle Installer",
+    "cols": {
+      "system": "System",
+      "file": "Datei",
+      "size": "Größe"
+    },
+    "platforms": {
+      "windows": "Windows",
+      "macArm": "macOS, Apple Silicon",
+      "macIntel": "macOS, Intel",
+      "appimage": "Linux, AppImage",
+      "deb": "Linux, Debian und Ubuntu"
+    },
+    "files": {
+      "windows": "Installer (.exe)",
+      "macArm": "Disk-Image (.dmg)",
+      "macIntel": "Disk-Image (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Paket (.deb)"
+    },
+    "get": "Herunterladen",
+    "firstRun": "Beim ersten Start installiert die App ihre Erkennungs-Engine, lassen Sie also das Internet eingeschaltet.",
+    "older": "Ältere Versionen"
+  },
+  "credits": {
+    "title": "Lizenz und Danksagungen",
+    "lead": "counter.bike ist freie Software, gebaut auf der freien Software anderer.",
+    "licenceTitle": "Die Lizenz",
+    "copyright": "Copyright © 2026 Rafael Schettino.",
+    "licenceText": "Verbreitet unter der GNU Affero General Public License, Version 3. Nutzen, studieren, ändern und teilen Sie sie. Wenn Sie eine geänderte Version weitergeben oder anderen über ein Netzwerk anbieten, veröffentlichen Sie ihren Quellcode unter derselben Lizenz.",
+    "licenceLink": "Die ganze Lizenz lesen",
+    "creditsTitle": "Gebaut mit",
+    "cols": {
+      "project": "Projekt",
+      "role": "Aufgabe hier",
+      "licence": "Lizenz"
+    },
+    "roles": [
+      "Findet Menschen und Fahrzeuge in jedem Bild",
+      "Führt die Erkennungsmodelle aus",
+      "Liest das Video und folgt der Bewegung",
+      "Verfolgt jedes Objekt von Bild zu Bild",
+      "Dekodiert Videos und kodiert das Endvideo",
+      "Rechnet mit Rahmen und Bahnen",
+      "Zeichnet den Text ins Endvideo",
+      "Macht die App zum Desktop-Programm",
+      "Liefert die Oberfläche aus",
+      "Zeichnet die Oberfläche",
+      "Trägt die acht Sprachen",
+      "Installiert beim ersten Start die Python-Engine",
+      "Die Schrift dieser Website",
+      "Das Designsystem dieser Website"
+    ],
+    "weights": "Die Erkennungsgewichte, auch das auf verwischte Fahrräder abgestimmte Modell, stammen von Ultralytics YOLO und tragen dieselbe AGPL-3.0."
+  },
+  "donate": {
+    "title": "Halten Sie die Zählung offen",
+    "lead": "counter.bike ist kostenlos und bleibt es. Spenden bezahlen, was Freiwillige nicht leisten können.",
+    "soon": "Die Spendenkanäle werden eingerichtet. Bis sie öffnen, ist der beste Beitrag ein beschrifteter Clip aus Ihrer Straße.",
+    "give": "Spenden mit {channel}",
+    "uses": [
+      {
+        "title": "Grafikkarten",
+        "text": "Rechenstunden, um die Modelle auf neuen Straßen zu trainieren."
+      },
+      {
+        "title": "Bildmodell",
+        "text": "Jede Kalibrierung schickt Tausende Querungen an ein kostenpflichtiges Modell."
+      },
+      {
+        "title": "Geteilte Videos",
+        "text": "Speicher für die Clips, die Städte und Freiwillige veröffentlichen."
+      }
+    ],
+    "other": "Weitere Wege zu helfen"
+  }
+}

@@ -1,0 +1,32 @@
+[
+ {
+  "shape": "Map / Diagram",
+  "theme": "wayfind",
+  "axes": "light/mono/cool",
+  "hero": "Banner",
+  "nav": "floating pill",
+  "footer": "letter close",
+  "imagery": "screenshots of the real app, product",
+  "photos": [],
+  "entry": "counter.bike",
+  "fingerprint": "banner+showcase+switcher+table+statement+rows+split",
+  "sections": [
+   "Hero",
+   "Showcase",
+   "Switcher",
+   "Table",
+   "Statement",
+   "Rows",
+   "Split",
+   "Footer"
+  ],
+  "signature": "the route, five square stops joined edge to edge that switch the real screen",
+  "waived": [
+   "44c",
+   "64"
+  ],
+  "prompt": "open-source bike counter for the urban mobility community",
+  "date": "2026-11-17",
+  "mode": "build"
+ }
+]

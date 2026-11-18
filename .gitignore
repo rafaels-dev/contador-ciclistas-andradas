@@ -75,3 +75,7 @@ web/data/
 !runs/ft_blur/weights/best.pt
 runs/ft_blur/*
 !runs/ft_blur/weights
+
+# Hallmark (design skill used by site/): installed copy and local salt
+.agents/
+/.hallmark/

@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "hallmark": {
+      "source": "nutlope/hallmark",
+      "sourceType": "github",
+      "skillPath": "skills/hallmark/SKILL.md",
+      "computedHash": "fc2c1acfe7c57734c16f1565f24e8074db2898616723a9f7b75b99fe0e51067c"
+    },
+    "next-intl-add-language": {
+      "source": "github/awesome-copilot",
+      "sourceType": "github",
+      "skillPath": "skills/next-intl-add-language/SKILL.md",
+      "computedHash": "6b30075c5f43a4498782729f129c513ca28db37d93032a81a07e444d4db575c5"
+    },
+    "tdd": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/tdd/SKILL.md",
+      "computedHash": "535d1a6f3bd5bded8971e7e4ea76538907cbff6b6d32c39cf97b669869dcd383"
+    }
+  }
+}

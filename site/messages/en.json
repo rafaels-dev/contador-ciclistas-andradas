@@ -1,0 +1,238 @@
+{
+  "meta": {
+    "title": "counter.bike, an open-source bike counter for street footage",
+    "description": "Free, open-source software that turns street-camera footage into reviewed counts of cyclists, pedestrians, cars and motorcycles."
+  },
+  "nav": {
+    "home": "counter.bike home",
+    "skip": "Skip to content",
+    "route": "How it works",
+    "checked": "Accuracy",
+    "contribute": "Contribute",
+    "source": "GitHub",
+    "language": "Language",
+    "download": "Download",
+    "donate": "Donate"
+  },
+  "hero": {
+    "title": "Count every bike that passes.",
+    "lead": "Open-source software that turns street-camera footage into reviewed counts of cyclists.",
+    "download": "Download the app",
+    "platforms": "Windows, macOS and Linux",
+    "source": "Read the source"
+  },
+  "showcase": {
+    "alt": "The review screen of the app: a list of passages, the clip of a cyclist crossing the counting line, the suggested class and a timeline of every crossing.",
+    "caption": "The review screen. Every passage gets a clip, a suggested class and a place on the timeline."
+  },
+  "route": {
+    "title": "Five stops from footage to count",
+    "lead": "The software proposes. A person decides.",
+    "tablist": "The five stops",
+    "stops": [
+      {
+        "name": "Add footage",
+        "title": "Any fixed camera will do",
+        "text": "Open a file from your computer or paste a Drive link. Group the hours of one street together.",
+        "alt": "The library of the app with groups of street videos."
+      },
+      {
+        "name": "Draw lines",
+        "title": "A line where people cross",
+        "text": "Draw counting lines at any angle and choose what each one counts: the bike lane, the sidewalk, the road.",
+        "alt": "The line editor with counting lines drawn over a frame of the street."
+      },
+      {
+        "name": "Detect",
+        "title": "Everything that moves is a candidate",
+        "text": "Object detection and motion tracking find each passage. A vision model suggests its class, blurred night riders included.",
+        "alt": "Frames of one passage, cut around a cyclist, as the vision model receives them."
+      },
+      {
+        "name": "Review",
+        "title": "Accept, correct or add by hand",
+        "text": "Enter accepts a suggestion and a number key changes it. Missed someone? Shift and a number counts them while the video plays.",
+        "alt": "The original video in the review screen, with the counting lines on top and the bar for counting by hand."
+      },
+      {
+        "name": "Export",
+        "title": "A video and a spreadsheet",
+        "text": "Get the footage with a running counter burned in, a CSV of every passage and a JSON report.",
+        "alt": "A frame of the final video with the counter panel over the street."
+      }
+    ]
+  },
+  "checked": {
+    "title": "Checked against counts made by hand",
+    "lead": "Detection is the first pass. The review closes the gap.",
+    "caption": "Two streets, one evening each, compared with counts made by hand",
+    "cols": {
+      "what": "What",
+      "where": "Street and hour",
+      "hand": "By hand",
+      "software": "Before review"
+    },
+    "rows": [
+      {
+        "what": "Cyclists",
+        "where": "Andradas, 5 to 6 pm"
+      },
+      {
+        "what": "Pedestrians",
+        "where": "Andradas, 5 to 6 pm"
+      },
+      {
+        "what": "Cars",
+        "where": "Andradas, 5 to 6 pm"
+      },
+      {
+        "what": "Cyclists",
+        "where": "Augusto de Lima bike lane, 5 to 8 pm"
+      }
+    ],
+    "note": "What the detector missed is added by hand. What it doubled is discarded."
+  },
+  "statement": {
+    "title": "Cities build for what they count.",
+    "text": "counter.bike is working toward one open count of cyclists, worldwide. It starts with your street."
+  },
+  "contribute": {
+    "title": "Four ways to help",
+    "lead": "The code, the models and the method are public.",
+    "rows": [
+      {
+        "title": "Improve the models",
+        "text": "Blurred bikes at dusk still get missed.",
+        "link": "See open issues"
+      },
+      {
+        "title": "Publish footage",
+        "text": "Labelled clips teach the detector your city.",
+        "link": "Share a clip"
+      },
+      {
+        "title": "Translate",
+        "text": "The app speaks eight languages. Add the ninth.",
+        "link": "Open the language files"
+      },
+      {
+        "title": "Count by hand",
+        "text": "Counts added by hand become ground truth.",
+        "link": "Get the app"
+      }
+    ]
+  },
+  "close": {
+    "title": "It runs on your own computer",
+    "facts": [
+      {
+        "term": "Systems",
+        "text": "Windows, macOS and Linux"
+      },
+      {
+        "term": "Graphics card",
+        "text": "NVIDIA is faster. A processor alone works."
+      },
+      {
+        "term": "Vision model",
+        "text": "Your own OpenRouter key, about 18 US cents per thousand passages"
+      },
+      {
+        "term": "Licence",
+        "text": "AGPL-3.0, free to use"
+      }
+    ],
+    "download": "Download for free",
+    "alt": "A frame of the final video: the street with the counter panel showing totals per category.",
+    "caption": "A frame of the final video, with the counter burned in."
+  },
+  "footer": {
+    "signoff": "Count the street you ride.",
+    "signature": "The counter.bike contributors",
+    "source": "Source code",
+    "languages": "Languages",
+    "credits": "Licence and credits"
+  },
+  "download": {
+    "title": "Download counter.bike",
+    "lead": "Free for Windows, macOS and Linux.",
+    "detected": "Download for {platform}",
+    "choose": "Pick your system below",
+    "version": "Version {version}, released {date}",
+    "all": "Every installer",
+    "cols": {
+      "system": "System",
+      "file": "File",
+      "size": "Size"
+    },
+    "platforms": {
+      "windows": "Windows",
+      "macArm": "macOS, Apple Silicon",
+      "macIntel": "macOS, Intel",
+      "appimage": "Linux, AppImage",
+      "deb": "Linux, Debian and Ubuntu"
+    },
+    "files": {
+      "windows": "Installer (.exe)",
+      "macArm": "Disk image (.dmg)",
+      "macIntel": "Disk image (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Package (.deb)"
+    },
+    "get": "Download",
+    "firstRun": "On its first run the app installs its detection engine, so keep the internet on.",
+    "older": "Older versions"
+  },
+  "credits": {
+    "title": "Licence and credits",
+    "lead": "counter.bike is free software, built on other people’s free software.",
+    "licenceTitle": "The licence",
+    "copyright": "Copyright © 2026 Rafael Schettino.",
+    "licenceText": "Distributed under the GNU Affero General Public License, version 3. Use it, study it, change it and share it. If you distribute a changed version, or offer it to others over a network, publish its source under the same licence.",
+    "licenceLink": "Read the full licence",
+    "creditsTitle": "Built with",
+    "cols": {
+      "project": "Project",
+      "role": "What it does here",
+      "licence": "Licence"
+    },
+    "roles": [
+      "Finds people and vehicles in each frame",
+      "Runs the detection models",
+      "Reads the video and follows motion",
+      "Tracks each object from frame to frame",
+      "Decodes footage and encodes the final video",
+      "Does the arithmetic on boxes and paths",
+      "Draws the text on the final video",
+      "Makes the app a desktop program",
+      "Serves the interface",
+      "Draws the interface",
+      "Carries the eight languages",
+      "Installs the Python engine on the first run",
+      "The typeface of this site",
+      "The design system behind this site"
+    ],
+    "weights": "The detection weights, including the model tuned for blurred bicycles, derive from Ultralytics YOLO and carry the same AGPL-3.0."
+  },
+  "donate": {
+    "title": "Keep the count open",
+    "lead": "counter.bike is free and stays free. Donations pay for what volunteers cannot give.",
+    "soon": "Donation channels are being set up. Until they open, the best gift is a labelled clip from your street.",
+    "give": "Donate with {channel}",
+    "uses": [
+      {
+        "title": "Graphics cards",
+        "text": "Hours of computing to train the models on new streets."
+      },
+      {
+        "title": "Vision model",
+        "text": "Each calibration sends thousands of passages to a paid model."
+      },
+      {
+        "title": "Shared footage",
+        "text": "Storage for the clips that cities and volunteers publish."
+      }
+    ],
+    "other": "Other ways to help"
+  }
+}
