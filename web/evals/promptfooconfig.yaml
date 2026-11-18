@@ -3,7 +3,7 @@
 # classified once per language, with the real app code (provider.mjs →
 # suggestCategory). A language whose prompt or category words drift shows up
 # as a column with a lower pass rate. See README.md for data and cost.
-description: Traffic Counter — vision prompt per language
+description: counter.bike — vision prompt per language
 
 # the prompt lives in src/lib/prompts.ts; promptfoo only needs a placeholder
 prompts:

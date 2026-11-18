@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Detection, suggestion and human review of traffic counts"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Theme: System → Dark → Light"
   },
   "update": {
-    "ready": "A new version of Traffic Counter is ready.",
-    "readyVersion": "Version {version} of Traffic Counter is ready.",
+    "ready": "A new version of counter.bike is ready.",
+    "readyVersion": "Version {version} of counter.bike is ready.",
     "busy": "{n, plural, one {There is one task running — restarting now interrupts it.} other {There are # tasks running — restarting now interrupts all of them.}} If you prefer, wait for it to finish: the update is installed when you close the app.",
     "installerHint": "The installer shows its progress and the app opens again by itself in about a minute.",
     "restarting": "Restarting…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Steps",
-    "title": "Welcome to Traffic Counter",
+    "title": "Welcome to counter.bike",
     "intro": "You choose the camera videos and draw the counting lines. The app finds everything that crosses the lines, an artificial intelligence suggests what each one is — and you confirm before creating the final video with the count.",
     "prepare": "Before starting, let's prepare this computer. There are 3 steps and it takes a few minutes.",
     "start": "Start",
@@ -763,7 +763,7 @@
     "notSaved": "This group has not been saved as a project yet.",
     "errors": {
       "notFound": "The project file was not found.",
-      "invalid": "That file is not a Traffic Counter project.",
+      "invalid": "That file is not a counter.bike project.",
       "newer": "This project was saved by a newer version of the app. Update the app to open it.",
       "empty": "The project has no videos.",
       "notWritable": "Could not save the project in that folder. Choose another one.",

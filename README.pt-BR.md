@@ -1,4 +1,6 @@
-# Traffic Counter
+# counter.bike
+
+**[counter.bike](https://counter.bike)**
 
 [English](README.md) · **Português (Brasil)** · [Español](README.es.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Nederlands](README.nl.md) · [Italiano](README.it.md) · [Dansk](README.da.md)
 
@@ -17,13 +19,13 @@ Feito para pesquisas de mobilidade (começou com a câmera da ciclovia de Andrad
 
 ## Baixar e instalar
 
-Baixe o instalador da última versão em **[Releases](https://github.com/rafaels-dev/contador-ciclistas-andradas/releases/latest)**:
+Baixe o instalador da última versão em **[Releases](https://github.com/rafaels-dev/counter-bike/releases/latest)**:
 
 | Sistema | Arquivo |
 |---|---|
-| Windows 10/11 (64 bits) | `TrafficCounter-Setup-<versão>.exe` |
-| macOS (chip Apple) | `TrafficCounter-<versão>-arm64.dmg` |
-| macOS (Intel) | `TrafficCounter-<versão>-x64.dmg` |
+| Windows 10/11 (64 bits) | `counter-bike-Setup-<versão>.exe` |
+| macOS (chip Apple) | `counter-bike-<versão>-arm64.dmg` |
+| macOS (Intel) | `counter-bike-<versão>-x64.dmg` |
 | Linux | `.AppImage` ou `.deb` |
 
 O instalador não pede administrador e o app se atualiza sozinho: quando há versão nova, aparece a faixa **Reiniciar e atualizar**.
@@ -120,6 +122,8 @@ Principais componentes de terceiros, todos open source:
 | [PyTorch](https://pytorch.org) | BSD-3-Clause |
 | [OpenCV](https://opencv.org) | Apache-2.0 |
 | [supervision](https://github.com/roboflow/supervision) | MIT |
+| [NumPy](https://numpy.org) | BSD-3-Clause |
+| [Pillow](https://python-pillow.github.io) | MIT-CMU |
 | [FFmpeg](https://ffmpeg.org) (via imageio-ffmpeg) | LGPL/GPL |
 | [Electron](https://www.electronjs.org), [Next.js](https://nextjs.org), [next-intl](https://next-intl.dev), [React](https://react.dev) | MIT |
 | [uv](https://github.com/astral-sh/uv) | MIT / Apache-2.0 |

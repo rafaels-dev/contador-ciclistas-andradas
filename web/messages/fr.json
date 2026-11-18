@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Détection, suggestion et vérification humaine des comptages de circulation"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Thème : Système → Sombre → Clair"
   },
   "update": {
-    "ready": "Une nouvelle version de Traffic Counter est prête.",
-    "readyVersion": "La version {version} de Traffic Counter est prête.",
+    "ready": "Une nouvelle version de counter.bike est prête.",
+    "readyVersion": "La version {version} de counter.bike est prête.",
     "busy": "{n, plural, one {Une tâche est en cours — redémarrer maintenant l’interrompt.} other {# tâches sont en cours — redémarrer maintenant les interrompt toutes.}} Si vous préférez, attendez la fin : la mise à jour s’installe à la fermeture de l’application.",
     "installerHint": "Le programme d’installation affiche sa progression et l’application se rouvre d’elle-même en une minute environ.",
     "restarting": "Redémarrage…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Étapes",
-    "title": "Bienvenue dans Traffic Counter",
+    "title": "Bienvenue dans counter.bike",
     "intro": "Vous choisissez les vidéos des caméras et tracez les lignes de comptage. L’application trouve tout ce qui franchit les lignes, une intelligence artificielle suggère ce qu’est chaque objet — et vous confirmez avant de créer la vidéo finale avec le comptage.",
     "prepare": "Avant de commencer, préparons cet ordinateur. Il y a 3 étapes et cela prend quelques minutes.",
     "start": "Commencer",
@@ -763,7 +763,7 @@
     "notSaved": "Ce groupe n'a pas encore été enregistré comme projet.",
     "errors": {
       "notFound": "Le fichier de projet est introuvable.",
-      "invalid": "Ce fichier n'est pas un projet Traffic Counter.",
+      "invalid": "Ce fichier n'est pas un projet counter.bike.",
       "newer": "Ce projet a été enregistré par une version plus récente de l'app. Mettez l'app à jour pour l'ouvrir.",
       "empty": "Le projet n'a pas de vidéos.",
       "notWritable": "Impossible d'enregistrer le projet dans ce dossier. Choisissez-en un autre.",

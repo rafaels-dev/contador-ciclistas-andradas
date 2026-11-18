@@ -1,0 +1,250 @@
+{
+  "meta": {
+    "title": "counter.bike, open source-cykeltæller til gadeoptagelser",
+    "description": "Gratis open source-software, der gør optagelser fra gadekameraer til gennemgåede tællinger af cyklister, fodgængere, biler og motorcykler."
+  },
+  "nav": {
+    "home": "counter.bike forside",
+    "skip": "Gå til indhold",
+    "route": "Sådan virker det",
+    "checked": "Nøjagtighed",
+    "contribute": "Bidrag",
+    "source": "GitHub",
+    "language": "Sprog",
+    "download": "Download",
+    "donate": "Doner",
+    "menu": "Menu"
+  },
+  "hero": {
+    "title": "Tæl hver cykel, der kører forbi.",
+    "lead": "Open source-software, der gør gadeoptagelser til gennemgåede tællinger af cyklister.",
+    "download": "Download appen",
+    "platforms": "Windows, macOS og Linux",
+    "source": "Se kildekoden"
+  },
+  "showcase": {
+    "alt": "Appens gennemgangsskærm: en liste over passager, klippet af en cyklist, der krydser tællelinjen, den foreslåede klasse og en tidslinje over hver krydsning.",
+    "caption": "Gennemgangsskærmen. Hver passage får et klip, en foreslået klasse og en plads på tidslinjen."
+  },
+  "route": {
+    "title": "Fem stop fra optagelse til tælling",
+    "lead": "Softwaren foreslår. Et menneske afgør.",
+    "tablist": "De fem stop",
+    "stops": [
+      {
+        "name": "Tilføj video",
+        "title": "Alle faste kameraer duer",
+        "text": "Åbn en fil fra din computer eller indsæt et Drive-link. Saml timerne fra én gade i en gruppe.",
+        "alt": "Appens bibliotek med grupper af gadevideoer."
+      },
+      {
+        "name": "Tegn linjer",
+        "title": "En linje, hvor folk krydser",
+        "text": "Tegn tællelinjer i en hvilken som helst vinkel, og vælg, hvad hver enkelt tæller: cykelstien, fortovet, kørebanen.",
+        "alt": "Linjeeditoren med tællelinjer tegnet over et billede af gaden."
+      },
+      {
+        "name": "Registrer",
+        "title": "Alt, der bevæger sig, er en kandidat",
+        "text": "Objektgenkendelse og bevægelsessporing finder hver passage. En billedmodel foreslår klassen, også for slørede cyklister om natten.",
+        "alt": "Billeder af én passage, beskåret omkring en cyklist, som billedmodellen modtager dem."
+      },
+      {
+        "name": "Gennemgå",
+        "title": "Accepter, ret eller tilføj i hånden",
+        "text": "Enter accepterer et forslag, og et tal ændrer det. Overset nogen? Shift og et tal tæller dem, mens videoen afspilles.",
+        "alt": "Den originale video i gennemgangsskærmen med tællelinjerne ovenpå og linjen til manuel optælling."
+      },
+      {
+        "name": "Eksporter",
+        "title": "En video og et regneark",
+        "text": "Få optagelsen med en løbende tæller brændt ind, en CSV med hver passage og en JSON-rapport.",
+        "alt": "Et billede af den færdige video med tællepanelet over gaden."
+      }
+    ]
+  },
+  "checked": {
+    "title": "Tjekket mod tællinger lavet i hånden",
+    "lead": "Registreringen er første runde. Gennemgangen lukker hullet.",
+    "caption": "To gader, en aften hver, sammenlignet med tællinger lavet i hånden",
+    "cols": {
+      "what": "Hvad",
+      "where": "Gade og tidspunkt",
+      "hand": "I hånden",
+      "software": "Før gennemgang"
+    },
+    "rows": [
+      {
+        "what": "Cyklister",
+        "where": "Andradas, kl. 17 til 18"
+      },
+      {
+        "what": "Fodgængere",
+        "where": "Andradas, kl. 17 til 18"
+      },
+      {
+        "what": "Biler",
+        "where": "Andradas, kl. 17 til 18"
+      },
+      {
+        "what": "Cyklister",
+        "where": "Cykelstien på Augusto de Lima, kl. 17 til 20"
+      }
+    ],
+    "note": "Det, detektoren overså, tilføjes i hånden. Det, den talte dobbelt, kasseres."
+  },
+  "statement": {
+    "title": "Byer bygger til det, de tæller.",
+    "text": "counter.bike arbejder på én åben optælling af cyklister, over hele verden. Den begynder med din gade."
+  },
+  "contribute": {
+    "title": "Fire måder at hjælpe på",
+    "lead": "Koden, modellerne og metoden er offentlige.",
+    "rows": [
+      {
+        "title": "Forbedr modellerne",
+        "text": "Slørede cykler i skumringen bliver stadig overset.",
+        "link": "Se åbne sager"
+      },
+      {
+        "title": "Del optagelser",
+        "text": "Mærkede klip lærer detektoren din by at kende.",
+        "link": "Del et klip"
+      },
+      {
+        "title": "Oversæt",
+        "text": "Appen taler otte sprog. Tilføj det niende.",
+        "link": "Åbn sprogfilerne"
+      },
+      {
+        "title": "Tæl i hånden",
+        "text": "Optællinger i hånden bliver facit.",
+        "link": "Hent appen"
+      }
+    ]
+  },
+  "close": {
+    "title": "Den kører på din egen computer",
+    "facts": [
+      {
+        "term": "Systemer",
+        "text": "Windows, macOS og Linux"
+      },
+      {
+        "term": "Grafikkort",
+        "text": "NVIDIA er hurtigere. En processor alene virker."
+      },
+      {
+        "term": "Billedmodel",
+        "text": "Din egen OpenRouter-nøgle, cirka 18 amerikanske cent pr. tusind passager"
+      },
+      {
+        "term": "Licens",
+        "text": "AGPL-3.0, gratis at bruge"
+      }
+    ],
+    "download": "Download gratis",
+    "alt": "Et billede af den færdige video: gaden med tællepanelet, der viser totaler pr. kategori.",
+    "caption": "Et billede af den færdige video med tælleren brændt ind."
+  },
+  "footer": {
+    "signoff": "Tæl den gade, du cykler på.",
+    "signature": "Bidragyderne bag counter.bike",
+    "source": "Kildekode",
+    "languages": "Sprog",
+    "credits": "Licens og kreditering",
+    "contributors": "Bidragydere"
+  },
+  "download": {
+    "title": "Download counter.bike",
+    "lead": "Gratis til Windows, macOS og Linux.",
+    "detected": "Download til {platform}",
+    "choose": "Vælg dit system herunder",
+    "version": "Version {version}, udgivet {date}",
+    "all": "Alle installationsfiler",
+    "cols": {
+      "system": "System",
+      "file": "Fil",
+      "size": "Størrelse"
+    },
+    "platforms": {
+      "windows": "Windows",
+      "macArm": "macOS, Apple Silicon",
+      "macIntel": "macOS, Intel",
+      "appimage": "Linux, AppImage",
+      "deb": "Linux, Debian og Ubuntu"
+    },
+    "files": {
+      "windows": "Installationsfil (.exe)",
+      "macArm": "Diskbillede (.dmg)",
+      "macIntel": "Diskbillede (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Pakke (.deb)"
+    },
+    "get": "Download",
+    "firstRun": "Ved første start installerer appen sin registreringsmotor, så hold internettet tændt.",
+    "older": "Ældre versioner"
+  },
+  "credits": {
+    "title": "Licens og kreditering",
+    "lead": "counter.bike er fri software, bygget på andres frie software.",
+    "licenceTitle": "Licensen",
+    "copyright": "Copyright © 2026 Rafael Schettino.",
+    "licenceText": "Udgivet under GNU Affero General Public License, version 3. Brug den, studer den, ændr den og del den. Hvis du udgiver en ændret version eller tilbyder den til andre over et netværk, skal du offentliggøre kildekoden under samme licens.",
+    "licenceLink": "Læs hele licensen",
+    "creditsTitle": "Bygget med",
+    "cols": {
+      "project": "Projekt",
+      "role": "Hvad det gør her",
+      "licence": "Licens"
+    },
+    "roles": [
+      "Finder personer og køretøjer i hvert billede",
+      "Kører registreringsmodellerne",
+      "Læser videoen og følger bevægelse",
+      "Følger hvert objekt fra billede til billede",
+      "Afkoder optagelser og koder den færdige video",
+      "Regner på bokse og baner",
+      "Tegner teksten på den færdige video",
+      "Gør appen til et skrivebordsprogram",
+      "Leverer brugerfladen",
+      "Tegner brugerfladen",
+      "Bærer de otte sprog",
+      "Installerer Python-motoren ved første start",
+      "Skrifttypen på dette site",
+      "Designsystemet bag dette site"
+    ],
+    "weights": "Registreringsvægtene, også modellen tunet til slørede cykler, stammer fra Ultralytics YOLO og bærer samme AGPL-3.0."
+  },
+  "donate": {
+    "title": "Hold optællingen åben",
+    "lead": "counter.bike er gratis og forbliver gratis. Donationer betaler for det, frivillige ikke kan give.",
+    "soon": "Donationskanalerne er ved at blive sat op. Indtil de åbner, er den bedste gave et mærket klip fra din gade.",
+    "give": "Doner med {channel}",
+    "uses": [
+      {
+        "title": "Grafikkort",
+        "text": "Timers regnekraft til at træne modellerne på nye gader."
+      },
+      {
+        "title": "Billedmodel",
+        "text": "Hver kalibrering sender tusindvis af passager til en betalt model."
+      },
+      {
+        "title": "Delte optagelser",
+        "text": "Lagerplads til de klip, byer og frivillige udgiver."
+      }
+    ],
+    "other": "Andre måder at hjælpe på"
+  },
+  "contributors": {
+    "title": "Bidragydere",
+    "lead": "De mennesker og grupper, der bygger counter.bike og tager det med ud på gaden.",
+    "roles": {
+      "programmer": "Programmør"
+    },
+    "join": "Har du talt en gade, rettet en fejl eller oversat en skærm? Dit navn hører til her.",
+    "joinLink": "Se, hvordan du kan bidrage",
+    "portrait": "Portræt af {name}"
+  }
+}

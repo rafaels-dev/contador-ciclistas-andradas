@@ -27,7 +27,7 @@ import cv2
 
 from counter import TrafficCounter, annotate_frame
 
-WINDOW = "Traffic Counter"
+WINDOW = "counter.bike"
 
 
 def has_display() -> bool:

@@ -1,10 +1,13 @@
-# Traffic Counter installers (npm run dist:win | dist:mac | dist:linux).
+# counter.bike installers (npm run dist:win | dist:mac | dist:linux).
 # Like Spotify: installs per user, without asking for administrator, opens at
 # the end and updates itself from the GitHub Releases (electron-updater).
 # appId and the package name stay as in 0.0.7 (contador-trafego): changing
 # them would make the update install a second app instead of replacing this one.
+# The product is "counter.bike" after 0.0.11 (was "Traffic Counter"). The data
+# folders keep the old name (desktop/data-folder.cjs, web/src/lib/storage.ts):
+# nothing has to move on the user's disk.
 appId: br.com.contadortrafego.app
-productName: Traffic Counter
+productName: counter.bike
 copyright: Copyright © 2026 Rafael Schettino
 directories:
   output: dist
@@ -30,13 +33,13 @@ asar: true
 
 win:
   target: nsis
-  artifactName: TrafficCounter-Setup-${version}.${ext}
+  artifactName: counter-bike-Setup-${version}.${ext}
 nsis:
   oneClick: true
   perMachine: false
   runAfterFinish: true
   createDesktopShortcut: always
-  shortcutName: Traffic Counter
+  shortcutName: counter.bike
   deleteAppDataOnUninstall: false
 
 mac:
@@ -47,17 +50,17 @@ mac:
   # ad-hoc signature: without an Apple certificate, an M-chip Mac requires at
   # least this to open (the user still confirms in Settings → Privacy)
   identity: "-"
-  artifactName: TrafficCounter-${version}-${arch}.${ext}
+  artifactName: counter-bike-${version}-${arch}.${ext}
 
 linux:
   target: [AppImage, deb]
   category: AudioVideo
   syncDesktopName: true
   maintainer: Rafael Schettino <rcschettino@gmail.com>
-  artifactName: TrafficCounter-${version}-${arch}.${ext}
+  artifactName: counter-bike-${version}-${arch}.${ext}
 
 publish:
   provider: github
   owner: rafaels-dev
-  repo: contador-ciclistas-andradas
+  repo: counter-bike
   releaseType: release

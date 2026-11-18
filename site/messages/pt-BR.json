@@ -1,0 +1,250 @@
+{
+  "meta": {
+    "title": "counter.bike, contador de bicicletas de código aberto",
+    "description": "Software livre e gratuito que transforma imagens de câmeras de rua em contagens revisadas de ciclistas, pedestres, carros e motos."
+  },
+  "nav": {
+    "home": "Início do counter.bike",
+    "skip": "Pular para o conteúdo",
+    "route": "Como funciona",
+    "checked": "Precisão",
+    "contribute": "Contribuir",
+    "source": "GitHub",
+    "language": "Idioma",
+    "download": "Baixar",
+    "donate": "Doar",
+    "menu": "Menu"
+  },
+  "hero": {
+    "title": "Conte cada bicicleta que passa.",
+    "lead": "Software de código aberto que transforma imagens de câmeras de rua em contagens revisadas de ciclistas.",
+    "download": "Baixar o app",
+    "platforms": "Windows, macOS e Linux",
+    "source": "Ver o código"
+  },
+  "showcase": {
+    "alt": "A tela de revisão do app: uma lista de passagens, o clipe de um ciclista cruzando a linha de contagem, a classe sugerida e uma linha do tempo de cada travessia.",
+    "caption": "A tela de revisão. Cada passagem tem um clipe, uma classe sugerida e um lugar na linha do tempo."
+  },
+  "route": {
+    "title": "Cinco etapas do vídeo à contagem",
+    "lead": "O software propõe. Uma pessoa decide.",
+    "tablist": "As cinco etapas",
+    "stops": [
+      {
+        "name": "Adicionar vídeo",
+        "title": "Qualquer câmera fixa serve",
+        "text": "Abra um arquivo do seu computador ou cole um link do Drive. Agrupe as horas de uma mesma rua.",
+        "alt": "A biblioteca do app com grupos de vídeos de rua."
+      },
+      {
+        "name": "Traçar linhas",
+        "title": "Uma linha onde as pessoas cruzam",
+        "text": "Trace linhas de contagem em qualquer ângulo e escolha o que cada uma conta: a ciclovia, a calçada, a pista.",
+        "alt": "O editor de linhas com linhas de contagem sobre um quadro da rua."
+      },
+      {
+        "name": "Detectar",
+        "title": "Tudo que se move é candidato",
+        "text": "Detecção de objetos e rastreamento de movimento encontram cada passagem. Um modelo de visão sugere a classe, até de quem passa borrado à noite.",
+        "alt": "Quadros de uma passagem, recortados em torno de um ciclista, como o modelo de visão os recebe."
+      },
+      {
+        "name": "Revisar",
+        "title": "Aceite, corrija ou adicione à mão",
+        "text": "Enter aceita a sugestão e uma tecla numérica a troca. Alguém escapou? Shift e um número contam a pessoa enquanto o vídeo roda.",
+        "alt": "O vídeo original na tela de revisão, com as linhas de contagem por cima e a barra de contagem manual."
+      },
+      {
+        "name": "Exportar",
+        "title": "Um vídeo e uma planilha",
+        "text": "Receba o vídeo com um contador gravado na imagem, um CSV de cada passagem e um relatório JSON.",
+        "alt": "Um quadro do vídeo final com o painel do contador sobre a rua."
+      }
+    ]
+  },
+  "checked": {
+    "title": "Conferido com contagens feitas à mão",
+    "lead": "A detecção é a primeira passada. A revisão fecha a diferença.",
+    "caption": "Duas ruas, uma noite cada, comparadas com contagens feitas à mão",
+    "cols": {
+      "what": "Categoria",
+      "where": "Rua e horário",
+      "hand": "À mão",
+      "software": "Antes da revisão"
+    },
+    "rows": [
+      {
+        "what": "Ciclistas",
+        "where": "Andradas, 17h às 18h"
+      },
+      {
+        "what": "Pedestres",
+        "where": "Andradas, 17h às 18h"
+      },
+      {
+        "what": "Carros",
+        "where": "Andradas, 17h às 18h"
+      },
+      {
+        "what": "Ciclistas",
+        "where": "Ciclovia da Augusto de Lima, 17h às 20h"
+      }
+    ],
+    "note": "O que o detector perdeu é adicionado à mão. O que ele contou em dobro é descartado."
+  },
+  "statement": {
+    "title": "A cidade constrói para quem ela conta.",
+    "text": "O counter.bike trabalha por uma contagem aberta de ciclistas, no mundo todo. Ela começa pela sua rua."
+  },
+  "contribute": {
+    "title": "Quatro jeitos de ajudar",
+    "lead": "O código, os modelos e o método são públicos.",
+    "rows": [
+      {
+        "title": "Melhore os modelos",
+        "text": "Bicicletas borradas ao entardecer ainda escapam.",
+        "link": "Ver issues abertas"
+      },
+      {
+        "title": "Publique imagens",
+        "text": "Clipes rotulados ensinam o detector a conhecer sua cidade.",
+        "link": "Enviar um trecho"
+      },
+      {
+        "title": "Traduza",
+        "text": "O app fala oito idiomas. Adicione o nono.",
+        "link": "Ver os idiomas"
+      },
+      {
+        "title": "Conte à mão",
+        "text": "Contagens feitas à mão viram referência.",
+        "link": "Baixar o app"
+      }
+    ]
+  },
+  "close": {
+    "title": "Roda no seu próprio computador",
+    "facts": [
+      {
+        "term": "Sistemas",
+        "text": "Windows, macOS e Linux"
+      },
+      {
+        "term": "Placa de vídeo",
+        "text": "Com NVIDIA fica mais rápido. Só o processador também funciona."
+      },
+      {
+        "term": "Modelo de visão",
+        "text": "Sua própria chave do OpenRouter, cerca de 18 centavos de dólar por mil passagens"
+      },
+      {
+        "term": "Licença",
+        "text": "AGPL-3.0, livre para usar"
+      }
+    ],
+    "download": "Baixar grátis",
+    "alt": "Um quadro do vídeo final: a rua com o painel do contador mostrando os totais por categoria.",
+    "caption": "Um quadro do vídeo final, com o contador gravado na imagem."
+  },
+  "footer": {
+    "signoff": "Conte a rua em que você pedala.",
+    "signature": "Quem contribui com o counter.bike",
+    "source": "Código-fonte",
+    "languages": "Idiomas",
+    "credits": "Licença e créditos",
+    "contributors": "Contribuidores"
+  },
+  "download": {
+    "title": "Baixar o counter.bike",
+    "lead": "Grátis para Windows, macOS e Linux.",
+    "detected": "Baixar para {platform}",
+    "choose": "Escolha o seu sistema abaixo",
+    "version": "Versão {version}, lançada em {date}",
+    "all": "Todos os instaladores",
+    "cols": {
+      "system": "Sistema",
+      "file": "Arquivo",
+      "size": "Tamanho"
+    },
+    "platforms": {
+      "windows": "Windows",
+      "macArm": "macOS, Apple Silicon",
+      "macIntel": "macOS, Intel",
+      "appimage": "Linux, AppImage",
+      "deb": "Linux, Debian e Ubuntu"
+    },
+    "files": {
+      "windows": "Instalador (.exe)",
+      "macArm": "Imagem de disco (.dmg)",
+      "macIntel": "Imagem de disco (.dmg)",
+      "appimage": "AppImage",
+      "deb": "Pacote (.deb)"
+    },
+    "get": "Baixar",
+    "firstRun": "Na primeira execução o app instala o motor de detecção, então mantenha a internet ligada.",
+    "older": "Versões anteriores"
+  },
+  "credits": {
+    "title": "Licença e créditos",
+    "lead": "O counter.bike é software livre, feito sobre o software livre de outras pessoas.",
+    "licenceTitle": "A licença",
+    "copyright": "Copyright © 2026 Rafael Schettino.",
+    "licenceText": "Distribuído sob a GNU Affero General Public License, versão 3. Use, estude, altere e compartilhe. Se distribuir uma versão alterada, ou oferecê-la a outras pessoas por uma rede, publique o código-fonte sob a mesma licença.",
+    "licenceLink": "Ler a licença completa",
+    "creditsTitle": "Feito com",
+    "cols": {
+      "project": "Projeto",
+      "role": "O que faz aqui",
+      "licence": "Licença"
+    },
+    "roles": [
+      "Encontra pessoas e veículos em cada quadro",
+      "Roda os modelos de detecção",
+      "Lê o vídeo e acompanha o movimento",
+      "Segue cada objeto de quadro em quadro",
+      "Decodifica o vídeo e codifica o final",
+      "Faz a conta com caixas e trajetos",
+      "Desenha o texto no vídeo final",
+      "Transforma o app em programa de desktop",
+      "Serve a interface",
+      "Desenha a interface",
+      "Traz os oito idiomas",
+      "Instala o motor Python na primeira execução",
+      "A fonte tipográfica deste site",
+      "O sistema de design deste site"
+    ],
+    "weights": "Os pesos de detecção, incluindo o modelo ajustado para bicicletas borradas, derivam do Ultralytics YOLO e levam a mesma AGPL-3.0."
+  },
+  "donate": {
+    "title": "Mantenha a contagem aberta",
+    "lead": "O counter.bike é gratuito e continua gratuito. As doações pagam o que voluntários não conseguem dar.",
+    "soon": "Os canais de doação estão sendo preparados. Até abrirem, o melhor presente é um trecho rotulado da sua rua.",
+    "give": "Doar com {channel}",
+    "uses": [
+      {
+        "title": "Placas de vídeo",
+        "text": "Horas de computação para treinar os modelos em novas ruas."
+      },
+      {
+        "title": "Modelo de visão",
+        "text": "Cada calibração envia milhares de passagens a um modelo pago."
+      },
+      {
+        "title": "Imagens compartilhadas",
+        "text": "Armazenamento para os trechos que cidades e voluntários publicam."
+      }
+    ],
+    "other": "Outras formas de ajudar"
+  },
+  "contributors": {
+    "title": "Contribuidores",
+    "lead": "As pessoas e os grupos que constroem o counter.bike e o levam para a rua.",
+    "roles": {
+      "programmer": "Programador"
+    },
+    "join": "Contou uma rua, corrigiu um erro ou traduziu uma tela? Seu nome entra aqui.",
+    "joinLink": "Veja como contribuir",
+    "portrait": "Retrato de {name}"
+  }
+}

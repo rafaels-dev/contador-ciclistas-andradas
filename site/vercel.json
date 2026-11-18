@@ -1,0 +1,14 @@
+{
+  "redirects": [
+    {
+      "source": "/pt-br/",
+      "destination": "/",
+      "permanent": false
+    },
+    {
+      "source": "/pt-br/:page(download|credits|donate)/",
+      "destination": "/:page/",
+      "permanent": false
+    }
+  ]
+}

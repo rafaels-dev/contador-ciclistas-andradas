@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Traffic Counter",
+    "name": "counter.bike",
     "description": "Detecção, sugestão e revisão humana de contagens de tráfego"
   },
   "categories": {
@@ -262,8 +262,8 @@
     "tooltip": "Tema: Sistema → Escuro → Claro"
   },
   "update": {
-    "ready": "Uma versão nova do Traffic Counter está pronta.",
-    "readyVersion": "A versão {version} do Traffic Counter está pronta.",
+    "ready": "Uma versão nova do counter.bike está pronta.",
+    "readyVersion": "A versão {version} do counter.bike está pronta.",
     "busy": "{n, plural, one {Há uma tarefa rodando — reiniciar agora interrompe ela.} other {Há # tarefas rodando — reiniciar agora interrompe todas.}} Se preferir, espere terminar: ao fechar o app, a atualização é instalada.",
     "installerHint": "O instalador mostra o progresso e o app abre de novo sozinho em cerca de um minuto.",
     "restarting": "Reiniciando…",
@@ -516,7 +516,7 @@
   },
   "welcome": {
     "stepsLabel": "Passos",
-    "title": "Bem-vindo ao Traffic Counter",
+    "title": "Bem-vindo ao counter.bike",
     "intro": "Você escolhe os vídeos das câmeras e desenha as linhas de contagem. O app encontra tudo o que passa pelas linhas, uma inteligência artificial sugere o que é cada um — e você confirma antes de gerar o vídeo final com a contagem.",
     "prepare": "Antes de começar, vamos preparar este computador. São 3 passos e leva alguns minutos.",
     "start": "Começar",
@@ -763,7 +763,7 @@
     "notSaved": "Este grupo ainda não foi salvo como projeto.",
     "errors": {
       "notFound": "O arquivo de projeto não foi encontrado.",
-      "invalid": "Esse arquivo não é um projeto do Traffic Counter.",
+      "invalid": "Esse arquivo não é um projeto do counter.bike.",
       "newer": "Este projeto foi salvo por uma versão mais nova do app. Atualize o app para abrir.",
       "empty": "O projeto não tem vídeos.",
       "notWritable": "Não foi possível gravar o projeto nessa pasta. Escolha outra.",
