@@ -1,12 +1,12 @@
 {
   "redirects": [
     {
-      "source": "/pt-br",
+      "source": "/pt-br/",
       "destination": "/",
       "permanent": false
     },
     {
-      "source": "/pt-br/:page(download|credits|donate)",
+      "source": "/pt-br/:page(download|credits|donate)/",
       "destination": "/:page/",
       "permanent": false
     }
