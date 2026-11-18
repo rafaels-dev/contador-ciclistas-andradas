@@ -179,6 +179,7 @@ main { display: block; }
 .person__face { display: grid; place-items: center; width: 100%; height: auto; aspect-ratio: 1 / 1; grid-row: 1 / span 2; border: var(--rule-bar) solid var(--color-ink); object-fit: cover; font-size: var(--text-display); font-weight: 800; font-stretch: 82%; letter-spacing: var(--tracking-display); }
 .person h2 { align-self: end; font-size: var(--text-section); line-height: 1; }
 .person p { align-self: start; }
+.person p a:hover { color: var(--color-accent); }
 .person h2 a { text-decoration: none; }
 .person h2 a:hover { color: var(--color-accent); }
 .foot__signature a:hover { color: var(--color-accent); }

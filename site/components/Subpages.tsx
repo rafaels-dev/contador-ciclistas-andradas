@@ -51,14 +51,17 @@ export function ContributorsPage({ locale, t }: Props) {
               <li className="person" key={person.name}>
                 {person.image ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img className="person__face" src={person.image} width={413} height={413} alt={t.contributors.portrait.replace("{name}", person.name)} />
+                  <img className="person__face" src={person.image} width={400} height={400} alt={t.contributors.portrait.replace("{name}", person.name)} />
                 ) : (
                   <span className="person__face on-ink" aria-hidden="true">
                     {person.name.split(" ").map((word) => word[0]).join("")}
                   </span>
                 )}
-                <h2><a href={person.url}>{person.name}</a></h2>
-                <p>{[person.role && t.contributors.roles[person.role], person.org].filter(Boolean).join(", ")}</p>
+                <h2>{person.url ? <a href={person.url}>{person.name}</a> : person.name}</h2>
+                <p>
+                  {person.role && `${t.contributors.roles[person.role]}, `}
+                  {person.orgUrl ? <a href={person.orgUrl}>{person.org}</a> : person.org}
+                </p>
               </li>
             ))}
           </ul>
